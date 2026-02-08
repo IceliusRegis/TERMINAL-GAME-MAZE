@@ -13,6 +13,7 @@ import com.sam.TERMINAL.entities.EntityFactory;
 import com.sam.TERMINAL.systems.CameraFollowSystem;
 import com.sam.TERMINAL.systems.MovementSystem;
 import com.sam.TERMINAL.systems.RenderSystem;
+import com.sam.TERMINAL.systems.SaveSystem;
 
 /**
  * Main - The entry point and manager for TERMINAL.
@@ -52,6 +53,7 @@ public class Main extends ApplicationAdapter {
         // === 3. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
         engine.addSystem(new MovementSystem());
         engine.addSystem(new CameraFollowSystem(camera));
+        engine.addSystem(new SaveSystem());
         engine.addSystem(new RenderSystem(batch));
 
         // === 4. LOAD ASSETS ===

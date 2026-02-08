@@ -4,10 +4,7 @@ import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.sam.TERMINAL.components.CollisionComponent;
-import com.sam.TERMINAL.components.PlayerComponent;
-import com.sam.TERMINAL.components.SpriteComponent;
-import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.*;
 
 /**
  * EntityFactory - Blueprint for creating game entities.
@@ -45,6 +42,15 @@ public class EntityFactory {
 
         // Add player marker so systems can identify this entity
         player.add(engine.createComponent(PlayerComponent.class));
+
+
+        //Persistence Data this is where player position is saved
+        PersistenceComponent persistence = engine.createComponent(PersistenceComponent.class);
+        persistence.saveId = "PLAYER-POGI"; //UID of the player
+        player.add(persistence);
+
+
+
 
         engine.addEntity(player);
     }
