@@ -1,9 +1,12 @@
 package com.sam.TERMINAL;
 
+import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -14,6 +17,9 @@ import com.sam.TERMINAL.systems.CameraFollowSystem;
 import com.sam.TERMINAL.systems.MovementSystem;
 import com.sam.TERMINAL.systems.RenderSystem;
 import com.sam.TERMINAL.systems.SaveSystem;
+import com.sam.TERMINAL.tiles.TileRegistry;
+import com.sam.TERMINAL.components.TileWorldComponent;
+import com.sam.TERMINAL.systems.TileRenderSystem;
 
 /**
  * Main - The entry point and manager for TERMINAL.
@@ -39,7 +45,8 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void create() {
-        // === 1. INITIALIZE RENDERING ===
+        // === 1. INITIALIZE RENDERING AND ECS ===
+        engine = new PooledEngine();
         batch = new SpriteBatch();
 
         // Set up camera (800x600 viewport)
@@ -47,16 +54,67 @@ public class Main extends ApplicationAdapter {
         camera.setToOrtho(false, 800, 600);
         camera.update();
 
-        // === 2. INITIALIZE ECS ENGINE ===
-        engine = new PooledEngine();
+        // Load Tiles
 
-        // === 3. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
+        //Creates walls
+        Texture wallTexture = new Texture(Gdx.files.internal("BackRoomsWall.png"));
+        TextureRegion wallRegion = new TextureRegion(wallTexture);
+
+        //Temp Floor
+        Texture floorTexture = new Texture(Gdx.files.internal("Floor.png"));
+        TextureRegion floorRegion = new TextureRegion(floorTexture);
+
+        //Registers the Walls
+        TileRegistry.registerTile(1, true, wallRegion);
+        TileRegistry.registerTile(2, false, floorRegion);
+
+        //Creates the actual Game world
+        Entity worldEntity = engine.createEntity();
+        TileWorldComponent tileCom = new TileWorldComponent();
+        tileCom.init(50,50);
+
+        // Fill the floor
+        for(int x=0; x<50; x++) {
+            for(int y=0; y<50; y++) {
+                tileCom.map[x][y] = 2;
+                if (Math.random() <0.2) tileCom.map[x][y] = 1;
+            }
+        }
+
+        worldEntity.add(tileCom);
+        engine.addEntity(worldEntity);
+
+        // Spawning Mechanics
+        int spawnTileX = 0;
+        int spawnTileY = 0;
+        boolean safeSpotFound = false;
+
+        while (!safeSpotFound) {
+            //Pick Random Coordinates
+            spawnTileX = (int) (Math.random() * 50);
+            spawnTileY = (int) (Math.random() * 50);
+
+            //Checks if the tile found is a floor
+            if (tileCom.map[spawnTileX][spawnTileY] == 2) {
+                safeSpotFound = true;
+            }
+        }
+
+        //Convert found coordinates into Pixels
+        //(Example: Tile 5 * 32 pixels = Pixel 160)
+        float startPixelX = spawnTileX * 32f;
+        float startPixelY = spawnTileY * 32f;
+
+
+
+        // === 2. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
         engine.addSystem(new MovementSystem());
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem());
+        engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch));
 
-        // === 4. LOAD ASSETS ===
+        // === 3. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
         try {
             playerSpriteSheet = new Texture("Soldier-walk.png");
@@ -72,20 +130,9 @@ public class Main extends ApplicationAdapter {
         // Create walking animation from first row (0.1 seconds per frame)
         Animation<TextureRegion> walkAnimation = new Animation<>(0.1f, frames[0]);
 
-        Texture wallTileset = new Texture("Tilesetv3.png");
-        TextureRegion[][] wallTiles = TextureRegion.split(wallTileset, 32, 32);
 
-        // Get specific wall tile (e.g., first tile in sheet)
-        TextureRegion wallSprite = wallTiles[9][5];
-
-
-        // === 5. CREATE INITIAL ENTITIES ===
-        EntityFactory.createPlayer(engine, 12f, 32f, walkAnimation);
-
-        // Create test walls to demonstrate collision
-        EntityFactory.createWall(engine, 100, 200, wallSprite);
-        EntityFactory.createWall(engine, 300, 200, wallSprite); // Adjacent wall
-        EntityFactory.createWall(engine, 500, 200, wallSprite); // Another adjacent wall
+        // === 4. CREATE INITIAL ENTITIES ===
+        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation);
 
         Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
     }
@@ -93,7 +140,7 @@ public class Main extends ApplicationAdapter {
     @Override
     public void render() {
         // Clear screen to black
-        ScreenUtils.clear(0.1f, 0.1f, 0.1f, 1);
+        ScreenUtils.clear(0f, 0f, 0f, 1);
 
         // Update camera
         camera.update();

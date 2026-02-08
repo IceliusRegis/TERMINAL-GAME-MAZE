@@ -20,12 +20,12 @@ public class EntityFactory {
      * @param engine The Ashley engine to add the entity to
      * @param walkAnimation The player's walking animation
      */
-    public static void createPlayer(PooledEngine engine, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation) {
+    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
         TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(100, 100); // Starting position
+        transform.pos.set(x, y); // Starting position
         transform.width = bodyWidth;
         transform.height = bodyHeight;
         transform.updateBounds();
@@ -37,8 +37,10 @@ public class EntityFactory {
         sprite.looping = true;
         player.add(sprite);
 
-        sprite.drawWidth = 150f;  // The actual size of the sprite frame
-        sprite.drawHeight = 150f;
+
+        // The actual size of the sprite frame HITBOX
+        sprite.drawWidth = 130f;
+        sprite.drawHeight = 130f;
 
         // Add player marker so systems can identify this entity
         player.add(engine.createComponent(PlayerComponent.class));

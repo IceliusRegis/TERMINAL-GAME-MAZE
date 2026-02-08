@@ -36,18 +36,32 @@ public class CameraFollowSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
-        TransformComponent position = positionMapper.get(entity);
+        TransformComponent transform = positionMapper.get(entity);
 
-        // Option 1: INSTANT camera follow (no smoothing)
-        camera.position.x = position.pos.x;
-        camera.position.y = position.pos.y;
-
-        // Option 2: SMOOTH camera follow (uncomment to use)
+        //SMOOTH camera follow
         // This creates a cinematic "lag" effect
-        /*
-        camera.position.x += (position.x - camera.position.x) * LERP_FACTOR;
-        camera.position.y += (position.y - camera.position.y) * LERP_FACTOR;
-        */
+        camera.position.x += (transform.pos.x - camera.position.x) * 0.1f;
+        camera.position.y += (transform.pos.y - camera.position.y) * 0.1f;
+
+        //Defines Map Size in Pixels (Remind me to make map size dynamic in the future)
+        float mapWidth = 50 * 32f;
+        float mapHeight = 50 * 32f;
+
+        //Calculate the "Half-Sizes" of the camera view
+        // The camera position is its CENTER, not its corner.
+        float halfW = camera.viewportWidth / 2f;
+        float halfH = camera.viewportHeight / 2f;
+
+        //The math is basically it doesn't let the center get too close to the edge
+
+        //X-Axis
+        if (camera.position.x < halfW) camera.position.x = halfW; // If Camera is near the left side stop the cam mid way through
+        if (camera.position.x > mapWidth - halfW) camera.position.x = mapWidth - halfW; // If Camera is near at the right to the same
+
+        //Y-Axis
+        if (camera.position.y < halfH) camera.position.y = halfH;
+        if (camera.position.y > mapHeight - halfH) camera.position.y = mapHeight - halfH;
+
 
         // Update camera matrices
         camera.update();

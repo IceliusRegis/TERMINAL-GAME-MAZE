@@ -1,14 +1,13 @@
 package com.sam.TERMINAL.systems;
 
-import com.badlogic.ashley.core.Component;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import persistence.GameData;
-import persistence.SaveManager;
+import com.sam.TERMINAL.persistence.GameData;
+import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 
