@@ -110,6 +110,21 @@ public class MovementSystem extends IteratingSystem {
         private boolean checkTileCollision (TransformComponent transform, TileWorldComponent world) {
             if (world == null) return false;
 
+            //World Border Check
+
+            // A. Calculate Maps length in Pixels
+            float mapPixelWidth = world.mapWidth * world.tileWidth;
+            float mapPixelHeight = world.mapHeight * world.tileHeight;
+
+            // B. Checks if near the Left & Bottom Coordinates border
+            if (transform.bounds.x < 0) return true;
+            if (transform.bounds.y < 0) return true;
+
+            // C. Checks is player is near at the Right and Top Border Coords
+            if (transform.bounds.x + transform.bounds.width > mapPixelWidth) return true;
+            if (transform.bounds.y + transform.bounds.height > mapPixelHeight) return true;
+
+
             // 1.) Get the 4 corners of the player's hitbox in Grid Coordinates (Pixels to Coordinates)
             int startX = (int) (transform.bounds.x / world.tileWidth);
             int endX = (int) ((transform.bounds.x + transform.bounds.width) / world.tileWidth);
