@@ -23,14 +23,14 @@ public class EntityFactory {
      * @param engine The Ashley engine to add the entity to
      * @param walkAnimation The player's walking animation
      */
-    public static void createPlayer(PooledEngine engine, Animation<TextureRegion> walkAnimation) {
+    public static void createPlayer(PooledEngine engine, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
         TransformComponent transform = engine.createComponent(TransformComponent.class);
         transform.pos.set(100, 100); // Starting position
-        transform.width = 64;
-        transform.height = 64;
+        transform.width = bodyWidth;
+        transform.height = bodyHeight;
         transform.updateBounds();
         player.add(transform);
 
@@ -39,6 +39,9 @@ public class EntityFactory {
         sprite.walkAnimation = walkAnimation;
         sprite.looping = true;
         player.add(sprite);
+
+        sprite.drawWidth = 150f;  // The actual size of the sprite frame
+        sprite.drawHeight = 150f;
 
         // Add player marker so systems can identify this entity
         player.add(engine.createComponent(PlayerComponent.class));
@@ -64,19 +67,12 @@ public class EntityFactory {
         transform.updateBounds();
         wall.add(transform);
 
-        SpriteComponent s = engine.createComponent(SpriteComponent.class);
-        // Since walls don't walk, we create a "Still" animation with just 1 frame
-        s.walkAnimation = new Animation<>(1f, wallSprite);
-        s.looping = false;
-        wall.add(s);
 
         // Add sprite component with static texture
         SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
         sprite.staticSprite = wallSprite;
         sprite.isStatic = true;  // Mark as non-animated
         wall.add(sprite);
-
-        wall.add(new CollisionComponent());
 
         // Add collision marker so player can bump into it
         wall.add(engine.createComponent(CollisionComponent.class));

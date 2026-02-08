@@ -25,4 +25,9 @@ public class SpriteComponent implements Component {
 
     // Set this to true if using staticSprite instead of animation
     public boolean isStatic = false;
+
+    public static boolean facingRight = true; // Default to facing right
+
+    public float drawWidth;
+    public float drawHeight;
 }

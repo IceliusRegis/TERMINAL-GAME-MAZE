@@ -57,7 +57,7 @@ public class Main extends ApplicationAdapter {
         // === 4. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
         try {
-            playerSpriteSheet = new Texture("mc_walk.png");
+            playerSpriteSheet = new Texture("Soldier-walk.png");
         } catch (Exception e) {
             Gdx.app.error("TERMINAL", "Could not load mc_walk.png - using placeholder");
             // Create a simple 32x32 white square as fallback
@@ -65,7 +65,7 @@ public class Main extends ApplicationAdapter {
         }
 
         // Split sprite sheet into frames (assumes 32x32 tiles)
-        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 32, 32);
+        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 100, 100);
 
         // Create walking animation from first row (0.1 seconds per frame)
         Animation<TextureRegion> walkAnimation = new Animation<>(0.1f, frames[0]);
@@ -78,7 +78,7 @@ public class Main extends ApplicationAdapter {
 
 
         // === 5. CREATE INITIAL ENTITIES ===
-        EntityFactory.createPlayer(engine, walkAnimation);
+        EntityFactory.createPlayer(engine, 12f, 32f, walkAnimation);
 
         // Create test walls to demonstrate collision
         EntityFactory.createWall(engine, 100, 200, wallSprite);

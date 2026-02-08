@@ -8,6 +8,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.sam.TERMINAL.components.CollisionComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 
 /**
@@ -50,9 +51,11 @@ public class MovementSystem extends IteratingSystem {
         }
         if (Gdx.input.isKeyPressed(Input.Keys.A)) {
             transform.pos.x -= speed;
+            SpriteComponent.facingRight = false;
         }
         if (Gdx.input.isKeyPressed(Input.Keys.D)) {
             transform.pos.x += speed;
+            SpriteComponent.facingRight = true;
         }
 
         // Update collision bounds to new position
@@ -70,7 +73,10 @@ public class MovementSystem extends IteratingSystem {
 
 
             }
-            System.out.println("MC Position: X=" + transform.pos.x + ", Y=" + transform.pos.y);
+            //System.out.println("MC Position: X=" + transform.pos.x + ", Y=" + transform.pos.y);
+
+
+
         }
     }
 }

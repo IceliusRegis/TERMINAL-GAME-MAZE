@@ -40,6 +40,18 @@ public class RenderSystem extends IteratingSystem {
 
         TextureRegion currentFrame;
 
+        // === 1. GET SIZES ===
+        // If drawWidth is 0 (forgot to set it), fallback to transform width
+        float width = (sprite.drawWidth > 0) ? sprite.drawWidth : transform.width;
+        float height = (sprite.drawHeight > 0) ? sprite.drawHeight : transform.height;
+
+        // === 2. CENTER THE IMAGE ===
+        // We calculate where to draw so the image is centered over the hitbox
+        // Logic: (HitboxX) - (ExtraWidth / 2)
+        float drawX = transform.pos.x - (width - transform.width) / 2;
+        float drawY = transform.pos.y - (height - transform.height) / 2;
+
+
         if (sprite.isStatic) {
             // Use static sprite for walls/tiles
             currentFrame = sprite.staticSprite;
@@ -50,15 +62,26 @@ public class RenderSystem extends IteratingSystem {
                 sprite.stateTime,
                 sprite.looping
             );
+
+            // Inside RenderSystem processEntity
+
+            // Logic: "If I want to face LEFT, but the sprite is flipped RIGHT -> Flip it"
+            if (!sprite.facingRight && !currentFrame.isFlipX()) {
+                currentFrame.flip(true, false);
+            }
+            // Logic: "If I want to face RIGHT, but the sprite is flipped LEFT -> Flip it"
+            else if (sprite.facingRight && currentFrame.isFlipX()) {
+                currentFrame.flip(true, false);
+            }
         }
 
         // Draw sprite at entity's position
         batch.draw(
             currentFrame,
-            transform.pos.x,
-            transform.pos.y,
-            transform.width,
-            transform.height
+            drawX,
+            drawY,
+            width,
+            height
         );
     }
 }
