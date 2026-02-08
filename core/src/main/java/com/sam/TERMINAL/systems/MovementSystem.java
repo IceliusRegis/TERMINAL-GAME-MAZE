@@ -94,6 +94,24 @@ public class MovementSystem extends IteratingSystem {
             transform.updateBounds();
         }
 
+        SpriteComponent sprite = entity.getComponent(SpriteComponent.class);
+
+        if (sprite != null) {
+
+            boolean isMoving = (xMove !=0 || yMove !=0);
+
+            if (isMoving) {
+                sprite.currentAnimation = sprite.walkAnimation;
+
+                if (xMove < 0) sprite.facingRight = false;
+                else if (xMove > 0) sprite.facingRight = true;
+
+                } else {
+                sprite.currentAnimation = sprite.idleAnimation;
+            }
+
+            }
+
         }
 
         private boolean checkEntityCollison(Entity player, TransformComponent playerTransfrom) {

@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.entities.EntityFactory;
 import com.sam.TERMINAL.systems.CameraFollowSystem;
 import com.sam.TERMINAL.systems.MovementSystem;
@@ -82,6 +83,10 @@ public class Main extends ApplicationAdapter {
         }
 
         worldEntity.add(tileCom);
+
+        //Saves Current Map
+        worldEntity.add(new PersistenceComponent("MAP","ZA_WARDO"));
+
         engine.addEntity(worldEntity);
 
         // Spawning Mechanics
@@ -116,6 +121,8 @@ public class Main extends ApplicationAdapter {
 
         // === 3. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
+
+        //Walking Animation
         try {
             playerSpriteSheet = new Texture("Soldier-walk.png");
         } catch (Exception e) {
@@ -123,16 +130,21 @@ public class Main extends ApplicationAdapter {
             // Create a simple 32x32 white square as fallback
             playerSpriteSheet = new Texture(Gdx.files.internal("badlogic.jpg")); // LibGDX default
         }
-
         // Split sprite sheet into frames (assumes 32x32 tiles)
         TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 100, 100);
-
         // Create walking animation from first row (0.1 seconds per frame)
         Animation<TextureRegion> walkAnimation = new Animation<>(0.1f, frames[0]);
 
+        //Idle Animation
+        Texture idleSheet = new Texture("Soldier-Idle.png");
+        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
+
+        // 0.15f makes the idle "breathing" slightly slower than walking
+        Animation<TextureRegion> idleAnimation = new Animation<>(0.15f, idleFrames[0]);
+
 
         // === 4. CREATE INITIAL ENTITIES ===
-        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation);
+        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
 
         Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
     }

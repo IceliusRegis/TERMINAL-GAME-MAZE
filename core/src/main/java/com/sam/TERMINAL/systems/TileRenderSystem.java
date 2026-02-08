@@ -46,6 +46,9 @@ public class TileRenderSystem extends IteratingSystem {
 
         //Gets the map Data
         TileWorldComponent world = worldMapper.get(entity);
+        int[][] currentMap = world.map;
+
+        if (currentMap == null) return;
 
         //1.) It finds the left side of the camera to start drawing there
         float viewLeft = camera.position.x - (camera.viewportWidth / 2);

@@ -38,7 +38,31 @@ public class RenderSystem extends IteratingSystem {
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
 
+        //Advance timer for animation to play
+        if (!sprite.isStatic) {
+            sprite.stateTime += deltaTime;
+        }
+
         TextureRegion currentFrame;
+
+        // If we have a specific animation set (Walk or Idle), use it.
+        // If not (fallback), use walk.
+
+        if (sprite.currentAnimation != null) {
+            currentFrame = sprite.currentAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
+        } else {
+            currentFrame = sprite.walkAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
+        }
+
+        // Logic: "If I want to face LEFT, but the sprite is flipped RIGHT -> Flip it"
+        if (!sprite.facingRight && !currentFrame.isFlipX()) {
+            currentFrame.flip(true, false);
+        }
+        // Logic: "If I want to face RIGHT, but the sprite is flipped LEFT -> Flip it"
+        else if (sprite.facingRight && currentFrame.isFlipX()) {
+            currentFrame.flip(true, false);
+        }
+
 
         // === 1. GET SIZES ===
         // If drawWidth is 0 (forgot to set it), fallback to transform width
@@ -51,37 +75,10 @@ public class RenderSystem extends IteratingSystem {
         float drawX = transform.pos.x - (width - transform.width) / 2;
         float drawY = transform.pos.y - (height - transform.height) / 2;
 
-
-        if (sprite.isStatic) {
-            // Use static sprite for walls/tiles
-            currentFrame = sprite.staticSprite;
-        } else {
-            // Use animation for player/enemies
-            sprite.stateTime += deltaTime;
-            currentFrame = sprite.walkAnimation.getKeyFrame(
-                sprite.stateTime,
-                sprite.looping
-            );
-
-            // Inside RenderSystem processEntity
-
-            // Logic: "If I want to face LEFT, but the sprite is flipped RIGHT -> Flip it"
-            if (!sprite.facingRight && !currentFrame.isFlipX()) {
-                currentFrame.flip(true, false);
-            }
-            // Logic: "If I want to face RIGHT, but the sprite is flipped LEFT -> Flip it"
-            else if (sprite.facingRight && currentFrame.isFlipX()) {
-                currentFrame.flip(true, false);
-            }
+        // Draw
+        if (currentFrame != null) {
+            batch.draw(currentFrame, drawX, drawY, width, height);
         }
 
-        // Draw sprite at entity's position
-        batch.draw(
-            currentFrame,
-            drawX,
-            drawY,
-            width,
-            height
-        );
     }
 }

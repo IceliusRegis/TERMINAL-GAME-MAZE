@@ -17,10 +17,11 @@ public class EntityFactory {
     /**
      * Creates the player entity with movement and rendering capabilities.
      *
-     * @param engine The Ashley engine to add the entity to
+     * @param engine        The Ashley engine to add the entity to
      * @param walkAnimation The player's walking animation
+     * @param idleAnimation
      */
-    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation) {
+    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
@@ -34,6 +35,8 @@ public class EntityFactory {
         // Add sprite component for rendering
         SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
         sprite.walkAnimation = walkAnimation;
+        sprite.idleAnimation = idleAnimation;
+        sprite.currentAnimation = idleAnimation;
         sprite.looping = true;
         player.add(sprite);
 
@@ -42,15 +45,10 @@ public class EntityFactory {
         sprite.drawWidth = 130f;
         sprite.drawHeight = 130f;
 
-        // Add player marker so systems can identify this entity
         player.add(engine.createComponent(PlayerComponent.class));
 
-
         //Persistence Data this is where player position is saved
-        PersistenceComponent persistence = engine.createComponent(PersistenceComponent.class);
-        persistence.saveId = "PLAYER-POGI"; //UID of the player
-        player.add(persistence);
-
+        player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
 
 
 

@@ -10,6 +10,7 @@ import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.TileWorldComponent;
 
 /**
  * SaveSystem - The bridge between the active Game World (ECS) and the File System.
@@ -33,6 +34,7 @@ public class SaveSystem extends IteratingSystem {
     //Declaration of Mapper,basically bookmarking the position and save state
     private ComponentMapper<PersistenceComponent> persistenceMapper;
     private ComponentMapper<TransformComponent> transformMapper;
+    private ComponentMapper<TileWorldComponent> tileMapper;
 
     //Save State
     private GameData pendingSaveData;
@@ -44,23 +46,24 @@ public class SaveSystem extends IteratingSystem {
 
     public SaveSystem() {
 
-        super(Family.all(PersistenceComponent.class, TransformComponent.class).get());
+        super(Family.all(PersistenceComponent.class).get());
 
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
-}
+        tileMapper = ComponentMapper.getFor(TileWorldComponent.class);
+    }
 
-@Override
-public void update(float deltaTime) {
+    @Override
+    public void update(float deltaTime) {
 
         //Save Button Trigger
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)){
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
             startSave();
         }
 
         //Load Button Trigger
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F9)){
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F9)) {
             startLoad();
         }
 
@@ -88,57 +91,74 @@ public void update(float deltaTime) {
 
 
         }
-}
+    }
 
-private void startSave() {
+    private void startSave() {
         saving = true;
         loading = false;
         pendingSaveData = new GameData(); // Create a clean, empty SAve File
-}
+    }
 
-private void startLoad(){
+    private void startLoad() {
         GameData data = SaveManager.load();
 
-        if (data !=null) {
+        if (data != null) {
             loadedData = data;
             loading = true;
             saving = false;
         } else {
             System.out.println("No save file found :(");
         }
-}
-
-@Override
-protected void processEntity(Entity entity, float deltaTime) {
-    // This method runs ONCE for every valid entity found.
-
-    // Get the actual data components from the entity
-    PersistenceComponent persistence = persistenceMapper.get(entity);
-    TransformComponent transform = transformMapper.get(entity);
-
-    // Saving (Entity to Data)
-    if (saving) {
-        //CHECK TAG: Is this the Player?
-        if ("PLAYER-POGI".equals(persistence.saveId)) {
-            //Put the player's X and Y into the savefile
-            pendingSaveData.playerX = transform.pos.x;
-            pendingSaveData.playerY = transform.pos.y;
-        }
-        //ADD else if for future entities
     }
 
-    // Loading (Data to Entity)
-    else if (loading) {
-        if ("PLAYER-POGI".equals(persistence.saveId)) {
-            transform.pos.x = loadedData.playerX;
-            transform.pos.y = loadedData.playerY;
+    @Override
+    protected void processEntity(Entity entity, float deltaTime) {
+        // This method runs ONCE for every valid entity found.
 
-            //VERY IMPORTANT PLAYER BECOMES A GHOST
-            transform.updateBounds();
+        // Get the actual data components from the entity
+        PersistenceComponent persistence = persistenceMapper.get(entity);
+        TransformComponent transform = transformMapper.get(entity);
+
+        // Saving (Entity to Data)
+        if (saving) {
+            switch (persistence.type) {
+
+                case "PLAYER":
+                    TransformComponent pTrans = transformMapper.get(entity);
+                    pendingSaveData.playerX = pTrans.pos.x;
+                    pendingSaveData.playerY = pTrans.pos.y;
+
+                case "MAP":
+                    TileWorldComponent tileWorld = tileMapper.get(entity);
+                    if (tileWorld != null) {
+                        pendingSaveData.map = tileWorld.map;
+                    } else {
+                        // Optional: Warn us in the console so we know something is wrong
+                        System.out.println("WARNING: Found a MAP entity with no TileWorldComponent!");
+                    }
+                    break;
+            }
+        }
+
+        // Loading (Data to Entity)
+        else if (loading) {
+            switch (persistence.type) {
+
+                case "PLAYER":
+                    TransformComponent pTrans = transformMapper.get(entity);
+                    pTrans.pos.x = loadedData.playerX;
+                    pTrans.pos.y = loadedData.playerY;
+                    pTrans.updateBounds();
+                    break;
+
+                case "MAP":
+                    TileWorldComponent tileWorld = tileMapper.get(entity);
+                    if (loadedData.map != null) {
+                        tileWorld.map = loadedData.map; // Restore the saved layout
+                    }
+                    break;
+            }
         }
     }
-
-
-}
 }
 
