@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.sam.TERMINAL.components.SpriteComponent;
@@ -18,17 +19,14 @@ import com.sam.TERMINAL.components.TransformComponent;
 public class RenderSystem extends IteratingSystem {
 
     private final SpriteBatch batch;
+    private final OrthographicCamera camera; // Add this
     private ComponentMapper<TransformComponent> transformMapper;
     private ComponentMapper<SpriteComponent> spriteMapper;
 
-    /**
-     * @param batch The SpriteBatch used for drawing (must be managed externally)
-     */
-    public RenderSystem(SpriteBatch batch) {
-        // Only process entities with BOTH Transform and Sprite components
+    public RenderSystem(SpriteBatch batch, OrthographicCamera camera) { // Add camera here
         super(Family.all(TransformComponent.class, SpriteComponent.class).get());
-
         this.batch = batch;
+        this.camera = camera; // Initialize it
         this.transformMapper = ComponentMapper.getFor(TransformComponent.class);
         this.spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     }

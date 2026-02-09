@@ -12,6 +12,10 @@ import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.StretchViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.entities.EntityFactory;
 import com.sam.TERMINAL.systems.CameraFollowSystem;
@@ -40,6 +44,7 @@ public class Main extends ApplicationAdapter {
     // LibGDX rendering tools
     private SpriteBatch batch;
     private OrthographicCamera camera;
+    private Viewport viewport;
 
     // TODO: Move to AssetManager later
     private Texture playerSpriteSheet;
@@ -52,8 +57,8 @@ public class Main extends ApplicationAdapter {
 
         // Set up camera (800x600 viewport)
         camera = new OrthographicCamera();
-        camera.setToOrtho(false, 800, 600);
-        camera.update();
+        viewport = new StretchViewport(800, 600, camera);
+        viewport.apply();
 
         // Load Tiles
 
@@ -117,7 +122,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem());
         engine.addSystem(new TileRenderSystem(batch, camera));
-        engine.addSystem(new RenderSystem(batch));
+        engine.addSystem(new RenderSystem(batch, camera));
 
         // === 3. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
@@ -151,14 +156,17 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void render() {
-        // Clear screen to black
+        // 1. Clear the screen
         ScreenUtils.clear(0f, 0f, 0f, 1);
 
-        // Update camera
+        // 2. Update the Viewport and Camera math
+        viewport.apply();
         camera.update();
+
+        // 3. IMPORTANT: Tell the Batch to use the new Camera math
         batch.setProjectionMatrix(camera.combined);
 
-        // Begin rendering
+        // 4. Draw everything
         batch.begin();
 
         // Run all systems (movement, rendering, etc.)
@@ -166,6 +174,11 @@ public class Main extends ApplicationAdapter {
         engine.update(Gdx.graphics.getDeltaTime());
 
         batch.end();
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        viewport.update(width, height, true);
     }
 
     @Override
