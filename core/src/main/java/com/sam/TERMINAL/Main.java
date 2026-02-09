@@ -4,10 +4,7 @@ import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -48,6 +45,7 @@ public class Main extends ApplicationAdapter {
 
     // TODO: Move to AssetManager later
     private Texture playerSpriteSheet;
+    private Texture cursorTexture;
 
     @Override
     public void create() {
@@ -152,6 +150,12 @@ public class Main extends ApplicationAdapter {
         EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
 
         Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
+
+        Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
+        cursorTexture = new Texture(Gdx.files.internal("cursor.png"));
+
+        // 1. Load the original pixmap
+        Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
     }
 
     @Override
@@ -159,26 +163,35 @@ public class Main extends ApplicationAdapter {
         // 1. Clear the screen
         ScreenUtils.clear(0f, 0f, 0f, 1);
 
-        // 2. Update the Viewport and Camera math
+        // 2. Draw the Game World (Walls, Player)
         viewport.apply();
         camera.update();
-
-        // 3. IMPORTANT: Tell the Batch to use the new Camera math
         batch.setProjectionMatrix(camera.combined);
-
-        // 4. Draw everything
         batch.begin();
-
-        // Run all systems (movement, rendering, etc.)
-        // Delta time ensures smooth, framerate-independent updates
         engine.update(Gdx.graphics.getDeltaTime());
+        batch.end();
 
+        // 3. Draw the Software Cursor (Calculates size based on window)
+        // Reset the Projection Matrix so (0,0) is bottom-left of the WINDOW
+        batch.getProjectionMatrix().setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+
+        // Calculate scaling (relative to your 800px base width)
+        float scale = Gdx.graphics.getWidth() / 800f;
+        float cursorSize = 48 * scale;
+
+        float mouseX = Gdx.input.getX();
+        float mouseY = Gdx.graphics.getHeight() - Gdx.input.getY(); // Flip Y
+
+        batch.begin();
+        if (cursorTexture != null) {
+            batch.draw(cursorTexture, mouseX, mouseY - cursorSize, cursorSize, cursorSize);
+        }
         batch.end();
     }
 
     @Override
     public void resize(int width, int height) {
-        viewport.update(width, height, true);
+        viewport.update(width, height, false);
     }
 
     @Override
@@ -187,6 +200,9 @@ public class Main extends ApplicationAdapter {
         batch.dispose();
         if (playerSpriteSheet != null) {
             playerSpriteSheet.dispose();
+        }
+        if (cursorTexture != null) {
+            cursorTexture.dispose();
         }
     }
 }
