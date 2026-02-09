@@ -127,6 +127,7 @@ public class SaveSystem extends IteratingSystem {
                     TransformComponent pTrans = transformMapper.get(entity);
                     pendingSaveData.playerX = pTrans.pos.x;
                     pendingSaveData.playerY = pTrans.pos.y;
+                    break;
 
                 case "MAP":
                     TileWorldComponent tileWorld = tileMapper.get(entity);
