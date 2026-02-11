@@ -23,7 +23,7 @@ public class Lwjgl3Launcher {
         configuration.setResizable(true);
 
         configuration.useVsync(true);
-        configuration.setWindowedMode(640, 480);
+        configuration.setWindowedMode(800, 600);
         //// Vsync limits the frames per second to what your hardware can display, and helps eliminate
         //// screen tearing. This setting doesn't always work on Linux, so the line after is a safeguard.
         configuration.useVsync(true);
