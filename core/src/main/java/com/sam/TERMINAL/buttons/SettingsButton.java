@@ -15,7 +15,8 @@ import com.badlogic.gdx.utils.Array;
 public class SettingsButton {
     private Array<Texture> textures = new Array<>();
 
-    public SettingsButton(Table settingsRoot, final Runnable onClose) {
+    // UPDATED: Constructor now accepts onClose, onRefresh, and onSave
+    public SettingsButton(Table settingsRoot, final Runnable onClose, final Runnable onSave) {
         settingsRoot.clear();
         settingsRoot.setFillParent(true);
 
@@ -23,9 +24,9 @@ public class SettingsButton {
         Stack stack = new Stack();
         settingsRoot.add(stack).expand().fill();
 
-        // --- LAYER 1: BACK BUTTON ---
+        // --- LAYER 1: BACK BUTTON (Top-Left) ---
         Table backLayer = new Table();
-        backLayer.top().left(); // Anchor ONLY this layer to top-left
+        backLayer.top().left();
 
         ImageButton backBtn = createBtn("Restart.png");
         backBtn.addListener(new ClickListener() {
@@ -35,19 +36,26 @@ public class SettingsButton {
             }
         });
 
-        ImageButton restartBtn = createBtn("refresh.png");
-
-        // Responsive size for back button (8% of screen height)
+        // Responsive size for back button
         Value backSize = Value.percentHeight(0.08f, settingsRoot);
         backLayer.add(backBtn).size(backSize).pad(10);
 
         // --- LAYER 2: CENTER MENU ---
         Table menuLayer = new Table();
-        menuLayer.center(); // This centers the table perfectly in its layer
+        menuLayer.center();
 
         ImageButton saveBtn = createBtn("saveMap.png");
-        ImageButton quitBtn = createBtn("quit.png");
+        saveBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                onSave.run(); // Calls the saveMapLogic from MenuScreen
+            }
+        });
 
+        // This is your actual Restart/Refresh button in the center
+        ImageButton refreshBtn = createBtn("refresh.png");
+
+        ImageButton quitBtn = createBtn("quit.png");
         quitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -55,12 +63,12 @@ public class SettingsButton {
             }
         });
 
-        // Responsive sizes for the 3 menu buttons (12% of screen height)
+        // Responsive sizes for the menu buttons
         Value btnSize = Value.percentHeight(0.12f, settingsRoot);
         Value gap = Value.percentWidth(0.02f, settingsRoot);
 
         menuLayer.add(saveBtn).size(btnSize).pad(gap);
-        menuLayer.add(restartBtn).size(btnSize).pad(gap);
+        menuLayer.add(refreshBtn).size(btnSize).pad(gap); // The refresh logic
         menuLayer.add(quitBtn).size(btnSize).pad(gap);
 
         // Add both layers to the stack

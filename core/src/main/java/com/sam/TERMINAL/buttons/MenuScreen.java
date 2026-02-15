@@ -1,5 +1,6 @@
 package com.sam.TERMINAL.buttons;
 
+import com.badlogic.ashley.core.PooledEngine; // Added
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Pixmap;
@@ -15,6 +16,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.sam.TERMINAL.systems.SaveSystem; // Added
 
 public class MenuScreen {
     private Stage uiStage;
@@ -25,8 +27,11 @@ public class MenuScreen {
     private boolean isInventoryVisible = false;
     private Table inventoryWindow;
     private Table bottomTable;
+    private PooledEngine engine; // Reference to trigger saves
 
-    public MenuScreen(SpriteBatch batch) {
+    // Constructor now takes only SpriteBatch and PooledEngine
+    public MenuScreen(SpriteBatch batch, final PooledEngine engine) {
+        this.engine = engine;
         float w = Gdx.graphics.getWidth();
         float h = Gdx.graphics.getHeight();
 
@@ -36,7 +41,7 @@ public class MenuScreen {
 
         createDimmerTexture();
 
-        // --- SETTINGS SETUP ---
+        // --- HUD SETUP ---
         Table mainRoot = new Table();
         mainRoot.setFillParent(true);
         mainRoot.top().left();
@@ -53,26 +58,26 @@ public class MenuScreen {
         mainRoot.add(settingsBtn).size(40, 40).pad(10);
         uiStage.addActor(mainRoot);
 
+        // --- SETTINGS WINDOW SETUP ---
         Table settingsRoot = new Table();
         settingsRoot.setFillParent(true);
-        settingsRoot.top().left();
-
-        backTexture = new Texture(Gdx.files.internal("Restart.png"));
-        Image backBtn = new Image(backTexture);
-        backBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                isSettingsVisible = false;
-                updateInputProcessor();
-            }
-        });
-        settingsRoot.add(backBtn).size(40, 40).pad(10);
         settingsStage.addActor(settingsRoot);
 
-        // --- INVENTORY HUD BUTTON ---
+        // Updated SettingsButton call: onClose, onRefresh (empty), onSave
+        // Inside MenuScreen constructor
+        new SettingsButton(settingsRoot,
+            () -> { // onClose
+                isSettingsVisible = false;
+                updateInputProcessor();
+            },
+            () -> { // onSave
+                saveMapLogic();
+            }
+        );
+
+        // --- INVENTORY SETUP ---
         invTexture = new Texture(Gdx.files.internal("inventory.png"));
         ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
-
         bottomTable = new Table();
         bottomTable.setFillParent(true);
         bottomTable.bottom();
@@ -87,75 +92,51 @@ public class MenuScreen {
             }
         });
 
-        // inventory window
         Table inventoryRoot = new Table();
         inventoryRoot.setFillParent(true);
         inventoryStage.addActor(inventoryRoot);
-
         inventoryWindow = new Table();
-
         TextureRegionDrawable windowBg = new TextureRegionDrawable(new TextureRegion(whitePixel));
         inventoryWindow.setBackground(windowBg.tint(new com.badlogic.gdx.graphics.Color(0.8f, 0.8f, 0.8f, 0.15f)));
+        inventoryRoot.center().add(inventoryWindow).size(500, 400);
 
-        inventoryRoot.center();
-        inventoryRoot.add(inventoryWindow).size(500, 400);
-
-        inventoryWindow.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                isInventoryVisible = false;
-                updateInputProcessor();
-            }
+        new InventoryButton(inventoryWindow, () -> {
+            isInventoryVisible = false;
+            updateInputProcessor();
         });
 
-        new InventoryButton(inventoryWindow, new Runnable() {
-            @Override
-            public void run() {
-                isInventoryVisible = false;
-                updateInputProcessor();
-            }
-        });
-
-        updateInputProcessor();
-
-        // settings window
-        settingsRoot.setFillParent(true);
-        settingsStage.addActor(settingsRoot);
-
-        // Just call the class using the existing variable
-        new SettingsButton(settingsRoot, new Runnable() {
-            @Override
-            public void run() {
-                isSettingsVisible = false;
-                updateInputProcessor();
-            }
-        });
-
-        // to use tab-key as shortcut for inventory
-        InputListener tabListener = new InputListener() {
+        // --- SHORTCUTS (TAB & F5) ---
+        InputListener globalListener = new InputListener() {
             @Override
             public boolean keyDown(InputEvent event, int keycode) {
                 if (keycode == Input.Keys.TAB) {
-                    // Toggle inventory visibility
                     isInventoryVisible = !isInventoryVisible;
-
-                    // If opening inventory, make sure settings are closed
                     if (isInventoryVisible) isSettingsVisible = false;
-
                     updateInputProcessor();
+                    return true;
+                }
+                if (keycode == Input.Keys.F5) {
+                    saveMapLogic();
                     return true;
                 }
                 return false;
             }
         };
+        uiStage.addListener(globalListener);
+        settingsStage.addListener(globalListener);
+        inventoryStage.addListener(globalListener);
 
-// Add the listener to all stages so Tab works regardless of what is open
-        uiStage.addListener(tabListener);
-        inventoryStage.addListener(tabListener);
-        settingsStage.addListener(tabListener);
+        updateInputProcessor();
     }
 
-    // dim effect of settings window
+    private void saveMapLogic() {
+        if (engine != null) {
+            SaveSystem saveSys = engine.getSystem(SaveSystem.class);
+            if (saveSys != null) saveSys.triggerManualSave();
+        }
+    }
+
+    // ... (createDimmerTexture, updateInputProcessor, render, resize, dispose remain the same)
     private void createDimmerTexture() {
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmap.setColor(1, 1, 1, 1);
@@ -166,10 +147,10 @@ public class MenuScreen {
 
     private void updateInputProcessor() {
         if (isSettingsVisible) {
-            Gdx.input.setInputProcessor(settingsStage); // does not allow to move the character when in settings window
+            Gdx.input.setInputProcessor(settingsStage);
         } else if (isInventoryVisible) {
             com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
-            multiplexer.addProcessor(inventoryStage); // allows to move the character when in inventory window
+            multiplexer.addProcessor(inventoryStage);
             Gdx.input.setInputProcessor(multiplexer);
         } else {
             Gdx.input.setInputProcessor(uiStage);
@@ -177,32 +158,24 @@ public class MenuScreen {
     }
 
     public void render(float delta) {
-        // ALWAYS draw the game/HUD first so it's visible in the background
         uiStage.act(delta);
         uiStage.draw();
-
         if (isSettingsVisible) {
             drawDim(settingsStage);
             settingsStage.act(delta);
             settingsStage.draw();
         } else if (isInventoryVisible) {
-            // This only draws the 500x400 box and its dim over the uiStage
             drawInventoryDim(inventoryStage);
             inventoryStage.act(delta);
             inventoryStage.draw();
         }
     }
 
-    // New logic: This dims ONLY the area of the inventory window, not the whole screen
     private void drawInventoryDim(Stage stage) {
         stage.getBatch().setProjectionMatrix(stage.getCamera().combined);
         stage.getBatch().begin();
-        stage.getBatch().setColor(0, 0, 0, 0.5f); // Semi-transparent black
-        // Draws ONLY in the middle area where the window is
-        stage.getBatch().draw(whitePixel,
-            (stage.getViewport().getWorldWidth() - 500) / 2,
-            (stage.getViewport().getWorldHeight() - 400) / 2,
-            500, 400);
+        stage.getBatch().setColor(0, 0, 0, 0.5f);
+        stage.getBatch().draw(whitePixel, (stage.getViewport().getWorldWidth() - 500) / 2, (stage.getViewport().getWorldHeight() - 400) / 2, 500, 400);
         stage.getBatch().setColor(1, 1, 1, 1);
         stage.getBatch().end();
     }
@@ -211,9 +184,7 @@ public class MenuScreen {
         stage.getBatch().setProjectionMatrix(stage.getCamera().combined);
         stage.getBatch().begin();
         stage.getBatch().setColor(0, 0, 0, 0.6f);
-        stage.getBatch().draw(whitePixel, 0, 0,
-            stage.getViewport().getWorldWidth(),
-            stage.getViewport().getWorldHeight());
+        stage.getBatch().draw(whitePixel, 0, 0, stage.getViewport().getWorldWidth(), stage.getViewport().getWorldHeight());
         stage.getBatch().setColor(1, 1, 1, 1);
         stage.getBatch().end();
     }
@@ -225,20 +196,10 @@ public class MenuScreen {
     }
 
     public void dispose() {
-        uiStage.dispose();
-        settingsStage.dispose();
-        inventoryStage.dispose();
-        settingsTexture.dispose();
-        backTexture.dispose();
-        whitePixel.dispose();
-        invTexture.dispose();
+        uiStage.dispose(); settingsStage.dispose(); inventoryStage.dispose();
+        settingsTexture.dispose(); whitePixel.dispose(); invTexture.dispose();
     }
 
-    public boolean isSettingsVisible() {
-        return isSettingsVisible;
-    }
-
-    public boolean isInventoryVisible() {
-        return isInventoryVisible;
-    }
+    public boolean isSettingsVisible() { return isSettingsVisible; }
+    public boolean isInventoryVisible() { return isInventoryVisible; }
 }

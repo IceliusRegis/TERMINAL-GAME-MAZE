@@ -160,7 +160,7 @@ public class Main extends ApplicationAdapter {
 
         Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
 
-        menuScreen = new MenuScreen(batch);
+        menuScreen = new MenuScreen(batch, engine);
     }
 
     @Override
