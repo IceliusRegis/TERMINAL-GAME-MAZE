@@ -109,6 +109,46 @@ public class Main extends ApplicationAdapter {
         float startPixelY = spawnTileY * 32f;
 
 
+        //Temporary Beep Spawning mechanics
+        int beepSpawnX = 0;
+        int beepSpawnY = 0;
+        boolean beepSafeSpawnFound = false;
+
+        int minDistance = 5;
+        int maxRadius = 15;
+
+        while (!beepSafeSpawnFound) {
+            // Picks a range between 5-15
+            int offSetX = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
+            int offSetY = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
+
+            int beepCandidateX = spawnTileX + offSetX;
+            int beepCandidateY = spawnTileY + offSetY;
+
+            if (beepCandidateX < 0 || beepCandidateX >=50 || beepCandidateY < 0 || beepCandidateY >=50) {
+                //Do not spawn their since it is out of bounds
+                continue;
+            }
+
+            if (tileCom.map[beepCandidateX][beepCandidateY] != 2) {
+                //Dont spawn also here cause walls
+                continue;
+            }
+
+            if (Math.abs(offSetX) + Math.abs(offSetY) < minDistance) {
+                //Avoid Spawning too close to the player
+                continue;
+            }
+
+            //If all checks passed
+            beepSpawnX = beepCandidateX;
+            beepSpawnY = beepCandidateY;
+            beepSafeSpawnFound = true;
+
+        }
+
+
+
 
         // === 2. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
         engine.addSystem(new MovementSystem());
@@ -143,20 +183,11 @@ public class Main extends ApplicationAdapter {
 
 
         // === 4. CREATE INITIAL ENTITIES ===
-        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
-
-        Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
-
-        Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
-        cursorTexture = new Texture(Gdx.files.internal("cursor.png"));
-
-        // 1. Load the original pixmap
-        Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
 
         //TEMPORARY KEY SPAWNING
         Entity beep = engine.createEntity();
         TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
-        beepTrans.pos.set(startPixelX + 50, startPixelY);
+        beepTrans.pos.set(beepSpawnX * 32f, beepSpawnY * 32);
         beep.add(beepTrans);
 
         SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
@@ -165,9 +196,22 @@ public class Main extends ApplicationAdapter {
         beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
         beep.add(beepSprite);
 
-        beep.add(new InteractableComponent("beep", 60f));
+        beep.add(new InteractableComponent("beep", 40f));
         engine.addEntity(beep);
 
+
+        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
+
+        Gdx.app.log("TERMINAL", "Spawned Player at (" + startPixelX + "," + startPixelY + ")");
+        Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + beepSpawnX + "," + beepSpawnY + ")");
+
+        Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
+
+        Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
+        cursorTexture = new Texture(Gdx.files.internal("cursor.png"));
+
+        // 1. Load the original pixmap
+        Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
     }
 
     @Override
