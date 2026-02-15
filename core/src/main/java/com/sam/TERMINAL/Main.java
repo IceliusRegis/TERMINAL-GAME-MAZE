@@ -4,15 +4,17 @@ import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.ExtendViewport;
-import com.badlogic.gdx.utils.viewport.FitViewport;
-import com.badlogic.gdx.utils.viewport.StretchViewport;
-import com.badlogic.gdx.utils.viewport.Viewport;
+import com.badlogic.gdx.utils.viewport.*;
+import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.entities.EntityFactory;
 import com.sam.TERMINAL.systems.CameraFollowSystem;
@@ -47,6 +49,8 @@ public class Main extends ApplicationAdapter {
     private Texture playerSpriteSheet;
     private Texture cursorTexture;
 
+    private MenuScreen menuScreen;
+
     @Override
     public void create() {
         // === 1. INITIALIZE RENDERING AND ECS ===
@@ -55,7 +59,7 @@ public class Main extends ApplicationAdapter {
 
         // Set up camera (800x600 viewport)
         camera = new OrthographicCamera();
-        viewport = new StretchViewport(800, 600, camera);
+        viewport = new ExtendViewport(800, 600, camera);
         viewport.apply();
 
         // Load Tiles
@@ -154,13 +158,15 @@ public class Main extends ApplicationAdapter {
         Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
         cursorTexture = new Texture(Gdx.files.internal("cursor.png"));
 
-        // 1. Load the original pixmap
         Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
+
+        menuScreen = new MenuScreen(batch, engine);
     }
 
     @Override
     public void render() {
         // 1. Clear the screen
+        float delta = Gdx.graphics.getDeltaTime();
         ScreenUtils.clear(0f, 0f, 0f, 1);
 
         // 2. Draw the Game World (Walls, Player)
@@ -168,8 +174,21 @@ public class Main extends ApplicationAdapter {
         camera.update();
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        engine.update(Gdx.graphics.getDeltaTime());
+
+        if (!menuScreen.isSettingsVisible()) {
+            engine.update(delta);
+        } else {
+            // When paused, we draw the last known state without moving anything
+            // This is done by passing 0 to the engine update or calling specific render systems
+            // In Ashley, usually we just stop the update entirely to "freeze" time
+            // However, to keep things visible while frozen, we call update with 0 delta:
+            engine.update(0);
+        }
+
         batch.end();
+
+        // 4. Draw the Menu (Drawn last so it sits on top of the character)
+        menuScreen.render(delta);
 
         // 3. Draw the Software Cursor (Calculates size based on window)
         // Reset the Projection Matrix so (0,0) is bottom-left of the WINDOW
@@ -192,6 +211,7 @@ public class Main extends ApplicationAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, false);
+        menuScreen.resize(width, height);
     }
 
     @Override

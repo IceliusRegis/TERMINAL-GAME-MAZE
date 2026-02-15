@@ -36,7 +36,7 @@ public class RenderSystem extends IteratingSystem {
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
 
-        //Advance timer for animation to play
+        //Advance timer for animation to playf
         if (!sprite.isStatic) {
             sprite.stateTime += deltaTime;
         }
