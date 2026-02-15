@@ -11,6 +11,7 @@ import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
+import com.sam.TERMINAL.components.InventoryComponent;
 
 /**
  * SaveSystem - The bridge between the active Game World (ECS) and the File System.
@@ -35,6 +36,7 @@ public class SaveSystem extends IteratingSystem {
     private ComponentMapper<PersistenceComponent> persistenceMapper;
     private ComponentMapper<TransformComponent> transformMapper;
     private ComponentMapper<TileWorldComponent> tileMapper;
+    private ComponentMapper<InventoryComponent> inventoryMapper;
 
     //Save State
     private GameData pendingSaveData;
@@ -52,6 +54,7 @@ public class SaveSystem extends IteratingSystem {
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
         tileMapper = ComponentMapper.getFor(TileWorldComponent.class);
+        inventoryMapper = ComponentMapper.getFor(InventoryComponent.class);
     }
 
     @Override
@@ -127,6 +130,15 @@ public class SaveSystem extends IteratingSystem {
                     TransformComponent pTrans = transformMapper.get(entity);
                     pendingSaveData.playerX = pTrans.pos.x;
                     pendingSaveData.playerY = pTrans.pos.y;
+
+                        InventoryComponent pInventory = inventoryMapper.get(entity);
+                        if (pInventory !=null) {
+                            pendingSaveData.inventoryItems.clear();
+                            pendingSaveData.inventoryItems.addAll(pInventory.items);
+                        }
+
+
+
                     break;
 
                 case "MAP":
@@ -150,6 +162,15 @@ public class SaveSystem extends IteratingSystem {
                     pTrans.pos.x = loadedData.playerX;
                     pTrans.pos.y = loadedData.playerY;
                     pTrans.updateBounds();
+
+
+                    InventoryComponent pInventoryLoad = inventoryMapper.get(entity);
+                    if (pInventoryLoad != null && loadedData.inventoryItems !=null) {
+                        pInventoryLoad.items.clear();
+                        pInventoryLoad.items.addAll(loadedData.inventoryItems);
+                        System.out.println("Inventory Loaded: " + pInventoryLoad.items.size() + " item/s.");
+                    }
+
                     break;
 
                 case "MAP":

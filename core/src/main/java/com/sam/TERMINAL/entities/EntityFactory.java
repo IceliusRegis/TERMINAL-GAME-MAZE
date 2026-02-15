@@ -49,41 +49,8 @@ public class EntityFactory {
 
         //Persistence Data this is where player position is saved
         player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
-
-
-
+        player.add(engine.createComponent(InventoryComponent.class));
         engine.addEntity(player);
-    }
-
-    /**
-     * Creates a solid wall entity at the specified position.
-     *
-     * @param engine The Ashley engine to add the entity to
-     * @param x X-coordinate of wall position
-     * @param y Y-coordinate of wall position
-     */
-    public static void createWall(PooledEngine engine,float x, float y, TextureRegion wallSprite) {
-        Entity wall = engine.createEntity();
-
-        // Add transform component
-        TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(x, y);
-        transform.width = 32;
-        transform.height = 32;
-        transform.updateBounds();
-        wall.add(transform);
-
-
-        // Add sprite component with static texture
-        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
-        sprite.staticSprite = wallSprite;
-        sprite.isStatic = true;  // Mark as non-animated
-        wall.add(sprite);
-
-        // Add collision marker so player can bump into it
-        wall.add(engine.createComponent(CollisionComponent.class));
-
-        engine.addEntity(wall);
     }
 
     /**

@@ -13,15 +13,10 @@ import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.StretchViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.sam.TERMINAL.components.PersistenceComponent;
+import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.entities.EntityFactory;
-import com.sam.TERMINAL.systems.CameraFollowSystem;
-import com.sam.TERMINAL.systems.MovementSystem;
-import com.sam.TERMINAL.systems.RenderSystem;
-import com.sam.TERMINAL.systems.SaveSystem;
+import com.sam.TERMINAL.systems.*;
 import com.sam.TERMINAL.tiles.TileRegistry;
-import com.sam.TERMINAL.components.TileWorldComponent;
-import com.sam.TERMINAL.systems.TileRenderSystem;
 
 /**
  * Main - The entry point and manager for TERMINAL.
@@ -121,6 +116,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new SaveSystem());
         engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch, camera));
+        engine.addSystem((new InteractionSystem()));
 
         // === 3. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
@@ -156,6 +152,22 @@ public class Main extends ApplicationAdapter {
 
         // 1. Load the original pixmap
         Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
+
+        //TEMPORARY KEY SPAWNING
+        Entity beep = engine.createEntity();
+        TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
+        beepTrans.pos.set(startPixelX + 50, startPixelY);
+        beep.add(beepTrans);
+
+        SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
+        beepSprite.staticSprite = new TextureRegion(new Texture(Gdx.files.internal("beep.png")));
+        beepSprite.isStatic = true;
+        beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
+        beep.add(beepSprite);
+
+        beep.add(new InteractableComponent("beep", 60f));
+        engine.addEntity(beep);
+
     }
 
     @Override

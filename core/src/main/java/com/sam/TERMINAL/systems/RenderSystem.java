@@ -36,21 +36,17 @@ public class RenderSystem extends IteratingSystem {
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
 
-        //Advance timer for animation to play
-        if (!sprite.isStatic) {
-            sprite.stateTime += deltaTime;
-        }
-
         TextureRegion currentFrame;
 
-        // If we have a specific animation set (Walk or Idle), use it.
-        // If not (fallback), use walk.
-
-        if (sprite.currentAnimation != null) {
+        //Advance timer for animation to play
+        if (sprite.isStatic) {
+            currentFrame = sprite.staticSprite;
+        } else if (sprite.currentAnimation != null) {   // If we have a specific animation set (Walk or Idle), use it.
             currentFrame = sprite.currentAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
-        } else {
+        }else { // If not (fallback), use walk.
             currentFrame = sprite.walkAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
         }
+
 
         // Logic: "If I want to face LEFT, but the sprite is flipped RIGHT -> Flip it"
         if (!sprite.facingRight && !currentFrame.isFlipX()) {
