@@ -1,6 +1,7 @@
 package com.sam.TERMINAL;
 
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -9,6 +10,7 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
@@ -16,14 +18,11 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.*;
 import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.PersistenceComponent;
+import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.entities.EntityFactory;
-import com.sam.TERMINAL.systems.CameraFollowSystem;
-import com.sam.TERMINAL.systems.MovementSystem;
-import com.sam.TERMINAL.systems.RenderSystem;
-import com.sam.TERMINAL.systems.SaveSystem;
+import com.sam.TERMINAL.systems.*;
 import com.sam.TERMINAL.tiles.TileRegistry;
 import com.sam.TERMINAL.components.TileWorldComponent;
-import com.sam.TERMINAL.systems.TileRenderSystem;
 
 /**
  * Main - The entry point and manager for TERMINAL.
@@ -51,11 +50,21 @@ public class Main extends ApplicationAdapter {
 
     private MenuScreen menuScreen;
 
+    private TextureRegion monsterTextureRegion;
+    private TextureRegion ghostTextureRegion; // Add this for your second monster
+    private float spawnTimer = 0;
+    private float spawnInterval = 3.0f;
+
+    // References to keep textures for disposal
+    private Texture monsterTex;
+    private Texture ghostTex;
+
     @Override
     public void create() {
         // === 1. INITIALIZE RENDERING AND ECS ===
         engine = new PooledEngine();
         batch = new SpriteBatch();
+
 
         // Set up camera (800x600 viewport)
         camera = new OrthographicCamera();
@@ -153,6 +162,10 @@ public class Main extends ApplicationAdapter {
         // === 4. CREATE INITIAL ENTITIES ===
         EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
 
+        batch.begin();
+        engine.update(0);
+        batch.end();
+
         Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
 
         Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
@@ -161,6 +174,38 @@ public class Main extends ApplicationAdapter {
         Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
 
         menuScreen = new MenuScreen(batch, engine);
+
+        // Load Monster 1
+        Texture monsterTex = new Texture(Gdx.files.internal("monster.png"));
+        monsterTextureRegion = new TextureRegion(monsterTex);
+
+// Load Monster 2
+        Texture ghostTex = new Texture(Gdx.files.internal("ghost.png"));
+        ghostTextureRegion = new TextureRegion(ghostTex);
+
+        // 3. Now you can use it to spawn monsters
+        EntityFactory.createMonster(engine, 60, 60, monsterTextureRegion);
+
+        //create monster
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        engine.addSystem(new EnemySystem(player));
+
+        // 3. Spawn a monster
+        EntityFactory.createMonster(engine, 60, 60, monsterTextureRegion);
+
+        // inside create()
+        for (int i = 0; i < 3; i++) {
+            float randomX = MathUtils.random(0, 1600);
+            float randomY = MathUtils.random(0, 1600);
+
+            if (i % 2 == 0) {
+                // Use the first texture
+                EntityFactory.createMonster(engine, randomX, randomY, monsterTextureRegion);
+            } else {
+                // Use the new second texture
+                EntityFactory.createMonster(engine, randomX, randomY, ghostTextureRegion);
+            }
+        }
     }
 
     @Override
@@ -206,6 +251,17 @@ public class Main extends ApplicationAdapter {
             batch.draw(cursorTexture, mouseX, mouseY - cursorSize, cursorSize, cursorSize);
         }
         batch.end();
+
+        if (spawnTimer >= spawnInterval) {
+            float rx = MathUtils.random(0, 1600);
+            float ry = MathUtils.random(0, 1600);
+
+            // Pick a random texture to use for the new spawn
+            TextureRegion randomRegion = MathUtils.randomBoolean() ? monsterTextureRegion : ghostTextureRegion;
+
+            EntityFactory.createMonster(engine, rx, ry, randomRegion);
+            spawnTimer = 0;
+        }
     }
 
     @Override
@@ -216,13 +272,20 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void dispose() {
-        // Clean up resources to prevent memory leaks
         batch.dispose();
         if (playerSpriteSheet != null) {
             playerSpriteSheet.dispose();
         }
         if (cursorTexture != null) {
             cursorTexture.dispose();
+        }
+
+        // Dispose the monster textures!
+        if (monsterTex != null) {
+            monsterTex.dispose();
+        }
+        if (ghostTex != null) {
+            ghostTex.dispose();
         }
     }
 }

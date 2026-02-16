@@ -92,4 +92,34 @@ public class EntityFactory {
      * - createConductor(engine, x, y)
      * - createTurnstile(engine, x, y)
      */
+
+    public static void createMonster(PooledEngine engine, float x, float y, TextureRegion monsterSprite) {
+        Entity monster = engine.createEntity();
+
+        // 1. Position
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 32f;
+        transform.height = 32f;
+        transform.updateBounds();
+        monster.add(transform);
+
+        // 2. Visuals - THIS IS WHERE THE FIX IS
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = monsterSprite;
+        sprite.isStatic = true;
+
+        // Line 52 in RenderSystem is looking for currentAnimation.
+        // We give it a 1-frame animation using the monster texture.
+        sprite.currentAnimation = new Animation<>(0.1f, monsterSprite);
+
+        sprite.drawWidth = 40;  // Make it big enough to see!
+        sprite.drawHeight = 40;
+        monster.add(sprite);
+
+        // 3. Brain
+        monster.add(engine.createComponent(EnemyComponent.class));
+
+        engine.addEntity(monster);
+    }
 }
