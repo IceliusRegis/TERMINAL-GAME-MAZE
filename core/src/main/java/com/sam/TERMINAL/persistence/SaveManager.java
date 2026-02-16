@@ -24,29 +24,44 @@ public class SaveManager {
     private static final Json json = new Json();
 
     public static void save(GameData data, String fileName) {
-        // 1. Convert the Java object to "pretty" JSON text (easier to read/debug)
-        String text = json.prettyPrint(data);
+        // 1. Ensure the directory exists
+        FileHandle dir = Gdx.files.local("saves/");
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
 
         // 2. Write to file
         // Gdx.files.local creates the file in your desktop project's root directory
-        FileHandle file = Gdx.files.local(fileName);
+        FileHandle file = Gdx.files.local("saves/" + fileName);
 
-        // false = overwrite the file (don't append to the end of the old save)
+        // 3. Serialize data to pretty-printed JSON string
+        // LibGDX's json.toJson() handles the conversion
+        String text = json.prettyPrint(data);
+
+        // 4. Write to disk (false = overwrite)
         file.writeString(text, false);
     }
 
     public static GameData load(String fileName) {
-        FileHandle file = Gdx.files.local(fileName);
+        // Look inside the saves folder
+        FileHandle file = Gdx.files.local("saves/" + fileName);
 
-        if (!file.exists()) {
-            return null;
+        // LOGIC FIX: Check if file EXISTS, then read it.
+        if (file.exists()) {
+            try {
+                return json.fromJson(GameData.class, file.readString());
+            } catch (Exception e) {
+                Gdx.app.error("SAVE_MANAGER", "Error parsing save file: " + fileName);
+                return null;
+            }
         }
 
-        return json.fromJson(GameData.class, file.readString());
+        System.out.println("Save file not found: " + fileName);
+        return null;
     }
 
     public static void delete(String fileName) {
-        FileHandle file = Gdx.files.local(fileName);
+        FileHandle file = Gdx.files.local("saves/" + fileName);
         if (file.exists()) {
             file.delete();
         }
