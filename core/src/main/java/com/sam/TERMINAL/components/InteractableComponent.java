@@ -17,7 +17,7 @@ public class InteractableComponent implements Component {
     public String type = "unknown";
     public boolean isActive = true; //This what determines if you can interact with it
 
-    public InteractableComponent() {}
+    //public InteractableComponent() {}
 
     public InteractableComponent(String type, float radius) {
         this.type = type;

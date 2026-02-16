@@ -53,6 +53,31 @@ public class EntityFactory {
         engine.addEntity(player);
     }
 
+    public static  void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite) {
+        Entity door = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 32;
+        transform.height = 32;
+        transform.updateBounds();
+        door.add(transform);
+
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = closedSprite;
+        sprite.isStatic = true;
+        door.add(sprite);
+
+        door.add(engine.createComponent(CollisionComponent.class));
+        door.add(new InteractableComponent("door", 40f));
+
+        engine.addEntity(door);
+
+
+    }
+
+
+
     /**
      * TODO: Future entity creation methods
      * - createCommuter(engine, x, y)

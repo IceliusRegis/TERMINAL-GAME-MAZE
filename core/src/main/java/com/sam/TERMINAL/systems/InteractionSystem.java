@@ -7,11 +7,10 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.glutils.ETC1;
-import com.sam.TERMINAL.components.InteractableComponent;
-import com.sam.TERMINAL.components.InventoryComponent;
-import com.sam.TERMINAL.components.PlayerComponent;
-import com.sam.TERMINAL.components.TransformComponent;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.sam.TERMINAL.components.CollisionComponent;
+import com.sam.TERMINAL.components.SpriteComponent;
+import com.sam.TERMINAL.components.*;
 
 /**
  * InteractionSystem - Handles the logic for using objects in the world.
@@ -31,12 +30,18 @@ public class InteractionSystem extends EntitySystem {
     private ComponentMapper<TransformComponent> transformMapper;
     private  ComponentMapper<InteractableComponent> interactMapper;
     private  ComponentMapper<InventoryComponent> inventoryMapper;
+    private ComponentMapper<SpriteComponent> spriteMapper;
+
+    private final TextureRegion openDoorSprite;
 
 
-    public InteractionSystem() {
+    public InteractionSystem(TextureRegion openDoorSprite) {
+        this.openDoorSprite = openDoorSprite;
+
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
         interactMapper = ComponentMapper.getFor(InteractableComponent.class);
         inventoryMapper =  ComponentMapper.getFor(InventoryComponent.class);
+        spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     }
 
     @Override
@@ -88,10 +93,14 @@ public class InteractionSystem extends EntitySystem {
             case "door":
                 if (inventory != null && inventory.hasItem("beep_card")) {
                     System.out.println("Door Unlocked!");
-                    //Change the sprite of door
+
+                    SpriteComponent doorSprite = spriteMapper.get(target);
+                    if (doorSprite !=null) {
+                        doorSprite.staticSprite = openDoorSprite;
+                    }
+
+                    target.remove(CollisionComponent.class);
                     typeData.isActive = false;
-                    //Remove door for now since no asset yet
-                    getEngine().removeEntity(target);
                 } else {
                     System.out.println("Door Locked! Find the Beep Card.");
                 }

@@ -55,6 +55,13 @@ public class Main extends ApplicationAdapter {
 
         // Load Tiles
 
+        //Temp Door
+        Texture doorOpenTexture = new Texture(Gdx.files.internal("opendoor.png"));
+        TextureRegion doorOpenRegion = new TextureRegion(doorOpenTexture);
+
+        Texture doorClosedTexture = new Texture(Gdx.files.internal("closedoor.png"));
+        TextureRegion doorCloseRegion = new TextureRegion(doorClosedTexture);
+
         //Creates walls
         Texture wallTexture = new Texture(Gdx.files.internal("BackRoomsWall.png"));
         TextureRegion wallRegion = new TextureRegion(wallTexture);
@@ -156,7 +163,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new SaveSystem());
         engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem((new InteractionSystem()));
+        engine.addSystem((new InteractionSystem(doorOpenRegion)));
 
         // === 3. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
@@ -201,6 +208,7 @@ public class Main extends ApplicationAdapter {
 
 
         EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
+        EntityFactory.createDoor(engine, startPixelX + 64f, startPixelY +64f, doorCloseRegion);
 
         Gdx.app.log("TERMINAL", "Spawned Player at (" + startPixelX + "," + startPixelY + ")");
         Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + beepSpawnX + "," + beepSpawnY + ")");
