@@ -115,6 +115,12 @@ public class SaveSystem extends IteratingSystem {
         pendingSaveData = new GameData(); // Create a clean, empty SAve File
     }
 
+    public void triggerManualSave() {
+        if (!saving) { // Prevent double-saving if already in progress
+            startSave();
+        }
+    }
+
     private void startLoad() {
         GameData data = SaveManager.load();
 
