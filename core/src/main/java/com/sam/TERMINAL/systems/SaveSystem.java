@@ -6,11 +6,10 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.persistence.GameData;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.sam.TERMINAL.persistence.SaveManager;
-import com.sam.TERMINAL.components.PersistenceComponent;
-import com.sam.TERMINAL.components.TransformComponent;
-import com.sam.TERMINAL.components.TileWorldComponent;
 
 /**
  * SaveSystem - The bridge between the active Game World (ECS) and the File System.
@@ -35,6 +34,10 @@ public class SaveSystem extends IteratingSystem {
     private ComponentMapper<PersistenceComponent> persistenceMapper;
     private ComponentMapper<TransformComponent> transformMapper;
     private ComponentMapper<TileWorldComponent> tileMapper;
+    private ComponentMapper<InventoryComponent> inventoryMapper;
+    private  ComponentMapper<InteractableComponent> interactMapper;
+    private  ComponentMapper<SpriteComponent> spriteMapper;
+    private ComponentMapper<CollisionComponent> collisionMapper;
 
     //Save State
     private GameData pendingSaveData;
@@ -44,14 +47,27 @@ public class SaveSystem extends IteratingSystem {
     private GameData loadedData; // reads data from disk
     private boolean loading = false; //tells the game we are loading data
 
-    public SaveSystem() {
+    //Sprites
+    private final  TextureRegion openDoorSprite;
+    private final  TextureRegion closedDoorSprite;
+    private final TextureRegion keySprite;
+
+    public SaveSystem(TextureRegion openDoorSprite, TextureRegion closedDoorSprite, TextureRegion keySprite) {
 
         super(Family.all(PersistenceComponent.class).get());
+
+        this.openDoorSprite = openDoorSprite;
+        this.closedDoorSprite = closedDoorSprite;
+        this.keySprite = keySprite;
 
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
         tileMapper = ComponentMapper.getFor(TileWorldComponent.class);
+        inventoryMapper = ComponentMapper.getFor(InventoryComponent.class);
+        interactMapper = ComponentMapper.getFor(InteractableComponent.class);
+        spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
+        collisionMapper = ComponentMapper.getFor(CollisionComponent.class);
     }
 
     @Override
@@ -125,6 +141,7 @@ public class SaveSystem extends IteratingSystem {
         PersistenceComponent persistence = persistenceMapper.get(entity);
         TransformComponent transform = transformMapper.get(entity);
 
+
         // Saving (Entity to Data)
         if (saving) {
             switch (persistence.type) {
@@ -133,6 +150,12 @@ public class SaveSystem extends IteratingSystem {
                     TransformComponent pTrans = transformMapper.get(entity);
                     pendingSaveData.playerX = pTrans.pos.x;
                     pendingSaveData.playerY = pTrans.pos.y;
+
+                        InventoryComponent pInventory = inventoryMapper.get(entity);
+                        if (pInventory !=null) {
+                            pendingSaveData.inventoryItems.clear();
+                            pendingSaveData.inventoryItems.addAll(pInventory.items);
+                        }
                     break;
 
                 case "MAP":
@@ -142,6 +165,12 @@ public class SaveSystem extends IteratingSystem {
                     } else {
                         // Optional: Warn us in the console so we know something is wrong
                         System.out.println("WARNING: Found a MAP entity with no TileWorldComponent!");
+                    }
+                    break;
+                case "INTERACTABLE":
+                    InteractableComponent interact = interactMapper.get(entity);
+                    if (interact !=null) {
+                        pendingSaveData.interactableStates.put(persistence.saveId, interact.isActive);
                     }
                     break;
             }
@@ -156,6 +185,15 @@ public class SaveSystem extends IteratingSystem {
                     pTrans.pos.x = loadedData.playerX;
                     pTrans.pos.y = loadedData.playerY;
                     pTrans.updateBounds();
+
+
+                    InventoryComponent pInventoryLoad = inventoryMapper.get(entity);
+                    if (pInventoryLoad != null && loadedData.inventoryItems !=null) {
+                        pInventoryLoad.items.clear();
+                        pInventoryLoad.items.addAll(loadedData.inventoryItems);
+                        System.out.println("Inventory Loaded: " + pInventoryLoad.items.size() + " item/s.");
+                    }
+
                     break;
 
                 case "MAP":
@@ -164,6 +202,56 @@ public class SaveSystem extends IteratingSystem {
                         tileWorld.map = loadedData.map; // Restore the saved layout
                     }
                     break;
+
+                case "INTERACTABLE":
+                    if (loadedData.interactableStates.containsKey(persistence.saveId)) {
+                        boolean shouldBeActive = loadedData.interactableStates.get(persistence.saveId);
+
+                        InteractableComponent interactLoad = interactMapper.get(entity);
+                        if (interactLoad !=null) {
+                            interactLoad.isActive = shouldBeActive;
+
+                            //If Item was taken / Door was opened
+                            if (!shouldBeActive) {
+                                if (interactLoad.type.equals("beep")) {
+                                    entity.remove((SpriteComponent.class));
+                                } else if (interactLoad.type.equals("door")) {
+                                    entity.remove(CollisionComponent.class);
+                                    SpriteComponent doorSprite = spriteMapper.get(entity);
+                                    if (doorSprite != null) doorSprite.staticSprite = openDoorSprite;
+                                }
+                            }
+
+                            //If item/door are not picked or opened restore it
+                            else {
+                                if (interactLoad.type.equals("beep")) {
+                                    if (spriteMapper.get(entity) == null) {
+                                        SpriteComponent restoredSprite = getEngine().createComponent(SpriteComponent.class);
+                                        restoredSprite.staticSprite = keySprite;
+                                        restoredSprite.isStatic = true;
+                                        restoredSprite.drawWidth = 16;
+                                        restoredSprite.drawHeight = 16;
+
+                                        entity.add(restoredSprite);
+                                    }
+                                }
+                                if (interactLoad.type.equals("door")) {
+                                    if (!collisionMapper.has(entity)) {
+                                        entity.add(getEngine().createComponent(CollisionComponent.class));
+                                    }
+
+                                    SpriteComponent doorSprite = spriteMapper.get(entity);
+                                    if (doorSprite !=null) {
+                                        doorSprite.staticSprite = closedDoorSprite;
+                                    }
+
+                                }
+
+                            }
+                        }
+                    }
+                    break;
+
             }
         }
     }

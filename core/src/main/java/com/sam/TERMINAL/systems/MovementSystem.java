@@ -41,6 +41,7 @@ public class MovementSystem extends IteratingSystem {
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         TransformComponent transform = transformMapper.get(entity);
+        SpriteComponent sprite = entity.getComponent(SpriteComponent.class);
 
         //Calculate how much we want to move
         float xMove = 0;
@@ -57,11 +58,11 @@ public class MovementSystem extends IteratingSystem {
         }
         if (Gdx.input.isKeyPressed(Input.Keys.A)) {
             xMove -= speed;
-            SpriteComponent.facingRight = false;
+            if (sprite != null) sprite.facingRight = false;
         }
         if (Gdx.input.isKeyPressed(Input.Keys.D)) {
             xMove += speed;
-            SpriteComponent.facingRight = true;
+            if (sprite !=null) sprite.facingRight = true;
         }
 
         // Get Map Data so that we know where the walls at
@@ -94,7 +95,6 @@ public class MovementSystem extends IteratingSystem {
             transform.updateBounds();
         }
 
-        SpriteComponent sprite = entity.getComponent(SpriteComponent.class);
 
         if (sprite != null) {
 

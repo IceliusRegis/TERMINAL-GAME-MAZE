@@ -36,31 +36,20 @@ public class RenderSystem extends IteratingSystem {
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
 
-        //Advance timer for animation to playf
-        if (!sprite.isStatic) {
+        if (!sprite.isStatic){
             sprite.stateTime += deltaTime;
         }
 
-        TextureRegion currentFrame;
+        TextureRegion currentFrame = null;
 
-        // If we have a specific animation set (Walk or Idle), use it.
-        // If not (fallback), use walk.
-
-        if (sprite.currentAnimation != null) {
+        //Advance timer for animation to play
+        if (sprite.isStatic) {
+            currentFrame = sprite.staticSprite;
+        } else if (sprite.currentAnimation != null) {   // If we have a specific animation set (Walk or Idle), use it.
             currentFrame = sprite.currentAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
-        } else {
+        }else { // If not (fallback), use walk.
             currentFrame = sprite.walkAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
         }
-
-        // Logic: "If I want to face LEFT, but the sprite is flipped RIGHT -> Flip it"
-        if (!sprite.facingRight && !currentFrame.isFlipX()) {
-            currentFrame.flip(true, false);
-        }
-        // Logic: "If I want to face RIGHT, but the sprite is flipped LEFT -> Flip it"
-        else if (sprite.facingRight && currentFrame.isFlipX()) {
-            currentFrame.flip(true, false);
-        }
-
 
         // === 1. GET SIZES ===
         // If drawWidth is 0 (forgot to set it), fallback to transform width
@@ -75,7 +64,18 @@ public class RenderSystem extends IteratingSystem {
 
         // Draw
         if (currentFrame != null) {
-            batch.draw(currentFrame, drawX, drawY, width, height);
+            boolean flipX = !sprite.facingRight; // if sprite is facing left this decides it
+
+            if (currentFrame.isFlipX()) {
+                flipX = !flipX; //if player chaarcter is already facing left, it toggles it
+            }
+
+           batch.draw(currentFrame,
+               drawX, drawY, //Position
+               width / 2f, height /2f, //Center of Cam
+               width, height, //How large to draw
+               flipX ? -1f : 1f, 1f, //Draws the flipped version if facing left
+               0f); //Rotate in place, or just dont rotate
         }
 
     }

@@ -13,17 +13,17 @@ import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.StretchViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
+import com.sam.TERMINAL.components.*;
 import com.badlogic.gdx.utils.viewport.*;
 import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.PersistenceComponent;
 import com.sam.TERMINAL.entities.EntityFactory;
-import com.sam.TERMINAL.systems.CameraFollowSystem;
-import com.sam.TERMINAL.systems.MovementSystem;
-import com.sam.TERMINAL.systems.RenderSystem;
-import com.sam.TERMINAL.systems.SaveSystem;
+import com.sam.TERMINAL.systems.*;
 import com.sam.TERMINAL.tiles.TileRegistry;
-import com.sam.TERMINAL.components.TileWorldComponent;
-import com.sam.TERMINAL.systems.TileRenderSystem;
 
 /**
  * Main - The entry point and manager for TERMINAL.
@@ -63,6 +63,18 @@ public class Main extends ApplicationAdapter {
         viewport.apply();
 
         // Load Tiles
+
+
+        //Beep
+        Texture beepTexture = new Texture(Gdx.files.internal("beep.png"));
+        TextureRegion beepRegion = new TextureRegion(beepTexture);
+
+        //Temp Door
+        Texture doorOpenTexture = new Texture(Gdx.files.internal("opendoor.png"));
+        TextureRegion doorOpenRegion = new TextureRegion(doorOpenTexture);
+
+        Texture doorClosedTexture = new Texture(Gdx.files.internal("closedoor.png"));
+        TextureRegion doorCloseRegion = new TextureRegion(doorClosedTexture);
 
         //Creates walls
         Texture wallTexture = new Texture(Gdx.files.internal("BackRoomsWall.png"));
@@ -118,13 +130,54 @@ public class Main extends ApplicationAdapter {
         float startPixelY = spawnTileY * 32f;
 
 
+        //Temporary Beep Spawning mechanics
+        int beepSpawnX = 0;
+        int beepSpawnY = 0;
+        boolean beepSafeSpawnFound = false;
+
+        int minDistance = 5;
+        int maxRadius = 15;
+
+        while (!beepSafeSpawnFound) {
+            // Picks a range between 5-15
+            int offSetX = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
+            int offSetY = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
+
+            int beepCandidateX = spawnTileX + offSetX;
+            int beepCandidateY = spawnTileY + offSetY;
+
+            if (beepCandidateX < 0 || beepCandidateX >=50 || beepCandidateY < 0 || beepCandidateY >=50) {
+                //Do not spawn their since it is out of bounds
+                continue;
+            }
+
+            if (tileCom.map[beepCandidateX][beepCandidateY] != 2) {
+                //Dont spawn also here cause walls
+                continue;
+            }
+
+            if (Math.abs(offSetX) + Math.abs(offSetY) < minDistance) {
+                //Avoid Spawning too close to the player
+                continue;
+            }
+
+            //If all checks passed
+            beepSpawnX = beepCandidateX;
+            beepSpawnY = beepCandidateY;
+            beepSafeSpawnFound = true;
+
+        }
+
+
+
 
         // === 2. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
         engine.addSystem(new MovementSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem());
+        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch, camera));
+        engine.addSystem((new InteractionSystem(doorOpenRegion)));
 
         // === 3. LOAD ASSETS ===
         // TODO: Replace with placeholder if mc_walk.png doesn't exist
@@ -151,7 +204,32 @@ public class Main extends ApplicationAdapter {
 
 
         // === 4. CREATE INITIAL ENTITIES ===
+
+        //TEMPORARY KEY SPAWNING
+        Entity beep = engine.createEntity();
+        TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
+        beepTrans.pos.set(beepSpawnX * 32f, beepSpawnY * 32);
+        beep.add(beepTrans);
+
+        SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
+        beepSprite.staticSprite = beepRegion;
+        beepSprite.isStatic = true;
+        beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
+        beep.add(beepSprite);
+
+        beep.add(new InteractableComponent("beep", 40f));
+        String uniqueID = "KEY_" + beepSpawnX + "_" + beepSpawnY;
+        beep.add(new PersistenceComponent("INTERACTABLE", uniqueID));
+
+        engine.addEntity(beep);
+
+
+
+        EntityFactory.createDoor(engine, startPixelX + 64f, startPixelY +64f, doorCloseRegion);
         EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
+
+        Gdx.app.log("TERMINAL", "Spawned Player at (" + startPixelX + "," + startPixelY + ")");
+        Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + beepSpawnX + "," + beepSpawnY + ")");
 
         Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
 
