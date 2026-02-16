@@ -4,6 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.Json;
 
+import java.io.File;
+
 /**
  * SaveManager - Handles the physical writing and reading of save files.
  *
@@ -21,25 +23,32 @@ public class SaveManager {
 
     private static final Json json = new Json();
 
-    public static void save(GameData data) {
+    public static void save(GameData data, String fileName) {
         // 1. Convert the Java object to "pretty" JSON text (easier to read/debug)
         String text = json.prettyPrint(data);
 
         // 2. Write to file
         // Gdx.files.local creates the file in your desktop project's root directory
-        FileHandle file = Gdx.files.local("saveFile.json");
+        FileHandle file = Gdx.files.local(fileName);
 
         // false = overwrite the file (don't append to the end of the old save)
         file.writeString(text, false);
     }
 
-    public static GameData load() {
-        FileHandle file = Gdx.files.local("saveFile.json");
+    public static GameData load(String fileName) {
+        FileHandle file = Gdx.files.local(fileName);
 
         if (!file.exists()) {
             return null;
         }
 
         return json.fromJson(GameData.class, file.readString());
+    }
+
+    public static void delete(String fileName) {
+        FileHandle file = Gdx.files.local(fileName);
+        if (file.exists()) {
+            file.delete();
+        }
     }
 }

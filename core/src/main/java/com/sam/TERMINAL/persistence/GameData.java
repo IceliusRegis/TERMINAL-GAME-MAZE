@@ -17,6 +17,7 @@ import java.util.HashMap;
 
 public class GameData {
     // 1. Data we want to save
+    public String runId = "";
     public float playerX, playerY;
     public int[][] map;
 

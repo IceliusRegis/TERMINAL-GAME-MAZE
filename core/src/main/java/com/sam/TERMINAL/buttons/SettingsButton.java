@@ -16,7 +16,7 @@ public class SettingsButton {
     private Array<Texture> textures = new Array<>();
 
     // UPDATED: Constructor now accepts onClose, onRefresh, and onSave
-    public SettingsButton(Table settingsRoot, final Runnable onClose, final Runnable onSave) {
+    public SettingsButton(Table settingsRoot, final Runnable onClose, final Runnable onSave, final Runnable onReset) {
         settingsRoot.clear();
         settingsRoot.setFillParent(true);
 
@@ -28,7 +28,7 @@ public class SettingsButton {
         Table backLayer = new Table();
         backLayer.top().left();
 
-        ImageButton backBtn = createBtn("Restart.png");
+        ImageButton backBtn = createBtn("ui/Restart.png");
         backBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -44,7 +44,7 @@ public class SettingsButton {
         Table menuLayer = new Table();
         menuLayer.center();
 
-        ImageButton saveBtn = createBtn("saveMap.png");
+        ImageButton saveBtn = createBtn("ui/saveMap.png");
         saveBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -53,9 +53,15 @@ public class SettingsButton {
         });
 
         // This is your actual Restart/Refresh button in the center
-        ImageButton refreshBtn = createBtn("refresh.png");
+        ImageButton refreshBtn = createBtn("ui/refresh.png");
+        refreshBtn.addListener(new ClickListener() {
+                                   @Override
+                                   public void clicked(InputEvent event, float x, float y) {
+                                       onReset.run();
+                                   }
+                               });
 
-        ImageButton quitBtn = createBtn("quit.png");
+        ImageButton quitBtn = createBtn("ui/quit.png");
         quitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {

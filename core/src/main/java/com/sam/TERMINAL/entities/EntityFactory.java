@@ -75,8 +75,29 @@ public class EntityFactory {
         door.add(new PersistenceComponent("INTERACTABLE", uniqueID));
 
         engine.addEntity(door);
+    }
 
+    public static void createKey (PooledEngine engine, float x, float y, TextureRegion beepRegion) {
+        Entity beep = engine.createEntity();
 
+        TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
+        beepTrans.pos.set(x, y);
+        beepTrans.width = 16;
+        beepTrans.height = 16;
+        beepTrans.updateBounds();
+        beep.add(beepTrans);
+
+        SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
+        beepSprite.staticSprite = beepRegion;
+        beepSprite.isStatic = true;
+        beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
+        beep.add(beepSprite);
+
+        beep.add(new InteractableComponent("beep", 40f));
+        String uniqueID = "KEY_" + x + "_" + y;
+        beep.add(new PersistenceComponent("INTERACTABLE", uniqueID));
+
+        engine.addEntity(beep);
     }
 
 

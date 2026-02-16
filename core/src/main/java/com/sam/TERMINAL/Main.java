@@ -1,7 +1,6 @@
 package com.sam.TERMINAL;
 
 import com.badlogic.ashley.core.Entity;
-import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -47,6 +46,11 @@ public class Main extends ApplicationAdapter {
     private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
+    //Save Files
+    private static final String TEMP_SAVE_FILE = "temp_initial_state.json";
+    private static final String MAIN_SAVE_FILE = "saveFile.json";
+
+
     @Override
     public void create() {
 
@@ -60,7 +64,7 @@ public class Main extends ApplicationAdapter {
         registerTiles();
 
         // 4.) Boot up game sys (Move, render, save)
-        initSystem();
+        initSystems();
 
         //5.) Game start (New vs Load)
         handleGameStart();
@@ -82,8 +86,8 @@ public class Main extends ApplicationAdapter {
     private void loadAssets() {
 
         //ENVIRONMENTS
-        wallTexture = new Texture(Gdx.files.internal("environment/BackRoomsWall.png"));
-        floorTexture = new Texture(Gdx.files.internal("environment/Floor.png"));
+        wallTexture = new Texture(Gdx.files.internal("environments/BackRoomsWall.png"));
+        floorTexture = new Texture(Gdx.files.internal("environments/Floor.png"));
 
         //INTERACTIVES
 
@@ -92,10 +96,10 @@ public class Main extends ApplicationAdapter {
         beepRegion = new TextureRegion(beepTexture);
 
         //Temp Door
-        doorOpenTexture = new Texture(Gdx.files.internal("environment/opendoor.png"));
+        doorOpenTexture = new Texture(Gdx.files.internal("environments/opendoor.png"));
         doorOpenRegion = new TextureRegion(doorOpenTexture);
 
-        doorClosedTexture = new Texture(Gdx.files.internal("environment/closedoor.png"));
+        doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
         doorCloseRegion = new TextureRegion(doorClosedTexture);
 
         //UI
@@ -108,8 +112,8 @@ public class Main extends ApplicationAdapter {
         walkAnimation = new Animation<>(0.1f, frames[0]);
 
         Texture idleSheet = new Texture("sprites/Soldier-Idle.png");
-        TextureRegion[][] idleframes = TextureRegion.split(idleSheet, 100, 100);
-        idleAnimation = new Animation<>(0.15f, frames[0]);
+        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
+        idleAnimation = new Animation<>(0.15f, idleFrames[0]);
     }
 
     private void registerTiles() {
@@ -117,7 +121,98 @@ public class Main extends ApplicationAdapter {
         TileRegistry.registerTile(2, false, new TextureRegion(floorTexture));
     }
 
+    private void initSystems() {
+        engine.addSystem(new MovementSystem());
+        engine.addSystem(new AnimationSystem());
+        engine.addSystem(new CameraFollowSystem(camera));
+        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
+        engine.addSystem(new TileRenderSystem(batch, camera));
+        engine.addSystem(new RenderSystem(batch, camera));
+        engine.addSystem(new InteractionSystem(doorOpenRegion));
+    }
 
+    private void createUI() {
+
+        menuScreen = new MenuScreen(batch, engine, this);
+    }
+
+    //GAME STATE LOGIC
+    private void handleGameStart() {
+        GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
+        GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
+        TileWorldComponent world =generateNewMap();
+
+        //LOAD GAME
+        if (mainSave != null) {
+
+            //Checks ID of Temp and Main Save File
+            boolean snapshotIsValid = false;
+            if (tempSave != null && mainSave.runId != null && tempSave.runId.equals(mainSave.runId)) {
+                snapshotIsValid = true;
+                Gdx.app.log("TERMINAL", "Snapshot verified. Reset enabled.");
+            } else {
+                Gdx.app.log("TERMINAL", "Snapshot missing or ID mismatch. Creating new safety snapshot from CURRENT loaded state.");
+                // NOTE: This isn't a "true" reset (it resets to this save, not the start of the game),
+                // but it prevents crashes if the player clicks Reset.
+            }
+
+            if (mainSave.runId != null) {
+                engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
+            }
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+            engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
+
+            if (!snapshotIsValid) {
+                engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+            }
+
+            Gdx.app.log("TERMINAL", "Save file loaded");
+        } else {
+            //NEW GAME
+
+            //Delete old saves
+            SaveManager.delete(MAIN_SAVE_FILE);
+            SaveManager.delete(TEMP_SAVE_FILE);
+
+            //Make new ID
+            engine.getSystem(SaveSystem.class).generateNewRunId();
+
+            //EntitySpawner now spawns initial stuff
+            EntitySpawner.spawnInitialEntities(engine, world, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+
+            //Initial Save Mechanic
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+            Gdx.app.log("TERMINAL", "New Instance Started");
+        }
+    }
+
+    private Entity createWorldEntity() {
+        Entity worldEntity = engine.createEntity();
+        worldEntity.add(new TileWorldComponent());
+        worldEntity.add(new PersistenceComponent("MAP", "ZA_WARDO"));
+        engine.addEntity(worldEntity);
+        return worldEntity;
+    }
+
+    private TileWorldComponent generateNewMap() {
+        Entity worldEntity = createWorldEntity();
+        TileWorldComponent tileCom = worldEntity.getComponent(TileWorldComponent.class);
+        tileCom.init(50,50);
+
+        for(int x=0; x<50; x++) {
+            for(int y=0; y<50; y++) {
+                tileCom.map[x][y] = 2;
+                if (Math.random() <0.2) tileCom.map[x][y] = 1;
+            }
+        }
+        return tileCom;
+    }
+
+    public void resetGame() {
+        Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+        engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
+
+    }
 
     @Override
     public void render() {
@@ -174,11 +269,13 @@ public class Main extends ApplicationAdapter {
     public void dispose() {
         // Clean up resources to prevent memory leaks
         batch.dispose();
-        if (playerSpriteSheet != null) {
-            playerSpriteSheet.dispose();
-        }
-        if (cursorTexture != null) {
-            cursorTexture.dispose();
-        }
+        if (menuScreen != null) menuScreen.dispose();
+        if (playerSpriteSheet != null) playerSpriteSheet.dispose();
+        if (cursorTexture != null) cursorTexture.dispose();
+        if (beepTexture != null) beepTexture.dispose();
+        if (doorOpenTexture != null) doorOpenTexture.dispose();
+        if (doorClosedTexture != null) doorClosedTexture.dispose();
+        if (wallTexture != null) wallTexture.dispose();
+        if (floorTexture != null) floorTexture.dispose();
     }
 }
