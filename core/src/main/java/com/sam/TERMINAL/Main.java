@@ -224,8 +224,9 @@ public class Main extends ApplicationAdapter {
         engine.addEntity(beep);
 
 
-        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
+
         EntityFactory.createDoor(engine, startPixelX + 64f, startPixelY +64f, doorCloseRegion);
+        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
 
         Gdx.app.log("TERMINAL", "Spawned Player at (" + startPixelX + "," + startPixelY + ")");
         Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + beepSpawnX + "," + beepSpawnY + ")");
