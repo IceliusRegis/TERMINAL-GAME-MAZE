@@ -4,241 +4,214 @@ import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.scenes.scene2d.Actor;
-import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
-import com.badlogic.gdx.utils.viewport.FitViewport;
-import com.badlogic.gdx.utils.viewport.StretchViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.sam.TERMINAL.components.*;
-import com.badlogic.gdx.utils.viewport.*;
 import com.sam.TERMINAL.buttons.MenuScreen;
-import com.sam.TERMINAL.components.PersistenceComponent;
-import com.sam.TERMINAL.entities.EntityFactory;
+import com.sam.TERMINAL.components.*;
+import com.sam.TERMINAL.entities.EntitySpawner;
+import com.sam.TERMINAL.persistence.GameData;
+import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.systems.*;
 import com.sam.TERMINAL.tiles.TileRegistry;
 
 /**
- * Main - The entry point and manager for TERMINAL.
+ * Main - The entry point and central manager for TERMINAL.
  *
  * Responsibilities:
- * - Initialize Ashley ECS engine
- * - Register systems (workers)
- * - Load assets
- * - Create initial entities
- * - Run the game loop
+ * - Lifecycle Management: Handles creation, rendering loop, resizing, and disposal.
+ * - Resource Management: Loads and holds heavy assets (Textures) to prevent memory leaks.
+ * - System Initialization: Sets up the ECS Engine, Camera, and Game Systems.
+ * - State Orchestration: Decides whether to load a save file or start a new game.
  */
+
 public class Main extends ApplicationAdapter {
 
-    // Ashley ECS engine - manages all entities, components, and systems
+    // Ashley ECS engine - manages all entities, components, rendering tools and systems
     private PooledEngine engine;
-
-    // LibGDX rendering tools
     private SpriteBatch batch;
     private OrthographicCamera camera;
     private Viewport viewport;
-
-    // TODO: Move to AssetManager later
-    private Texture playerSpriteSheet;
-    private Texture cursorTexture;
-
     private MenuScreen menuScreen;
+
+    // Asset References (Fileds for Reset Logic and Disposal)
+    private Texture playerSpriteSheet, cursorTexture;
+    private Texture beepTexture, doorOpenTexture, doorClosedTexture, wallTexture, floorTexture;
+
+    // Regions and Animation (Shared)
+    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion;
+    private Animation<TextureRegion> walkAnimation, idleAnimation;
+
+    //Save Files
+    private static final String TEMP_SAVE_FILE = "temp_initial_state.json";
+    private static final String MAIN_SAVE_FILE = "saveFile.json";
+
 
     @Override
     public void create() {
-        // === 1. INITIALIZE RENDERING AND ECS ===
+
+        // 1.) Load Core Tools
+        initEngine();
+
+        // 2.) Load assets
+        loadAssets();
+
+        // 3.) Register Tile Types
+        registerTiles();
+
+        // 4.) Boot up game sys (Move, render, save)
+        initSystems();
+
+        //5.) Game start (New vs Load)
+        handleGameStart();
+
+        //6.) Starts Up UI
+        createUI();
+
+    }
+
+    private void initEngine() {
         engine = new PooledEngine();
         batch = new SpriteBatch();
-
-        // Set up camera (800x600 viewport)
         camera = new OrthographicCamera();
         viewport = new ExtendViewport(800, 600, camera);
         viewport.apply();
+        Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
+    }
 
-        // Load Tiles
+    private void loadAssets() {
 
+        //ENVIRONMENTS
+        wallTexture = new Texture(Gdx.files.internal("environments/BackRoomsWall.png"));
+        floorTexture = new Texture(Gdx.files.internal("environments/Floor.png"));
+
+        //INTERACTIVES
 
         //Beep
-        Texture beepTexture = new Texture(Gdx.files.internal("beep.png"));
-        TextureRegion beepRegion = new TextureRegion(beepTexture);
+        beepTexture = new Texture(Gdx.files.internal("sprites/beep.png"));
+        beepRegion = new TextureRegion(beepTexture);
 
         //Temp Door
-        Texture doorOpenTexture = new Texture(Gdx.files.internal("opendoor.png"));
-        TextureRegion doorOpenRegion = new TextureRegion(doorOpenTexture);
+        doorOpenTexture = new Texture(Gdx.files.internal("environments/opendoor.png"));
+        doorOpenRegion = new TextureRegion(doorOpenTexture);
 
-        Texture doorClosedTexture = new Texture(Gdx.files.internal("closedoor.png"));
-        TextureRegion doorCloseRegion = new TextureRegion(doorClosedTexture);
+        doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
+        doorCloseRegion = new TextureRegion(doorClosedTexture);
 
-        //Creates walls
-        Texture wallTexture = new Texture(Gdx.files.internal("BackRoomsWall.png"));
-        TextureRegion wallRegion = new TextureRegion(wallTexture);
+        //UI
+        cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
-        //Temp Floor
-        Texture floorTexture = new Texture(Gdx.files.internal("Floor.png"));
-        TextureRegion floorRegion = new TextureRegion(floorTexture);
+        //PLAYER SPRITES
+        playerSpriteSheet = new Texture("sprites/Soldier-Walk.png");
 
-        //Registers the Walls
-        TileRegistry.registerTile(1, true, wallRegion);
-        TileRegistry.registerTile(2, false, floorRegion);
+        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 100, 100);
+        walkAnimation = new Animation<>(0.1f, frames[0]);
 
-        //Creates the actual Game world
+        Texture idleSheet = new Texture("sprites/Soldier-Idle.png");
+        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
+        idleAnimation = new Animation<>(0.15f, idleFrames[0]);
+    }
+
+    private void registerTiles() {
+        TileRegistry.registerTile(1, true, new TextureRegion(wallTexture));
+        TileRegistry.registerTile(2, false, new TextureRegion(floorTexture));
+    }
+
+    private void initSystems() {
+        engine.addSystem(new MovementSystem());
+        engine.addSystem(new AnimationSystem());
+        engine.addSystem(new CameraFollowSystem(camera));
+        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
+        engine.addSystem(new TileRenderSystem(batch, camera));
+        engine.addSystem(new RenderSystem(batch, camera));
+        engine.addSystem(new InteractionSystem(doorOpenRegion));
+    }
+
+    private void createUI() {
+
+        menuScreen = new MenuScreen(batch, engine, this);
+    }
+
+    //GAME STATE LOGIC
+    private void handleGameStart() {
+        GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
+        GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
+        TileWorldComponent world =generateNewMap();
+
+        //LOAD GAME
+        if (mainSave != null) {
+
+            //Checks ID of Temp and Main Save File
+            boolean snapshotIsValid = false;
+            if (tempSave != null && mainSave.runId != null && tempSave.runId.equals(mainSave.runId)) {
+                snapshotIsValid = true;
+                Gdx.app.log("TERMINAL", "Snapshot verified. Reset enabled.");
+            } else {
+                Gdx.app.log("TERMINAL", "Snapshot missing or ID mismatch. Creating new safety snapshot from CURRENT loaded state.");
+                // NOTE: This isn't a "true" reset (it resets to this save, not the start of the game),
+                // but it prevents crashes if the player clicks Reset.
+            }
+
+            if (mainSave.runId != null) {
+                engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
+            }
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+            engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
+
+            if (!snapshotIsValid) {
+                engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+            }
+
+            Gdx.app.log("TERMINAL", "Save file loaded");
+        } else {
+            //NEW GAME
+
+            //Delete old saves
+            SaveManager.delete(MAIN_SAVE_FILE);
+            SaveManager.delete(TEMP_SAVE_FILE);
+
+            //Make new ID
+            engine.getSystem(SaveSystem.class).generateNewRunId();
+
+            //EntitySpawner now spawns initial stuff
+            EntitySpawner.spawnInitialEntities(engine, world, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+
+            //Initial Save Mechanic
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+            Gdx.app.log("TERMINAL", "New Instance Started");
+        }
+    }
+
+    private Entity createWorldEntity() {
         Entity worldEntity = engine.createEntity();
-        TileWorldComponent tileCom = new TileWorldComponent();
+        worldEntity.add(new TileWorldComponent());
+        worldEntity.add(new PersistenceComponent("MAP", "ZA_WARDO"));
+        engine.addEntity(worldEntity);
+        return worldEntity;
+    }
+
+    private TileWorldComponent generateNewMap() {
+        Entity worldEntity = createWorldEntity();
+        TileWorldComponent tileCom = worldEntity.getComponent(TileWorldComponent.class);
         tileCom.init(50,50);
 
-        // Fill the floor
         for(int x=0; x<50; x++) {
             for(int y=0; y<50; y++) {
                 tileCom.map[x][y] = 2;
                 if (Math.random() <0.2) tileCom.map[x][y] = 1;
             }
         }
+        return tileCom;
+    }
 
-        worldEntity.add(tileCom);
+    public void resetGame() {
+        Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+        engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
-        //Saves Current Map
-        worldEntity.add(new PersistenceComponent("MAP","ZA_WARDO"));
-
-        engine.addEntity(worldEntity);
-
-        // Spawning Mechanics
-        int spawnTileX = 0;
-        int spawnTileY = 0;
-        boolean safeSpotFound = false;
-
-        while (!safeSpotFound) {
-            //Pick Random Coordinates
-            spawnTileX = (int) (Math.random() * 50);
-            spawnTileY = (int) (Math.random() * 50);
-
-            //Checks if the tile found is a floor
-            if (tileCom.map[spawnTileX][spawnTileY] == 2) {
-                safeSpotFound = true;
-            }
-        }
-
-        //Convert found coordinates into Pixels
-        //(Example: Tile 5 * 32 pixels = Pixel 160)
-        float startPixelX = spawnTileX * 32f;
-        float startPixelY = spawnTileY * 32f;
-
-
-        //Temporary Beep Spawning mechanics
-        int beepSpawnX = 0;
-        int beepSpawnY = 0;
-        boolean beepSafeSpawnFound = false;
-
-        int minDistance = 5;
-        int maxRadius = 15;
-
-        while (!beepSafeSpawnFound) {
-            // Picks a range between 5-15
-            int offSetX = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
-            int offSetY = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
-
-            int beepCandidateX = spawnTileX + offSetX;
-            int beepCandidateY = spawnTileY + offSetY;
-
-            if (beepCandidateX < 0 || beepCandidateX >=50 || beepCandidateY < 0 || beepCandidateY >=50) {
-                //Do not spawn their since it is out of bounds
-                continue;
-            }
-
-            if (tileCom.map[beepCandidateX][beepCandidateY] != 2) {
-                //Dont spawn also here cause walls
-                continue;
-            }
-
-            if (Math.abs(offSetX) + Math.abs(offSetY) < minDistance) {
-                //Avoid Spawning too close to the player
-                continue;
-            }
-
-            //If all checks passed
-            beepSpawnX = beepCandidateX;
-            beepSpawnY = beepCandidateY;
-            beepSafeSpawnFound = true;
-
-        }
-
-
-
-
-        // === 2. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
-        engine.addSystem(new MovementSystem());
-        engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
-        engine.addSystem(new TileRenderSystem(batch, camera));
-        engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem((new InteractionSystem(doorOpenRegion)));
-
-        // === 3. LOAD ASSETS ===
-        // TODO: Replace with placeholder if mc_walk.png doesn't exist
-
-        //Walking Animation
-        try {
-            playerSpriteSheet = new Texture("Soldier-walk.png");
-        } catch (Exception e) {
-            Gdx.app.error("TERMINAL", "Could not load mc_walk.png - using placeholder");
-            // Create a simple 32x32 white square as fallback
-            playerSpriteSheet = new Texture(Gdx.files.internal("badlogic.jpg")); // LibGDX default
-        }
-        // Split sprite sheet into frames (assumes 32x32 tiles)
-        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 100, 100);
-        // Create walking animation from first row (0.1 seconds per frame)
-        Animation<TextureRegion> walkAnimation = new Animation<>(0.1f, frames[0]);
-
-        //Idle Animation
-        Texture idleSheet = new Texture("Soldier-Idle.png");
-        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
-
-        // 0.15f makes the idle "breathing" slightly slower than walking
-        Animation<TextureRegion> idleAnimation = new Animation<>(0.15f, idleFrames[0]);
-
-
-        // === 4. CREATE INITIAL ENTITIES ===
-
-        //TEMPORARY KEY SPAWNING
-        Entity beep = engine.createEntity();
-        TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
-        beepTrans.pos.set(beepSpawnX * 32f, beepSpawnY * 32);
-        beep.add(beepTrans);
-
-        SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
-        beepSprite.staticSprite = beepRegion;
-        beepSprite.isStatic = true;
-        beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
-        beep.add(beepSprite);
-
-        beep.add(new InteractableComponent("beep", 40f));
-        String uniqueID = "KEY_" + beepSpawnX + "_" + beepSpawnY;
-        beep.add(new PersistenceComponent("INTERACTABLE", uniqueID));
-
-        engine.addEntity(beep);
-
-
-
-        EntityFactory.createDoor(engine, startPixelX + 64f, startPixelY +64f, doorCloseRegion);
-        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
-
-        Gdx.app.log("TERMINAL", "Spawned Player at (" + startPixelX + "," + startPixelY + ")");
-        Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + beepSpawnX + "," + beepSpawnY + ")");
-
-        Gdx.app.log("TERMINAL", "Week 0 initialization complete!");
-
-        Gdx.graphics.setSystemCursor(Cursor.SystemCursor.None);
-        cursorTexture = new Texture(Gdx.files.internal("cursor.png"));
-
-        Pixmap originalPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
-
-        menuScreen = new MenuScreen(batch, engine);
     }
 
     @Override
@@ -296,11 +269,13 @@ public class Main extends ApplicationAdapter {
     public void dispose() {
         // Clean up resources to prevent memory leaks
         batch.dispose();
-        if (playerSpriteSheet != null) {
-            playerSpriteSheet.dispose();
-        }
-        if (cursorTexture != null) {
-            cursorTexture.dispose();
-        }
+        if (menuScreen != null) menuScreen.dispose();
+        if (playerSpriteSheet != null) playerSpriteSheet.dispose();
+        if (cursorTexture != null) cursorTexture.dispose();
+        if (beepTexture != null) beepTexture.dispose();
+        if (doorOpenTexture != null) doorOpenTexture.dispose();
+        if (doorClosedTexture != null) doorClosedTexture.dispose();
+        if (wallTexture != null) wallTexture.dispose();
+        if (floorTexture != null) floorTexture.dispose();
     }
 }

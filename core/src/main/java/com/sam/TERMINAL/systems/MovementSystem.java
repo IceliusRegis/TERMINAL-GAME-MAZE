@@ -8,7 +8,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.sam.TERMINAL.components.CollisionComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
-import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.tiles.Tile;
@@ -19,16 +18,14 @@ import com.sam.TERMINAL.tiles.TileRegistry;
  *
  * Responsibilities:
  * 1. Reads WASD Input.
- * 2. Moves the entity on the X-Axis -> Checks Collision -> Reverts if hit.
- * 3. Moves the entity on the Y-Axis -> Checks Collision -> Reverts if hit.
- * (This separation allows "Wall Sliding" without getting stuck).
- * 4. Checks against both other Entities (CollisionComponent) AND the Map (TileWorldComponent).
+ * 2. Moves the entity on X/Y axes independently.
+ * 3. Checks for collisions against Walls or Map Borders and reverts movement if hit.
  */
+
 public class MovementSystem extends IteratingSystem {
 
     // ComponentMapper provides fast access to components
     private ComponentMapper<TransformComponent> transformMapper;
-
     /** Movement speed in pixels per second */
     private static final float PLAYER_SPEED = 200f;
 
@@ -41,7 +38,6 @@ public class MovementSystem extends IteratingSystem {
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         TransformComponent transform = transformMapper.get(entity);
-        SpriteComponent sprite = entity.getComponent(SpriteComponent.class);
 
         //Calculate how much we want to move
         float xMove = 0;
@@ -49,7 +45,7 @@ public class MovementSystem extends IteratingSystem {
         // Calculate movement based on deltaTime for smooth, framerate-independent motion
         float speed = PLAYER_SPEED * deltaTime;
 
-        // Handle WASD input
+        // Handle WASD input (Velocity)
         if (Gdx.input.isKeyPressed(Input.Keys.W)) {
             yMove += speed;
         }
@@ -58,11 +54,9 @@ public class MovementSystem extends IteratingSystem {
         }
         if (Gdx.input.isKeyPressed(Input.Keys.A)) {
             xMove -= speed;
-            if (sprite != null) sprite.facingRight = false;
         }
         if (Gdx.input.isKeyPressed(Input.Keys.D)) {
             xMove += speed;
-            if (sprite !=null) sprite.facingRight = true;
         }
 
         // Get Map Data so that we know where the walls at
@@ -94,25 +88,7 @@ public class MovementSystem extends IteratingSystem {
             transform.pos.y = oldY;
             transform.updateBounds();
         }
-
-
-        if (sprite != null) {
-
-            boolean isMoving = (xMove !=0 || yMove !=0);
-
-            if (isMoving) {
-                sprite.currentAnimation = sprite.walkAnimation;
-
-                if (xMove < 0) sprite.facingRight = false;
-                else if (xMove > 0) sprite.facingRight = true;
-
-                } else {
-                sprite.currentAnimation = sprite.idleAnimation;
-            }
-
-            }
-
-        }
+    }
 
         private boolean checkEntityCollison(Entity player, TransformComponent playerTransfrom) {
             for (Entity wall : getEngine().getEntitiesFor(Family.all(CollisionComponent.class).get())) {

@@ -10,6 +10,7 @@ import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.persistence.GameData;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.sam.TERMINAL.persistence.SaveManager;
+import java.util.UUID;
 
 /**
  * SaveSystem - The bridge between the active Game World (ECS) and the File System.
@@ -42,10 +43,14 @@ public class SaveSystem extends IteratingSystem {
     //Save State
     private GameData pendingSaveData;
     private boolean saving = false;
+    private String currentSaveFile = "saveFile.json";
 
     //Load State
     private GameData loadedData; // reads data from disk
     private boolean loading = false; //tells the game we are loading data
+
+    //IDs
+    private String currentRunId = "";
 
     //Sprites
     private final  TextureRegion openDoorSprite;
@@ -70,17 +75,25 @@ public class SaveSystem extends IteratingSystem {
         collisionMapper = ComponentMapper.getFor(CollisionComponent.class);
     }
 
+    public void  generateNewRunId() {
+        this.currentRunId = UUID.randomUUID().toString();
+    }
+
+    public void setRunID(String id) {
+        this.currentRunId = id;
+    }
+
     @Override
     public void update(float deltaTime) {
 
         //Save Button Trigger
         if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
-            startSave();
+            triggerManualSave("saveFile.json");
         }
 
         //Load Button Trigger
         if (Gdx.input.isKeyJustPressed(Input.Keys.F9)) {
-            startLoad();
+            triggerManualLoad("saveFile.json");
         }
 
         if (saving || loading) {
@@ -90,8 +103,8 @@ public class SaveSystem extends IteratingSystem {
 
             if (saving) {
                 //Finished collecting data, now write it to disk.
-                SaveManager.save(pendingSaveData);
-                System.out.println("Game Saved");
+                SaveManager.save(pendingSaveData, currentSaveFile);
+                System.out.println("Saved to: " + currentSaveFile);
 
                 //Reset the system so it stops saving
                 saving = false;
@@ -100,7 +113,7 @@ public class SaveSystem extends IteratingSystem {
             }
 
             if (loading) {
-                System.out.println("Game Loaded!");
+                System.out.println("Loaded from: " + currentSaveFile);
                 loading = false;
                 loadedData = null;
             }
@@ -109,29 +122,32 @@ public class SaveSystem extends IteratingSystem {
         }
     }
 
-    private void startSave() {
-        saving = true;
-        loading = false;
-        pendingSaveData = new GameData(); // Create a clean, empty SAve File
-    }
-
-    public void triggerManualSave() {
+    public void triggerManualSave(String fileName) {
         if (!saving) { // Prevent double-saving if already in progress
-            startSave();
+            this.currentSaveFile = fileName;
+            this.saving = true;
+            this.loading = false;
+            this.pendingSaveData = new GameData();
+            this.pendingSaveData.runId = this.currentRunId;
         }
     }
 
-    private void startLoad() {
-        GameData data = SaveManager.load();
-
-        if (data != null) {
-            loadedData = data;
-            loading = true;
-            saving = false;
-        } else {
-            System.out.println("No save file found :(");
+    public void triggerManualLoad(String fileName) {
+        if(!loading) {
+            //Check if file exist first to avoid crashes
+            GameData data = SaveManager.load(fileName);
+            if (data != null) {
+                this.currentSaveFile = fileName;
+                this.loadedData = data;
+                this.loading = true;
+                this.saving = false;
+                if (data.runId !=null) this.currentRunId = data.runId;
+            } else {
+                System.out.println("Cannot load: " + fileName + " does not exist");
+            }
         }
     }
+
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
@@ -178,6 +194,11 @@ public class SaveSystem extends IteratingSystem {
 
         // Loading (Data to Entity)
         else if (loading) {
+
+            if (loadedData != null && !loadedData.runId.isEmpty()) {
+                this.currentRunId = loadedData.runId;
+            }
+
             switch (persistence.type) {
 
                 case "PLAYER":

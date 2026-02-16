@@ -17,6 +17,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.sam.TERMINAL.systems.SaveSystem; // Added
+import com.sam.TERMINAL.Main;
 
 public class MenuScreen {
     private Stage uiStage;
@@ -28,10 +29,12 @@ public class MenuScreen {
     private Table inventoryWindow;
     private Table bottomTable;
     private PooledEngine engine; // Reference to trigger saves
+    private Main mainGame;
 
     // Constructor now takes only SpriteBatch and PooledEngine
-    public MenuScreen(SpriteBatch batch, final PooledEngine engine) {
+    public MenuScreen(SpriteBatch batch, final PooledEngine engine, final Main mainGame) {
         this.engine = engine;
+        this.mainGame = mainGame;
         float w = Gdx.graphics.getWidth();
         float h = Gdx.graphics.getHeight();
 
@@ -46,7 +49,7 @@ public class MenuScreen {
         mainRoot.setFillParent(true);
         mainRoot.top().left();
 
-        settingsTexture = new Texture(Gdx.files.internal("settings.png"));
+        settingsTexture = new Texture(Gdx.files.internal("ui/settings.png"));
         Image settingsBtn = new Image(settingsTexture);
         settingsBtn.addListener(new ClickListener() {
             @Override
@@ -72,11 +75,16 @@ public class MenuScreen {
             },
             () -> { // onSave
                 saveMapLogic();
+            },
+            () -> { //onReset
+            mainGame.resetGame();
+            isSettingsVisible = false;
+            updateInputProcessor();
             }
         );
 
         // --- INVENTORY SETUP ---
-        invTexture = new Texture(Gdx.files.internal("inventory.png"));
+        invTexture = new Texture(Gdx.files.internal("ui/inventory.png"));
         ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
         bottomTable = new Table();
         bottomTable.setFillParent(true);
@@ -132,7 +140,7 @@ public class MenuScreen {
     private void saveMapLogic() {
         if (engine != null) {
             SaveSystem saveSys = engine.getSystem(SaveSystem.class);
-            if (saveSys != null) saveSys.triggerManualSave();
+            if (saveSys != null) saveSys.triggerManualSave("saveFile.json");
         }
     }
 

@@ -18,7 +18,7 @@ public class InventoryButton {
 
         // Load the specific picture for the exit button here
         // Make sure "exit_icon.png" is in your assets folder!
-        exitTexture = new Texture(Gdx.files.internal("exit.png"));
+        exitTexture = new Texture(Gdx.files.internal("ui/exit.png"));
 
         TextureRegionDrawable exitDrawable = new TextureRegionDrawable(new TextureRegion(exitTexture));
         ImageButton exitBtn = new ImageButton(exitDrawable);
