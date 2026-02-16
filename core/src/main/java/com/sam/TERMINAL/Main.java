@@ -55,6 +55,11 @@ public class Main extends ApplicationAdapter {
 
         // Load Tiles
 
+
+        //Beep
+        Texture beepTexture = new Texture(Gdx.files.internal("beep.png"));
+        TextureRegion beepRegion = new TextureRegion(beepTexture);
+
         //Temp Door
         Texture doorOpenTexture = new Texture(Gdx.files.internal("opendoor.png"));
         TextureRegion doorOpenRegion = new TextureRegion(doorOpenTexture);
@@ -160,7 +165,7 @@ public class Main extends ApplicationAdapter {
         // === 2. REGISTER SYSTEMS (Order matters! Logic before rendering) ===
         engine.addSystem(new MovementSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem());
+        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem((new InteractionSystem(doorOpenRegion)));
@@ -198,12 +203,15 @@ public class Main extends ApplicationAdapter {
         beep.add(beepTrans);
 
         SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
-        beepSprite.staticSprite = new TextureRegion(new Texture(Gdx.files.internal("beep.png")));
+        beepSprite.staticSprite = beepRegion;
         beepSprite.isStatic = true;
         beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
         beep.add(beepSprite);
 
         beep.add(new InteractableComponent("beep", 40f));
+        String uniqueID = "KEY_" + beepSpawnX + "_" + beepSpawnY;
+        beep.add(new PersistenceComponent("INTERACTABLE", uniqueID));
+
         engine.addEntity(beep);
 
 

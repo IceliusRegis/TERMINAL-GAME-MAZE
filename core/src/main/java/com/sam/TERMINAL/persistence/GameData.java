@@ -2,6 +2,8 @@ package com.sam.TERMINAL.persistence;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * GameData - A raw data container for saving and loading.
@@ -20,6 +22,8 @@ public class GameData {
 
     // We'll use a simple list of Strings for item IDs (e.g., "key_card_blue")
     public List<String> inventoryItems;
+
+    public Map<String, Boolean> interactableStates = new HashMap<>();
 
     // 2. Required for JSON serialization
     public GameData() {

@@ -86,8 +86,8 @@ public class InteractionSystem extends EntitySystem {
             case "beep":
                 System.out.println("Picked up a BEEP CARD!");
                 if (inventory != null) inventory.addItem("beep_card");
-                //Remove the picked up item
-                getEngine().removeEntity(target);
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
                 break;
 
             case "door":

@@ -71,6 +71,9 @@ public class EntityFactory {
         door.add(engine.createComponent(CollisionComponent.class));
         door.add(new InteractableComponent("door", 40f));
 
+        String uniqueID = "DOOR_" + (int)x + "_" + (int)y;
+        door.add(new PersistenceComponent("INTERACTABLE", uniqueID));
+
         engine.addEntity(door);
 
 
