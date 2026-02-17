@@ -1,5 +1,7 @@
 package com.sam.TERMINAL.buttons;
 
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine; // Added
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -12,10 +14,14 @@ import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.sam.TERMINAL.components.InventoryComponent;
+import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.systems.EnemySystem;
 import com.sam.TERMINAL.systems.SaveSystem; // Added
 import com.sam.TERMINAL.Main;
 
@@ -96,6 +102,7 @@ public class MenuScreen {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 isInventoryVisible = true;
+                refreshInventory();
                 updateInputProcessor();
             }
         });
@@ -120,6 +127,7 @@ public class MenuScreen {
                 if (keycode == Input.Keys.TAB) {
                     isInventoryVisible = !isInventoryVisible;
                     if (isInventoryVisible) isSettingsVisible = false;
+                    refreshInventory();
                     updateInputProcessor();
                     return true;
                 }
@@ -210,4 +218,24 @@ public class MenuScreen {
 
     public boolean isSettingsVisible() { return isSettingsVisible; }
     public boolean isInventoryVisible() { return isInventoryVisible; }
+
+    private void refreshInventory() {
+        inventoryWindow.clearChildren();
+
+        //Re ADDS Exit butt
+        new InventoryButton(inventoryWindow, () -> {isInventoryVisible = false; updateInputProcessor();});
+        inventoryWindow.row();
+
+        //Check Items
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+
+        //DRAW PLEASEE
+        if (inv != null && inv.hasItem("beep_card")) {
+            Image icon = new Image(mainGame.getBeepRegion());
+            inventoryWindow.add(icon).size(64, 64).pad(20);
+            inventoryWindow.add(new com.badlogic.gdx.scenes.scene2d.ui.Label("Beep Card", new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(new com.badlogic.gdx.graphics.g2d.BitmapFont(), com.badlogic.gdx.graphics.Color.WHITE)));
+        }
+    }
 }
