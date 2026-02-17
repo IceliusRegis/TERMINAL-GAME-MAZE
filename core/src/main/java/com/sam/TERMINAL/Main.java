@@ -238,6 +238,14 @@ public class Main extends ApplicationAdapter {
 
     public void resetGame() {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+
+        //Locks all door before reset
+        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        for (Entity door : doors) {
+            door.getComponent(InteractableComponent.class).isActive = true; // Close it!
+        }
+
+
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
 
