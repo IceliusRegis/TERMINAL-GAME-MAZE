@@ -251,6 +251,13 @@ public class Main extends ApplicationAdapter {
             t.updateBounds();
         }
 
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        wls.gameOver = false;
+        wls.win = false;
+
+        // 4. Reset UI (NEW LINE)
+        menuScreen.resetUI();
+
 
     }
 
@@ -266,7 +273,7 @@ public class Main extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
-        if (!menuScreen.isSettingsVisible()) {
+        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver()) {
             engine.update(delta);
         } else {
             // When paused, we draw the last known state without moving anything
@@ -280,6 +287,14 @@ public class Main extends ApplicationAdapter {
 
         // 4. Draw the Menu (Drawn last so it sits on top of the character)
         menuScreen.render(delta);
+
+        //Decides what outcome to render
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        if (wls.win && !menuScreen.isGameOver()) {
+            menuScreen.showGameOver(true);
+        } else if (wls.gameOver && !menuScreen.isGameOver()) {
+            menuScreen.showGameOver(false);
+        }
 
         // 3. Draw the Software Cursor (Calculates size based on window)
         // Reset the Projection Matrix so (0,0) is bottom-left of the WINDOW

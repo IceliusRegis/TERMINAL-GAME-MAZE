@@ -21,15 +21,23 @@ public class WinLossSystem extends EnemySystem {
         ImmutableArray<Entity> players = getEngine().getEntitiesFor(Family.all(PlayerComponent.class).get());
         ImmutableArray<Entity> enemies = getEngine().getEntitiesFor(Family.all(EnemyComponent.class).get());
 
+        boolean hit = false;
+
         if (players.size() > 0 && enemies.size() > 0) {
             TransformComponent pT = players.first().getComponent(TransformComponent.class);
             for (Entity e : enemies) {
-                if (e.getComponent(TransformComponent.class).bounds.overlaps(pT.bounds)) {
-                    System.out.println("YOU DIED - GAME OVER");
-                    gameOver = true;
-                    mainGame.resetGame(); // Immediate reset
+                TransformComponent eT = e.getComponent(TransformComponent.class);
+                if (eT != null && eT.bounds.overlaps(pT.bounds)) {
+                    hit = true;
+                    break;
                 }
             }
+        }
+
+        if (hit) {
+            System.out.println("YOU DIED - GAME OVER");
+            gameOver = true;
+            //mainGame.resetGame();
         }
 
         //WIN CONDITION
