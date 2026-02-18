@@ -227,6 +227,45 @@ public class MenuScreen {
         inventoryStage.getViewport().update(width, height, true);
     }
 
+    private void setupHUD() {
+        uiStage.clear(); // 1. Clean the slate
+
+        // 2. Create Top-Left Settings Button
+        Table mainRoot = new Table();
+        mainRoot.setFillParent(true);
+        mainRoot.top().left();
+
+        Image settingsBtn = new Image(settingsTexture);
+        settingsBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                isSettingsVisible = true;
+                updateInputProcessor();
+            }
+        });
+        mainRoot.add(settingsBtn).size(40, 40).pad(10);
+        uiStage.addActor(mainRoot);
+
+        // 3. Create Bottom-Center Inventory Button
+        Table bottomTable = new Table();
+        bottomTable.setFillParent(true);
+        bottomTable.bottom();
+
+        ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
+        inventoryBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                isInventoryVisible = true;
+                refreshInventory();
+                updateInputProcessor();
+            }
+        });
+
+        bottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
+        uiStage.addActor(bottomTable);
+    }
+
+
     public void dispose() {
         uiStage.dispose(); settingsStage.dispose(); inventoryStage.dispose();
         settingsTexture.dispose(); whitePixel.dispose(); invTexture.dispose();
@@ -309,6 +348,7 @@ public class MenuScreen {
         // ... Re-add Settings Button code ...
         // ... Re-add Inventory Button code ...
 
+        setupHUD();
         updateInputProcessor();
     }
 
