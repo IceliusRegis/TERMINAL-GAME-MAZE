@@ -10,9 +10,6 @@ import com.sam.TERMINAL.components.CollisionComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.TransformComponent;
-import com.sam.TERMINAL.tiles.Tile;
-import com.sam.TERMINAL.tiles.TileRegistry;
-
 /**
  * MovementSystem - Handles player input, physics, and collision.
  *
@@ -107,8 +104,8 @@ public class MovementSystem extends IteratingSystem {
             //World Border Check
 
             // A. Calculate Maps length in Pixels
-            float mapPixelWidth = world.mapWidth * world.tileWidth;
-            float mapPixelHeight = world.mapHeight * world.tileHeight;
+            float mapPixelWidth = world.mapWidthTiles* world.tileWidth;
+            float mapPixelHeight = world.mapHeightTiles * world.tileHeight;
 
             // B. Checks if near the Left & Bottom Coordinates border
             if (transform.bounds.x < 0) return true;
@@ -128,24 +125,13 @@ public class MovementSystem extends IteratingSystem {
             //2.) Loop through every tile the player is touching
             for (int x = startX; x <= endX; x++) {
                 for (int y = startY; y <= endY; y++) {
-
-                    //Makes everything Outside the map as a solid wall
-                    if (x < 0 || x >= world.mapWidth || y < 0 || y >= world.mapHeight) {
+                    //3.) Checks the Collison Layer
+                    if (world.isSolid(x, y)) {
                         return true;
-                    }
-
-                    //3.) Looks up the actual wall/tileId
-                    int tileId = world.map[x][y];
-                    Tile tile = TileRegistry.getTile(tileId);
-
-                    //4.) Checks if Tile isSolid
-                    if (tile != null && tile.isSolid) {
-                        return true; //Player has bumped into something
                     }
                 }
             }
             return false;
         }
-
     }
 

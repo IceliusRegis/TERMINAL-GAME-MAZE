@@ -4,7 +4,6 @@ import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.persistence.GameData;
 
 /**
@@ -29,7 +28,7 @@ public class EntitySpawner {
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
-    public static void spawnInitialEntities (PooledEngine engine, TileWorldComponent tileCom,
+    public static void spawnInitialEntities (PooledEngine engine,
                                              TextureRegion beepRegion, TextureRegion doorRegion,
                                              Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
 

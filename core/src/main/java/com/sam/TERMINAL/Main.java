@@ -14,10 +14,10 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.entities.EntitySpawner;
+import com.sam.TERMINAL.entities.MapManager;
 import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.systems.*;
-import com.sam.TERMINAL.tiles.TileRegistry;
 import com.badlogic.ashley.core.Family;
 
 /**
@@ -38,6 +38,7 @@ public class Main extends ApplicationAdapter {
     private OrthographicCamera camera;
     private Viewport viewport;
     private MenuScreen menuScreen;
+    private MapManager mapManager;
 
     // Asset References (Fileds for Reset Logic and Disposal)
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
@@ -61,16 +62,13 @@ public class Main extends ApplicationAdapter {
         // 2.) Load assets
         loadAssets();
 
-        // 3.) Register Tile Types
-        registerTiles();
-
-        // 4.) Boot up game sys (Move, render, save)
+        // 3.) Boot up game sys (Move, render, save)
         initSystems();
 
-        //5.) Game start (New vs Load)
+        //4.) Game start (New vs Load)
         handleGameStart();
 
-        //6.) Starts Up UI
+        //5.) Starts Up UI
         createUI();
 
     }
@@ -85,11 +83,6 @@ public class Main extends ApplicationAdapter {
     }
 
     private void loadAssets() {
-
-        //ENVIRONMENTS
-        wallTexture = new Texture(Gdx.files.internal("environments/BackRoomsWall.png"));
-        floorTexture = new Texture(Gdx.files.internal("environments/Floor.png"));
-
         //INTERACTIVES
 
         //Beep
@@ -122,10 +115,6 @@ public class Main extends ApplicationAdapter {
 
     }
 
-    private void registerTiles() {
-        TileRegistry.registerTile(1, true, new TextureRegion(wallTexture));
-        TileRegistry.registerTile(2, false, new TextureRegion(floorTexture));
-    }
 
     private void initSystems() {
         engine.addSystem(new MovementSystem());
@@ -134,7 +123,6 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
-        engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(doorOpenRegion));
     }
@@ -148,7 +136,10 @@ public class Main extends ApplicationAdapter {
     private void handleGameStart() {
         GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
         GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
-        TileWorldComponent world =generateNewMap();
+
+        // --- NEW MAP LOADING LOGIC ---
+        mapManager = new MapManager(engine);
+        mapManager.loadMap("maps/mapTest.tmx");
 
         //LOAD GAME
         if (mainSave != null) {
@@ -186,54 +177,12 @@ public class Main extends ApplicationAdapter {
             engine.getSystem(SaveSystem.class).generateNewRunId();
 
             //EntitySpawner now spawns initial stuff
-            EntitySpawner.spawnInitialEntities(engine, world, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
 
             //Initial Save Mechanic
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
-    }
-
-    private Entity createWorldEntity() {
-        Entity worldEntity = engine.createEntity();
-        worldEntity.add(new TileWorldComponent());
-        worldEntity.add(new PersistenceComponent("MAP", "ZA_WARDO"));
-        engine.addEntity(worldEntity);
-        return worldEntity;
-    }
-
-    private TileWorldComponent generateNewMap() {
-        Entity worldEntity = createWorldEntity();
-        TileWorldComponent tileCom = worldEntity.getComponent(TileWorldComponent.class);
-        tileCom.init(50,50);
-
-        for(int x=0; x<50; x++) {
-            for(int y=0; y<50; y++) {
-                tileCom.map[x][y] = 2;
-                if (Math.random() <0.2) tileCom.map[x][y] = 1;
-            }
-        }
-
-        //Outer Walls
-        for (int i = 0; i < 50; i++) {
-            tileCom.map[i][0] = 1; tileCom.map[i][49] = 1;
-            tileCom.map[0][i] = 1; tileCom.map[49][i] = 1;
-        }
-
-        //FORCE SAFE SPOTS (Drill holes for our hardcoded entities)
-        // Player Spawn (5, 5)
-        tileCom.map[5][5] = 2; tileCom.map[6][5] = 2;
-
-        // Key Spawn (20, 10)
-        tileCom.map[20][10] = 2;
-
-        // Door Spawn (40, 40)
-        tileCom.map[40][40] = 2;
-
-        // Enemy Spawn (5, 40)
-        tileCom.map[5][40] = 2;
-
-        return tileCom;
     }
 
     public void resetGame() {
@@ -274,6 +223,9 @@ public class Main extends ApplicationAdapter {
         // 1. Clear the screen
         float delta = Gdx.graphics.getDeltaTime();
         ScreenUtils.clear(0f, 0f, 0f, 1);
+
+        // --- NEW: DRAW TMX MAP FIRST ---
+        mapManager.render(camera);
 
         // 2. Draw the Game World (Walls, Player)
         viewport.apply();
@@ -338,8 +290,6 @@ public class Main extends ApplicationAdapter {
         if (beepTexture != null) beepTexture.dispose();
         if (doorOpenTexture != null) doorOpenTexture.dispose();
         if (doorClosedTexture != null) doorClosedTexture.dispose();
-        if (wallTexture != null) wallTexture.dispose();
-        if (floorTexture != null) floorTexture.dispose();
     }
 
     //HELPER FUNC
