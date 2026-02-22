@@ -18,6 +18,7 @@ import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.systems.*;
 import com.sam.TERMINAL.tiles.TileRegistry;
+import com.badlogic.ashley.core.Family;
 
 /**
  * Main - The entry point and central manager for TERMINAL.
@@ -39,11 +40,11 @@ public class Main extends ApplicationAdapter {
     private MenuScreen menuScreen;
 
     // Asset References (Fileds for Reset Logic and Disposal)
-    private Texture playerSpriteSheet, cursorTexture;
+    private Texture playerSpriteSheet, cursorTexture, enemyTexture;
     private Texture beepTexture, doorOpenTexture, doorClosedTexture, wallTexture, floorTexture;
 
     // Regions and Animation (Shared)
-    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion;
+    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     //Save Files
@@ -114,6 +115,11 @@ public class Main extends ApplicationAdapter {
         Texture idleSheet = new Texture("sprites/Soldier-Idle.png");
         TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
         idleAnimation = new Animation<>(0.15f, idleFrames[0]);
+
+        //ENEMY
+        enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
+        enemyRegion = new TextureRegion(enemyTexture);
+
     }
 
     private void registerTiles() {
@@ -123,6 +129,8 @@ public class Main extends ApplicationAdapter {
 
     private void initSystems() {
         engine.addSystem(new MovementSystem());
+        engine.addSystem(new EnemySystem());
+        engine.addSystem(new WinLossSystem(this));
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
@@ -159,7 +167,7 @@ public class Main extends ApplicationAdapter {
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -178,7 +186,7 @@ public class Main extends ApplicationAdapter {
             engine.getSystem(SaveSystem.class).generateNewRunId();
 
             //EntitySpawner now spawns initial stuff
-            EntitySpawner.spawnInitialEntities(engine, world, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+            EntitySpawner.spawnInitialEntities(engine, world, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
 
             //Initial Save Mechanic
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
@@ -205,12 +213,59 @@ public class Main extends ApplicationAdapter {
                 if (Math.random() <0.2) tileCom.map[x][y] = 1;
             }
         }
+
+        //Outer Walls
+        for (int i = 0; i < 50; i++) {
+            tileCom.map[i][0] = 1; tileCom.map[i][49] = 1;
+            tileCom.map[0][i] = 1; tileCom.map[49][i] = 1;
+        }
+
+        //FORCE SAFE SPOTS (Drill holes for our hardcoded entities)
+        // Player Spawn (5, 5)
+        tileCom.map[5][5] = 2; tileCom.map[6][5] = 2;
+
+        // Key Spawn (20, 10)
+        tileCom.map[20][10] = 2;
+
+        // Door Spawn (40, 40)
+        tileCom.map[40][40] = 2;
+
+        // Enemy Spawn (5, 40)
+        tileCom.map[5][40] = 2;
+
         return tileCom;
     }
 
     public void resetGame() {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+
+        //Locks all door before reset
+        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        for (Entity door : doors) {
+            door.getComponent(InteractableComponent.class).isActive = true; // Close it!
+        }
+
+
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
+
+
+        //Hard Reset for enemy to avoid spawn killing
+        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
+
+        for (Entity enemy : enemies) {
+            TransformComponent t = enemy.getComponent(TransformComponent.class);
+
+            t.pos.set(5 * 32f, 40 * 32f);
+            t.updateBounds();
+        }
+
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        wls.gameOver = false;
+        wls.win = false;
+
+        // 4. Reset UI (NEW LINE)
+        menuScreen.resetUI();
+
 
     }
 
@@ -226,7 +281,7 @@ public class Main extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
-        if (!menuScreen.isSettingsVisible()) {
+        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver()) {
             engine.update(delta);
         } else {
             // When paused, we draw the last known state without moving anything
@@ -240,6 +295,14 @@ public class Main extends ApplicationAdapter {
 
         // 4. Draw the Menu (Drawn last so it sits on top of the character)
         menuScreen.render(delta);
+
+        //Decides what outcome to render
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        if (wls.win && !menuScreen.isGameOver()) {
+            menuScreen.showGameOver(true);
+        } else if (wls.gameOver && !menuScreen.isGameOver()) {
+            menuScreen.showGameOver(false);
+        }
 
         // 3. Draw the Software Cursor (Calculates size based on window)
         // Reset the Projection Matrix so (0,0) is bottom-left of the WINDOW
@@ -278,4 +341,10 @@ public class Main extends ApplicationAdapter {
         if (wallTexture != null) wallTexture.dispose();
         if (floorTexture != null) floorTexture.dispose();
     }
+
+    //HELPER FUNC
+    public TextureRegion getBeepRegion() {
+        return beepRegion;
+    }
+
 }
