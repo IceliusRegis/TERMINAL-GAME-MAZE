@@ -107,14 +107,14 @@ public class Main extends ApplicationAdapter {
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
         //PLAYER SPRITES
-        playerSpriteSheet = new Texture("sprites/Soldier-Walk.png");
+        playerSpriteSheet = new Texture("sprites/MC (Walk).png");
 
-        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 100, 100);
+        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 128, 250);
         walkAnimation = new Animation<>(0.1f, frames[0]);
 
-        Texture idleSheet = new Texture("sprites/Soldier-Idle.png");
-        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
-        idleAnimation = new Animation<>(0.15f, idleFrames[0]);
+        Texture idleSheet = new Texture("sprites/MC (Idle).png");
+        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 128, 250);
+        idleAnimation = new Animation<>(0.3f, idleFrames[0]);
 
         //ENEMY
         enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));

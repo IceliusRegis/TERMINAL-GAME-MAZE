@@ -42,8 +42,8 @@ public class EntityFactory {
 
 
         // The actual size of the sprite frame HITBOX
-        sprite.drawWidth = 165f;
-        sprite.drawHeight = 165f;
+        sprite.drawWidth = 128f;
+        sprite.drawHeight = 250f;
 
         player.add(engine.createComponent(PlayerComponent.class));
 
