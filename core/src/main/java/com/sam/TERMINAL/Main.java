@@ -17,12 +17,12 @@ import com.sam.TERMINAL.entities.EntitySpawner;
 import com.sam.TERMINAL.entities.MapManager;
 import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
+import com.sam.TERMINAL.screen.TitleScreen;
 import com.sam.TERMINAL.systems.*;
 import com.badlogic.ashley.core.Family;
 
 /**
  * Main - The entry point and central manager for TERMINAL.
- *
  * Responsibilities:
  * - Lifecycle Management: Handles creation, rendering loop, resizing, and disposal.
  * - Resource Management: Loads and holds heavy assets (Textures) to prevent memory leaks.
@@ -38,11 +38,13 @@ public class Main extends ApplicationAdapter {
     private OrthographicCamera camera;
     private Viewport viewport;
     private MenuScreen menuScreen;
+    private TitleScreen titleScreen;
+    private boolean showingTitleScreen = true;
     private MapManager mapManager;
 
     // Asset References (Fileds for Reset Logic and Disposal)
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, doorOpenTexture, doorClosedTexture, wallTexture, floorTexture;
+    private Texture beepTexture, doorOpenTexture, doorClosedTexture;
 
     // Regions and Animation (Shared)
     private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion;
@@ -62,7 +64,17 @@ public class Main extends ApplicationAdapter {
         // 2.) Load assets
         loadAssets();
 
-        // 3.) Boot up game sys (Move, render, save)
+        // 3.) Show title screen; game systems start when user picks New Game / Continue
+        boolean hasSave = SaveManager.load(MAIN_SAVE_FILE) != null;
+        titleScreen = new TitleScreen(batch, hasSave, this::onTitleScreenChoice);
+    }
+
+    // Called by TitleScreen when user picks New Game (loadExisting=false) or Continue (loadExisting=true)
+    private void onTitleScreenChoice(boolean loadExisting) {
+        if (!loadExisting) {
+            SaveManager.delete(MAIN_SAVE_FILE);
+            SaveManager.delete(TEMP_SAVE_FILE);
+        }
         initSystems();
 
         //4.) Game start (New vs Load)
@@ -70,7 +82,11 @@ public class Main extends ApplicationAdapter {
 
         //5.) Starts Up UI
         createUI();
-
+        if (titleScreen != null) {
+            titleScreen.dispose();
+            titleScreen = null;
+        }
+        showingTitleScreen = false;
     }
 
     private void initEngine() {
@@ -224,8 +240,16 @@ public class Main extends ApplicationAdapter {
         float delta = Gdx.graphics.getDeltaTime();
         ScreenUtils.clear(0f, 0f, 0f, 1);
 
+        if (showingTitleScreen && titleScreen != null) {
+            titleScreen.render(delta);
+            drawCursor();
+            return;
+        }
+
         // --- NEW: DRAW TMX MAP FIRST ---
-        mapManager.render(camera);
+        if (mapManager != null) {
+            mapManager.render(camera);
+        }
 
         // 2. Draw the Game World (Walls, Player)
         viewport.apply();
@@ -256,17 +280,15 @@ public class Main extends ApplicationAdapter {
             menuScreen.showGameOver(false);
         }
 
-        // 3. Draw the Software Cursor (Calculates size based on window)
-        // Reset the Projection Matrix so (0,0) is bottom-left of the WINDOW
-        batch.getProjectionMatrix().setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        drawCursor();
+    }
 
-        // Calculate scaling (relative to your 800px base width)
+    private void drawCursor() {
+        batch.getProjectionMatrix().setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         float scale = Gdx.graphics.getWidth() / 800f;
         float cursorSize = 48 * scale;
-
         float mouseX = Gdx.input.getX();
-        float mouseY = Gdx.graphics.getHeight() - Gdx.input.getY(); // Flip Y
-
+        float mouseY = Gdx.graphics.getHeight() - Gdx.input.getY();
         batch.begin();
         if (cursorTexture != null) {
             batch.draw(cursorTexture, mouseX, mouseY - cursorSize, cursorSize, cursorSize);
@@ -277,19 +299,22 @@ public class Main extends ApplicationAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, false);
-        menuScreen.resize(width, height);
+        if (titleScreen != null) titleScreen.resize(width, height);
+        if (menuScreen != null) menuScreen.resize(width, height);
     }
 
     @Override
     public void dispose() {
         // Clean up resources to prevent memory leaks
         batch.dispose();
+        if (titleScreen != null) titleScreen.dispose();
         if (menuScreen != null) menuScreen.dispose();
         if (playerSpriteSheet != null) playerSpriteSheet.dispose();
         if (cursorTexture != null) cursorTexture.dispose();
         if (beepTexture != null) beepTexture.dispose();
         if (doorOpenTexture != null) doorOpenTexture.dispose();
         if (doorClosedTexture != null) doorClosedTexture.dispose();
+        if (enemyTexture != null) enemyTexture.dispose();
     }
 
     //HELPER FUNC
