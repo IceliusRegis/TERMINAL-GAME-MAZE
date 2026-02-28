@@ -74,7 +74,7 @@ public class TitleScreen {
         float h = Gdx.graphics.getHeight();
         stage = new Stage(new ExtendViewport(w, h), batch);
 
-        backgroundTexture = new Texture(Gdx.files.internal("ui/title_background.png"));
+        backgroundTexture = new Texture(Gdx.files.internal("ui/title_background.jpg"));
 
         titleFont = loadFont("fonts/BIOSfontII.ttf", 72);
         menuFont = loadFont("fonts/BIOSfontII.ttf", 32);
