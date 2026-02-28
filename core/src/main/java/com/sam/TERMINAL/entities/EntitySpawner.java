@@ -4,7 +4,6 @@ import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.persistence.GameData;
 
 /**
@@ -18,9 +17,23 @@ import com.sam.TERMINAL.persistence.GameData;
 
 public class EntitySpawner {
 
-    public static void spawnInitialEntities (PooledEngine engine, TileWorldComponent tileCom,
+    // Helper coordinates (So we don't typo them)
+    private static final float TILE_SIZE = 32f;
+    private static final float PLAYER_X = 5 * TILE_SIZE;
+    private static final float PLAYER_Y = 5 * TILE_SIZE;
+    private static final float KEY_X = 20 * TILE_SIZE;
+    private static final float KEY_Y = 10 * TILE_SIZE;
+    private static final float DOOR_X = 40 * TILE_SIZE;
+    private static final float DOOR_Y = 40 * TILE_SIZE;
+    private static final float ENEMY_X = 5 * TILE_SIZE;
+    private static final float ENEMY_Y = 40 * TILE_SIZE;
+
+    public static void spawnInitialEntities (PooledEngine engine,
                                              TextureRegion beepRegion, TextureRegion doorRegion,
-                                             Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
+                                             Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
+
+       /* Disable complex spawn for noww
+
 
         //PLAYER SPAWN MECHANICS
 
@@ -124,30 +137,38 @@ public class EntitySpawner {
 
         }
 
+        **/
+
         //CREATE THE ENTITIES THROUGH ENTITY FACTORY
 
         //Create Beep
-        EntityFactory.createKey(engine, beepSpawnX * 32f, beepSpawnY *32f, beepRegion);
+        EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion);
 
         //Create Door
-        EntityFactory.createDoor(engine, doorSpawnX * 32f, doorSpawnY * 32f, doorRegion);
+        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion);
 
         //Create Player
-        EntityFactory.createPlayer(engine, startPixelX, startPixelY, 20f, 20f, walkAnimation, idleAnimation);
+        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
 
-        Gdx.app.log("TERMINAL", "Spawned Player at (" + startPixelX + "," + startPixelY + ")");
-        Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + beepSpawnX + "," + beepSpawnY + ")");
-        Gdx.app.log("TERMINAL", "Spawned Door at (" + doorSpawnX + "," + doorSpawnY + ")");
+        //Create Enemy
+        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
+
+        Gdx.app.log("TERMINAL", "Spawned Player at (" + PLAYER_X + "," + PLAYER_Y + ")");
+        Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + KEY_X + "," + KEY_Y + ")");
+        Gdx.app.log("TERMINAL", "Spawned Door at (" + DOOR_X + "," + DOOR_Y + ")");
+        Gdx.app.log("TERMINAL", "Spawned Enemy at (" + ENEMY_X + "," + ENEMY_Y + ")");
 
     }
 
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
                                     TextureRegion beepRegion, TextureRegion doorRegion,
-                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
-        EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 20f, 20f, walkAnimation, idleAnimation);
+                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
+        EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 24f, 15f, walkAnimation, idleAnimation);
 
-        EntityFactory.createKey(engine, 64f, 64f, beepRegion);
-        EntityFactory.createDoor(engine, 128f, 128f, doorRegion);
+        EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion);
+        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion);
+
+        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
 
         Gdx.app.log("SPAWNER", "Restored entities for Save Load.");
     }

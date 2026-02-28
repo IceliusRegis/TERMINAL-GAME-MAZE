@@ -42,8 +42,8 @@ public class EntityFactory {
 
 
         // The actual size of the sprite frame HITBOX
-        sprite.drawWidth = 165f;
-        sprite.drawHeight = 165f;
+        sprite.drawWidth = 128f;
+        sprite.drawHeight = 250f;
 
         player.add(engine.createComponent(PlayerComponent.class));
 
@@ -99,6 +99,22 @@ public class EntityFactory {
 
         engine.addEntity(beep);
     }
+
+    public static void createEnemy(PooledEngine engine, float x, float y, TextureRegion texture) {
+        Entity enemy = engine.createEntity();
+        TransformComponent t = engine.createComponent(TransformComponent.class);
+        t.pos.set(x, y); t.width = 32; t.height = 32; t.updateBounds();
+        enemy.add(t);
+
+        SpriteComponent s = engine.createComponent(SpriteComponent.class);
+        s.staticSprite = texture; s.isStatic = true; s.drawWidth = 32; s.drawHeight = 32;
+        enemy.add(s);
+
+        enemy.add(new EnemyComponent());
+        engine.addEntity(enemy);
+    }
+
+
 
 
 

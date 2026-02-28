@@ -1,5 +1,7 @@
 package com.sam.TERMINAL.buttons;
 
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine; // Added
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -12,20 +14,31 @@ import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.sam.TERMINAL.components.InventoryComponent;
+import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.systems.EnemySystem;
 import com.sam.TERMINAL.systems.SaveSystem; // Added
 import com.sam.TERMINAL.Main;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
+
 
 public class MenuScreen {
     private Stage uiStage;
     private Stage settingsStage;
     private Stage inventoryStage;
     private Texture settingsTexture, backTexture, whitePixel, invTexture;
+    private Texture restartTexture;
     private boolean isSettingsVisible = false;
     private boolean isInventoryVisible = false;
+    private boolean isGameOver = false;
+    private BitmapFont font;
     private Table inventoryWindow;
     private Table bottomTable;
     private PooledEngine engine; // Reference to trigger saves
@@ -41,6 +54,10 @@ public class MenuScreen {
         uiStage = new Stage(new ExtendViewport(w, h), batch);
         settingsStage = new Stage(new ExtendViewport(w, h), batch);
         inventoryStage = new Stage(new ExtendViewport(w, h), batch);
+
+        font = new BitmapFont();
+        font.getData().setScale(2f);
+        restartTexture = new Texture(Gdx.files.internal("ui/Restart.png"));
 
         createDimmerTexture();
 
@@ -96,6 +113,7 @@ public class MenuScreen {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 isInventoryVisible = true;
+                refreshInventory();
                 updateInputProcessor();
             }
         });
@@ -120,6 +138,7 @@ public class MenuScreen {
                 if (keycode == Input.Keys.TAB) {
                     isInventoryVisible = !isInventoryVisible;
                     if (isInventoryVisible) isSettingsVisible = false;
+                    refreshInventory();
                     updateInputProcessor();
                     return true;
                 }
@@ -136,6 +155,9 @@ public class MenuScreen {
 
         updateInputProcessor();
     }
+
+    //GAME OVERRR
+
 
     private void saveMapLogic() {
         if (engine != null) {
@@ -154,7 +176,9 @@ public class MenuScreen {
     }
 
     private void updateInputProcessor() {
-        if (isSettingsVisible) {
+        if (isGameOver) {
+            Gdx.input.setInputProcessor(uiStage); // Only allow clicking Restart
+        } else if (isSettingsVisible) {
             Gdx.input.setInputProcessor(settingsStage);
         } else if (isInventoryVisible) {
             com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
@@ -203,6 +227,45 @@ public class MenuScreen {
         inventoryStage.getViewport().update(width, height, true);
     }
 
+    private void setupHUD() {
+        uiStage.clear(); // 1. Clean the slate
+
+        // 2. Create Top-Left Settings Button
+        Table mainRoot = new Table();
+        mainRoot.setFillParent(true);
+        mainRoot.top().left();
+
+        Image settingsBtn = new Image(settingsTexture);
+        settingsBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                isSettingsVisible = true;
+                updateInputProcessor();
+            }
+        });
+        mainRoot.add(settingsBtn).size(40, 40).pad(10);
+        uiStage.addActor(mainRoot);
+
+        // 3. Create Bottom-Center Inventory Button
+        Table bottomTable = new Table();
+        bottomTable.setFillParent(true);
+        bottomTable.bottom();
+
+        ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
+        inventoryBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                isInventoryVisible = true;
+                refreshInventory();
+                updateInputProcessor();
+            }
+        });
+
+        bottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
+        uiStage.addActor(bottomTable);
+    }
+
+
     public void dispose() {
         uiStage.dispose(); settingsStage.dispose(); inventoryStage.dispose();
         settingsTexture.dispose(); whitePixel.dispose(); invTexture.dispose();
@@ -210,4 +273,89 @@ public class MenuScreen {
 
     public boolean isSettingsVisible() { return isSettingsVisible; }
     public boolean isInventoryVisible() { return isInventoryVisible; }
+
+    private void refreshInventory() {
+        inventoryWindow.clearChildren();
+
+        //Re ADDS Exit butt
+        new InventoryButton(inventoryWindow, () -> {isInventoryVisible = false; updateInputProcessor();});
+        inventoryWindow.row();
+
+        //Check Items
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+
+        //DRAW PLEASEE
+        if (inv != null && inv.hasItem("beep_card")) {
+            Image icon = new Image(mainGame.getBeepRegion());
+            inventoryWindow.add(icon).size(64, 64).pad(20);
+            inventoryWindow.add(new com.badlogic.gdx.scenes.scene2d.ui.Label("Beep Card", new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(new com.badlogic.gdx.graphics.g2d.BitmapFont(), com.badlogic.gdx.graphics.Color.WHITE)));
+        }
+    }
+
+    // 1. Shows the Win/Lose screen
+    public void showGameOver(boolean win) {
+        if (isGameOver) return;
+        isGameOver = true;
+
+        uiStage.clear(); // Wipes the Settings/Inventory buttons
+        isSettingsVisible = false;
+        isInventoryVisible = false;
+
+        // Dark Background
+        Image dimmer = new Image(whitePixel);
+        dimmer.setColor(0, 0, 0, 0.8f);
+        dimmer.setFillParent(true);
+        uiStage.addActor(dimmer);
+
+        // Center Table for Text + Button
+        Table table = new Table();
+        table.setFillParent(true);
+        table.center();
+
+        // "YOU DIED" or "YOU ESCAPED"
+        String text = win ? "YOU ESCAPED!" : "YOU DIED";
+        Color color = win ? Color.GREEN : Color.RED;
+        Label.LabelStyle style = new Label.LabelStyle(font, color);
+        Label label = new Label(text, style);
+
+        // Restart Button
+        ImageButton restartBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(restartTexture)));
+        restartBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                mainGame.resetGame();
+            }
+        });
+
+        table.add(label).padBottom(20).row();
+        table.add(restartBtn).size(64, 64);
+
+        uiStage.addActor(table);
+        updateInputProcessor();
+    }
+
+    // 2. Resets the UI back to normal
+    public void resetUI() {
+        isGameOver = false;
+        uiStage.clear();
+
+        // RE-ADD YOUR HUD BUTTONS HERE (Settings & Inventory)
+        // (Copy the HUD setup code from your constructor and paste it here,
+        //  or move that code into a private setupHUD() method and call it.)
+
+        // ... Re-add Settings Button code ...
+        // ... Re-add Inventory Button code ...
+
+        setupHUD();
+        updateInputProcessor();
+    }
+
+    public boolean isGameOver() { return isGameOver; }
+
+
+
+
+
 }

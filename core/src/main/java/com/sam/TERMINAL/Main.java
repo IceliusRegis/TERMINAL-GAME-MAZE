@@ -14,11 +14,11 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.entities.EntitySpawner;
+import com.sam.TERMINAL.entities.MapManager;
 import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.systems.*;
-import com.sam.TERMINAL.tiles.TileRegistry;
-import com.sam.TERMINAL.screen.TitleScreen;
+import com.badlogic.ashley.core.Family;
 
 /**
  * Main - The entry point and central manager for TERMINAL.
@@ -39,13 +39,14 @@ public class Main extends ApplicationAdapter {
     private MenuScreen menuScreen;
     private TitleScreen titleScreen;
     private boolean showingTitleScreen = true;
+    private MapManager mapManager;
 
-    // Asset References (Fields for Reset Logic and Disposal)
-    private Texture playerSpriteSheet, cursorTexture;
-    private Texture beepTexture, doorOpenTexture, doorClosedTexture, wallTexture, floorTexture;
+    // Asset References (Fileds for Reset Logic and Disposal)
+    private Texture playerSpriteSheet, cursorTexture, enemyTexture;
+    private Texture beepTexture, doorOpenTexture, doorClosedTexture;
 
     // Regions and Animation (Shared)
-    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion;
+    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     //Save Files
@@ -62,10 +63,7 @@ public class Main extends ApplicationAdapter {
         // 2.) Load assets
         loadAssets();
 
-        // 3.) Register Tile Types
-        registerTiles();
-
-        // 4.) Show title screen; game systems start when user picks New Game / Continue
+        // 3.) Show title screen; game systems start when user picks New Game / Continue
         boolean hasSave = SaveManager.load(MAIN_SAVE_FILE) != null;
         titleScreen = new TitleScreen(batch, hasSave, this::onTitleScreenChoice);
     }
@@ -77,7 +75,11 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(TEMP_SAVE_FILE);
         }
         initSystems();
+
+        //4.) Game start (New vs Load)
         handleGameStart();
+
+        //5.) Starts Up UI
         createUI();
         if (titleScreen != null) {
             titleScreen.dispose();
@@ -96,11 +98,6 @@ public class Main extends ApplicationAdapter {
     }
 
     private void loadAssets() {
-
-        //ENVIRONMENTS
-        wallTexture = new Texture(Gdx.files.internal("environments/BackRoomsWall.png"));
-        floorTexture = new Texture(Gdx.files.internal("environments/Floor.png"));
-
         //INTERACTIVES
 
         //Beep
@@ -118,27 +115,29 @@ public class Main extends ApplicationAdapter {
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
         //PLAYER SPRITES
-        playerSpriteSheet = new Texture("sprites/Soldier-Walk.png");
+        playerSpriteSheet = new Texture("sprites/MC (Walk).png");
 
-        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 100, 100);
+        TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 128, 250);
         walkAnimation = new Animation<>(0.1f, frames[0]);
 
-        Texture idleSheet = new Texture("sprites/Soldier-Idle.png");
-        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 100, 100);
-        idleAnimation = new Animation<>(0.15f, idleFrames[0]);
+        Texture idleSheet = new Texture("sprites/MC (Idle).png");
+        TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 128, 250);
+        idleAnimation = new Animation<>(0.3f, idleFrames[0]);
+
+        //ENEMY
+        enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
+        enemyRegion = new TextureRegion(enemyTexture);
+
     }
 
-    private void registerTiles() {
-        TileRegistry.registerTile(1, true, new TextureRegion(wallTexture));
-        TileRegistry.registerTile(2, false, new TextureRegion(floorTexture));
-    }
 
     private void initSystems() {
         engine.addSystem(new MovementSystem());
+        engine.addSystem(new EnemySystem());
+        engine.addSystem(new WinLossSystem(this));
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
-        engine.addSystem(new TileRenderSystem(batch, camera));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(doorOpenRegion));
     }
@@ -152,7 +151,10 @@ public class Main extends ApplicationAdapter {
     private void handleGameStart() {
         GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
         GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
-        TileWorldComponent world =generateNewMap();
+
+        // --- NEW MAP LOADING LOGIC ---
+        mapManager = new MapManager(engine);
+        mapManager.loadMap("maps/mapTest.tmx");
 
         //LOAD GAME
         if (mainSave != null) {
@@ -171,7 +173,7 @@ public class Main extends ApplicationAdapter {
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -190,7 +192,7 @@ public class Main extends ApplicationAdapter {
             engine.getSystem(SaveSystem.class).generateNewRunId();
 
             //EntitySpawner now spawns initial stuff
-            EntitySpawner.spawnInitialEntities(engine, world, beepRegion, doorCloseRegion, walkAnimation, idleAnimation);
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
 
             //Initial Save Mechanic
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
@@ -198,31 +200,36 @@ public class Main extends ApplicationAdapter {
         }
     }
 
-    private Entity createWorldEntity() {
-        Entity worldEntity = engine.createEntity();
-        worldEntity.add(new TileWorldComponent());
-        worldEntity.add(new PersistenceComponent("MAP", "ZA_WARDO"));
-        engine.addEntity(worldEntity);
-        return worldEntity;
-    }
-
-    private TileWorldComponent generateNewMap() {
-        Entity worldEntity = createWorldEntity();
-        TileWorldComponent tileCom = worldEntity.getComponent(TileWorldComponent.class);
-        tileCom.init(50,50);
-
-        for(int x=0; x<50; x++) {
-            for(int y=0; y<50; y++) {
-                tileCom.map[x][y] = 2;
-                if (Math.random() <0.2) tileCom.map[x][y] = 1;
-            }
-        }
-        return tileCom;
-    }
-
     public void resetGame() {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+
+        //Locks all door before reset
+        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        for (Entity door : doors) {
+            door.getComponent(InteractableComponent.class).isActive = true; // Close it!
+        }
+
+
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
+
+
+        //Hard Reset for enemy to avoid spawn killing
+        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
+
+        for (Entity enemy : enemies) {
+            TransformComponent t = enemy.getComponent(TransformComponent.class);
+
+            t.pos.set(5 * 32f, 40 * 32f);
+            t.updateBounds();
+        }
+
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        wls.gameOver = false;
+        wls.win = false;
+
+        // 4. Reset UI (NEW LINE)
+        menuScreen.resetUI();
+
 
     }
 
@@ -238,13 +245,18 @@ public class Main extends ApplicationAdapter {
             return;
         }
 
+        // --- NEW: DRAW TMX MAP FIRST ---
+        if (mapManager != null) {
+            mapManager.render(camera);
+        }
+
         // 2. Draw the Game World (Walls, Player)
         viewport.apply();
         camera.update();
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
-        if (!menuScreen.isSettingsVisible()) {
+        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver()) {
             engine.update(delta);
         } else {
             // When paused, we draw the last known state without moving anything
@@ -259,12 +271,13 @@ public class Main extends ApplicationAdapter {
         // 4. Draw the Menu (Drawn last so it sits on top of the character)
         menuScreen.render(delta);
 
-        /*WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        //Decides what outcome to render
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls.win && !menuScreen.isGameOver()) {
             menuScreen.showGameOver(true);
         } else if (wls.gameOver && !menuScreen.isGameOver()) {
             menuScreen.showGameOver(false);
-        }*/
+        }
 
         drawCursor();
     }
@@ -300,7 +313,12 @@ public class Main extends ApplicationAdapter {
         if (beepTexture != null) beepTexture.dispose();
         if (doorOpenTexture != null) doorOpenTexture.dispose();
         if (doorClosedTexture != null) doorClosedTexture.dispose();
-        if (wallTexture != null) wallTexture.dispose();
-        if (floorTexture != null) floorTexture.dispose();
+        if (enemyTexture != null) enemyTexture.dispose();
     }
+
+    //HELPER FUNC
+    public TextureRegion getBeepRegion() {
+        return beepRegion;
+    }
+
 }
