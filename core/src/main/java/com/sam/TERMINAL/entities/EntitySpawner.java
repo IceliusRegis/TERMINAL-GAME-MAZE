@@ -4,7 +4,6 @@ import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.persistence.GameData;
 
 /**
@@ -29,7 +28,7 @@ public class EntitySpawner {
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
-    public static void spawnInitialEntities (PooledEngine engine, TileWorldComponent tileCom,
+    public static void spawnInitialEntities (PooledEngine engine,
                                              TextureRegion beepRegion, TextureRegion doorRegion,
                                              Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
 
@@ -149,7 +148,7 @@ public class EntitySpawner {
         EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion);
 
         //Create Player
-        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 20f, 20f, walkAnimation, idleAnimation);
+        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
 
         //Create Enemy
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
@@ -164,7 +163,7 @@ public class EntitySpawner {
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
                                     TextureRegion beepRegion, TextureRegion doorRegion,
                                     Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
-        EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 20f, 20f, walkAnimation, idleAnimation);
+        EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 24f, 15f, walkAnimation, idleAnimation);
 
         EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion);
         EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion);

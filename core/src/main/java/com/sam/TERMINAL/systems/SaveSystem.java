@@ -34,7 +34,6 @@ public class SaveSystem extends IteratingSystem {
     //Declaration of Mapper,basically bookmarking the position and save state
     private ComponentMapper<PersistenceComponent> persistenceMapper;
     private ComponentMapper<TransformComponent> transformMapper;
-    private ComponentMapper<TileWorldComponent> tileMapper;
     private ComponentMapper<InventoryComponent> inventoryMapper;
     private  ComponentMapper<InteractableComponent> interactMapper;
     private  ComponentMapper<SpriteComponent> spriteMapper;
@@ -68,7 +67,6 @@ public class SaveSystem extends IteratingSystem {
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
-        tileMapper = ComponentMapper.getFor(TileWorldComponent.class);
         inventoryMapper = ComponentMapper.getFor(InventoryComponent.class);
         interactMapper = ComponentMapper.getFor(InteractableComponent.class);
         spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
@@ -174,15 +172,6 @@ public class SaveSystem extends IteratingSystem {
                         }
                     break;
 
-                case "MAP":
-                    TileWorldComponent tileWorld = tileMapper.get(entity);
-                    if (tileWorld != null) {
-                        pendingSaveData.map = tileWorld.map;
-                    } else {
-                        // Optional: Warn us in the console so we know something is wrong
-                        System.out.println("WARNING: Found a MAP entity with no TileWorldComponent!");
-                    }
-                    break;
                 case "INTERACTABLE":
                     InteractableComponent interact = interactMapper.get(entity);
                     if (interact !=null) {
@@ -217,12 +206,6 @@ public class SaveSystem extends IteratingSystem {
 
                     break;
 
-                case "MAP":
-                    TileWorldComponent tileWorld = tileMapper.get(entity);
-                    if (loadedData.map != null) {
-                        tileWorld.map = loadedData.map; // Restore the saved layout
-                    }
-                    break;
 
                 case "INTERACTABLE":
                     if (loadedData.interactableStates.containsKey(persistence.saveId)) {
