@@ -24,15 +24,21 @@ import com.badlogic.ashley.core.Family;
  * Main - The entry point and central manager for TERMINAL.
  *
  * Responsibilities:
- * - Lifecycle Management: Handles creation, rendering loop, resizing, and disposal.
- * - Resource Management: Loads and holds heavy assets (Textures) to prevent memory leaks.
+ * - Lifecycle Management: Handles creation, rendering loop, resizing, and
+ * disposal.
+ * - Resource Management: Loads and holds heavy assets (Textures) to prevent
+ * memory leaks.
  * - System Initialization: Sets up the ECS Engine, Camera, and Game Systems.
- * - State Orchestration: Decides whether to load a save file or start a new game.
+ * - State Orchestration: Decides whether to load a save file or start a new
+ * game.
  */
+
+// Hello : )
 
 public class Main extends ApplicationAdapter {
 
-    // Ashley ECS engine - manages all entities, components, rendering tools and systems
+    // Ashley ECS engine - manages all entities, components, rendering tools and
+    // systems
     private PooledEngine engine;
     private SpriteBatch batch;
     private OrthographicCamera camera;
@@ -48,10 +54,9 @@ public class Main extends ApplicationAdapter {
     private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
-    //Save Files
+    // Save Files
     private static final String TEMP_SAVE_FILE = "temp_initial_state.json";
     private static final String MAIN_SAVE_FILE = "saveFile.json";
-
 
     @Override
     public void create() {
@@ -65,10 +70,10 @@ public class Main extends ApplicationAdapter {
         // 3.) Boot up game sys (Move, render, save)
         initSystems();
 
-        //4.) Game start (New vs Load)
+        // 4.) Game start (New vs Load)
         handleGameStart();
 
-        //5.) Starts Up UI
+        // 5.) Starts Up UI
         createUI();
 
     }
@@ -83,23 +88,23 @@ public class Main extends ApplicationAdapter {
     }
 
     private void loadAssets() {
-        //INTERACTIVES
+        // INTERACTIVES
 
-        //Beep
+        // Beep
         beepTexture = new Texture(Gdx.files.internal("sprites/beep.png"));
         beepRegion = new TextureRegion(beepTexture);
 
-        //Temp Door
+        // Temp Door
         doorOpenTexture = new Texture(Gdx.files.internal("environments/opendoor.png"));
         doorOpenRegion = new TextureRegion(doorOpenTexture);
 
         doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
         doorCloseRegion = new TextureRegion(doorClosedTexture);
 
-        //UI
+        // UI
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
-        //PLAYER SPRITES
+        // PLAYER SPRITES
         playerSpriteSheet = new Texture("sprites/MC (Walk).png");
 
         TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 128, 250);
@@ -109,12 +114,11 @@ public class Main extends ApplicationAdapter {
         TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 128, 250);
         idleAnimation = new Animation<>(0.3f, idleFrames[0]);
 
-        //ENEMY
+        // ENEMY
         enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
         enemyRegion = new TextureRegion(enemyTexture);
 
     }
-
 
     private void initSystems() {
         engine.addSystem(new MovementSystem());
@@ -132,7 +136,7 @@ public class Main extends ApplicationAdapter {
         menuScreen = new MenuScreen(batch, engine, this);
     }
 
-    //GAME STATE LOGIC
+    // GAME STATE LOGIC
     private void handleGameStart() {
         GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
         GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
@@ -141,24 +145,27 @@ public class Main extends ApplicationAdapter {
         mapManager = new MapManager(engine);
         mapManager.loadMap("maps/mapTest.tmx");
 
-        //LOAD GAME
+        // LOAD GAME
         if (mainSave != null) {
 
-            //Checks ID of Temp and Main Save File
+            // Checks ID of Temp and Main Save File
             boolean snapshotIsValid = false;
             if (tempSave != null && mainSave.runId != null && tempSave.runId.equals(mainSave.runId)) {
                 snapshotIsValid = true;
                 Gdx.app.log("TERMINAL", "Snapshot verified. Reset enabled.");
             } else {
-                Gdx.app.log("TERMINAL", "Snapshot missing or ID mismatch. Creating new safety snapshot from CURRENT loaded state.");
-                // NOTE: This isn't a "true" reset (it resets to this save, not the start of the game),
+                Gdx.app.log("TERMINAL",
+                        "Snapshot missing or ID mismatch. Creating new safety snapshot from CURRENT loaded state.");
+                // NOTE: This isn't a "true" reset (it resets to this save, not the start of the
+                // game),
                 // but it prevents crashes if the player clicks Reset.
             }
 
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
+                    enemyRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -167,19 +174,20 @@ public class Main extends ApplicationAdapter {
 
             Gdx.app.log("TERMINAL", "Save file loaded");
         } else {
-            //NEW GAME
+            // NEW GAME
 
-            //Delete old saves
+            // Delete old saves
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
 
-            //Make new ID
+            // Make new ID
             engine.getSystem(SaveSystem.class).generateNewRunId();
 
-            //EntitySpawner now spawns initial stuff
-            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
+            // EntitySpawner now spawns initial stuff
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
+                    enemyRegion);
 
-            //Initial Save Mechanic
+            // Initial Save Mechanic
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
@@ -188,18 +196,18 @@ public class Main extends ApplicationAdapter {
     public void resetGame() {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
 
-        //Locks all door before reset
-        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        // Locks all door before reset
+        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine
+                .getEntitiesFor(Family.all(InteractableComponent.class).get());
         for (Entity door : doors) {
             door.getComponent(InteractableComponent.class).isActive = true; // Close it!
         }
 
-
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
-
-        //Hard Reset for enemy to avoid spawn killing
-        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
+        // Hard Reset for enemy to avoid spawn killing
+        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine
+                .getEntitiesFor(Family.all(EnemyComponent.class).get());
 
         for (Entity enemy : enemies) {
             TransformComponent t = enemy.getComponent(TransformComponent.class);
@@ -214,7 +222,6 @@ public class Main extends ApplicationAdapter {
 
         // 4. Reset UI (NEW LINE)
         menuScreen.resetUI();
-
 
     }
 
@@ -237,7 +244,8 @@ public class Main extends ApplicationAdapter {
             engine.update(delta);
         } else {
             // When paused, we draw the last known state without moving anything
-            // This is done by passing 0 to the engine update or calling specific render systems
+            // This is done by passing 0 to the engine update or calling specific render
+            // systems
             // In Ashley, usually we just stop the update entirely to "freeze" time
             // However, to keep things visible while frozen, we call update with 0 delta:
             engine.update(0);
@@ -248,7 +256,7 @@ public class Main extends ApplicationAdapter {
         // 4. Draw the Menu (Drawn last so it sits on top of the character)
         menuScreen.render(delta);
 
-        //Decides what outcome to render
+        // Decides what outcome to render
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls.win && !menuScreen.isGameOver()) {
             menuScreen.showGameOver(true);
@@ -284,15 +292,21 @@ public class Main extends ApplicationAdapter {
     public void dispose() {
         // Clean up resources to prevent memory leaks
         batch.dispose();
-        if (menuScreen != null) menuScreen.dispose();
-        if (playerSpriteSheet != null) playerSpriteSheet.dispose();
-        if (cursorTexture != null) cursorTexture.dispose();
-        if (beepTexture != null) beepTexture.dispose();
-        if (doorOpenTexture != null) doorOpenTexture.dispose();
-        if (doorClosedTexture != null) doorClosedTexture.dispose();
+        if (menuScreen != null)
+            menuScreen.dispose();
+        if (playerSpriteSheet != null)
+            playerSpriteSheet.dispose();
+        if (cursorTexture != null)
+            cursorTexture.dispose();
+        if (beepTexture != null)
+            beepTexture.dispose();
+        if (doorOpenTexture != null)
+            doorOpenTexture.dispose();
+        if (doorClosedTexture != null)
+            doorClosedTexture.dispose();
     }
 
-    //HELPER FUNC
+    // HELPER FUNC
     public TextureRegion getBeepRegion() {
         return beepRegion;
     }
