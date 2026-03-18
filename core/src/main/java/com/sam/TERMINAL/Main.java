@@ -317,6 +317,7 @@ public class Main extends ApplicationAdapter {
     public void dispose() {
         // Clean up resources to prevent memory leaks
         batch.dispose();
+        if (mapManager != null) mapManager.dispose();
         if (titleScreen != null)
             titleScreen.dispose();
         if (menuScreen != null)

@@ -4,8 +4,10 @@ import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
+import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 
 /**
@@ -21,6 +23,8 @@ public class CameraFollowSystem extends IteratingSystem {
 
     // Component mappers for fast access
     private ComponentMapper<TransformComponent> positionMapper;
+    private ComponentMapper<TileWorldComponent> worldMapper =
+        ComponentMapper.getFor(TileWorldComponent.class);
 
     // Smoothing factor (1.0 = instant, lower = smoother but slower)
     private static final float LERP_FACTOR = 0.1f;
@@ -43,9 +47,18 @@ public class CameraFollowSystem extends IteratingSystem {
         camera.position.x += (transform.pos.x - camera.position.x) * 0.1f;
         camera.position.y += (transform.pos.y - camera.position.y) * 0.1f;
 
-        //Defines Map Size in Pixels (Remind me to make map size dynamic in the future)
-        float mapWidth = 50 * 32f;
+        //Dynamically read map dimensions from TileWorldComponent (fallback to 50x50)
+        ImmutableArray<Entity> worldEntities = getEngine()
+            .getEntitiesFor(Family.all(TileWorldComponent.class).get());
+
+        float mapWidth  = 50 * 32f;  // fallback default
         float mapHeight = 50 * 32f;
+
+        if (worldEntities.size() > 0) {
+            TileWorldComponent world = worldMapper.get(worldEntities.first());
+            mapWidth  = world.mapWidthTiles  * world.tileWidth;
+            mapHeight = world.mapHeightTiles * world.tileHeight;
+        }
 
         //Calculate the "Half-Sizes" of the camera view
         // The camera position is its CENTER, not its corner.

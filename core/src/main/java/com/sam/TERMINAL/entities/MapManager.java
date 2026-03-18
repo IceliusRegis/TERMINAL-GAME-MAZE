@@ -9,7 +9,7 @@ import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.sam.TERMINAL.components.TileWorldComponent;
 
-import static sun.tools.jconsole.inspector.XDataViewer.dispose;
+
 
 /**
  * MapManager - Owns the TiledMap lifecycle and rendering.
@@ -34,7 +34,7 @@ public class MapManager {
 
     public void loadMap(String tmxPath) {
         // 1. Clean up any existing map before loading a new one
-        dispose();
+        this.dispose();
 
         try {
             // 2. Load the actual TMX file from assets

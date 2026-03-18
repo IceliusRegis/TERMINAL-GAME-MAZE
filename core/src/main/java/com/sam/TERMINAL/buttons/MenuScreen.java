@@ -5,6 +5,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine; // Added
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -26,7 +27,6 @@ import com.sam.TERMINAL.systems.SaveSystem; // Added
 import com.sam.TERMINAL.Main;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.scenes.scene2d.ui.Label;
 
 
 public class MenuScreen {
@@ -40,6 +40,7 @@ public class MenuScreen {
     private boolean isGameOver = false;
     private BitmapFont font;
     private Table inventoryWindow;
+    private Table itemTable;
     private Table bottomTable;
     private PooledEngine engine; // Reference to trigger saves
     private Main mainGame;
@@ -109,12 +110,12 @@ public class MenuScreen {
         bottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
         uiStage.addActor(bottomTable);
 
+        // B-6 Fix: Removed refreshInventory() from ClickListener — it now runs in render()
         inventoryBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 isInventoryVisible = true;
-                refreshInventory();
-                updateInputProcessor();
+                updateInputProcessor();       // refreshInventory() now runs in render()
             }
         });
 
@@ -126,19 +127,35 @@ public class MenuScreen {
         inventoryWindow.setBackground(windowBg.tint(new com.badlogic.gdx.graphics.Color(0.8f, 0.8f, 0.8f, 0.15f)));
         inventoryRoot.center().add(inventoryWindow).size(500, 400);
 
+        // Stable exit button — added once, never cleared by refreshInventory()
+        // We wrap it in a cell and align it to the left.
         new InventoryButton(inventoryWindow, () -> {
             isInventoryVisible = false;
             updateInputProcessor();
         });
+        
+        // Ensure the cell containing the exit button aligns left
+        inventoryWindow.getCells().peek().left().expandX();
+        inventoryWindow.row();
 
-        // --- SHORTCUTS (TAB & F5) ---
+        // Sub-table for item rows — only this gets cleared every frame
+        // Align the item table to the top-left so items flow left-to-right naturally
+        itemTable = new Table();
+        itemTable.top().left();
+        inventoryWindow.add(itemTable).expand().fill();
+
+        setupGlobalListener();
+
+        updateInputProcessor();
+    }
+
+    private void setupGlobalListener() {
         InputListener globalListener = new InputListener() {
             @Override
             public boolean keyDown(InputEvent event, int keycode) {
                 if (keycode == Input.Keys.TAB) {
                     isInventoryVisible = !isInventoryVisible;
                     if (isInventoryVisible) isSettingsVisible = false;
-                    refreshInventory();
                     updateInputProcessor();
                     return true;
                 }
@@ -149,11 +166,14 @@ public class MenuScreen {
                 return false;
             }
         };
+        // Re-adding a listener doesn't duplicate it if we clear() first, but to be safe:
+        uiStage.removeListener(globalListener); 
+        settingsStage.removeListener(globalListener);
+        inventoryStage.removeListener(globalListener);
+        
         uiStage.addListener(globalListener);
         settingsStage.addListener(globalListener);
         inventoryStage.addListener(globalListener);
-
-        updateInputProcessor();
     }
 
     //GAME OVERRR
@@ -176,13 +196,24 @@ public class MenuScreen {
     }
 
     private void updateInputProcessor() {
+        // B-5 GUARD: If the game-over screen is showing, it owns input exclusively.
+        // No other state should be able to override this.
         if (isGameOver) {
-            Gdx.input.setInputProcessor(uiStage); // Only allow clicking Restart
-        } else if (isSettingsVisible) {
-            Gdx.input.setInputProcessor(settingsStage);
+            Gdx.input.setInputProcessor(uiStage);
+            return;
+        }
+
+        // B-7 Fix: Settings branch now wraps uiStage + settingsStage in a multiplexer
+        if (isSettingsVisible) {
+            InputMultiplexer multiplexer = new InputMultiplexer();
+            multiplexer.addProcessor(uiStage);         // First: global HUD keys
+            multiplexer.addProcessor(settingsStage);    // Second: clicks on settings actors
+            Gdx.input.setInputProcessor(multiplexer);
         } else if (isInventoryVisible) {
-            com.badlogic.gdx.InputMultiplexer multiplexer = new com.badlogic.gdx.InputMultiplexer();
-            multiplexer.addProcessor(inventoryStage);
+            // B-7 Fix: Inventory branch now includes uiStage for TAB/global keys
+            InputMultiplexer multiplexer = new InputMultiplexer();
+            multiplexer.addProcessor(uiStage);        // First: global HUD keys (TAB to close, etc.)
+            multiplexer.addProcessor(inventoryStage); // Second: clicks on inventory window actors
             Gdx.input.setInputProcessor(multiplexer);
         } else {
             Gdx.input.setInputProcessor(uiStage);
@@ -197,6 +228,8 @@ public class MenuScreen {
             settingsStage.act(delta);
             settingsStage.draw();
         } else if (isInventoryVisible) {
+            // B-6 Fix: Refresh inventory from live ECS state every frame the panel is visible
+            refreshInventory();
             drawInventoryDim(inventoryStage);
             inventoryStage.act(delta);
             inventoryStage.draw();
@@ -252,11 +285,11 @@ public class MenuScreen {
         bottomTable.bottom();
 
         ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
+        // B-6 Fix: No refreshInventory() in ClickListener — handled in render()
         inventoryBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 isInventoryVisible = true;
-                refreshInventory();
                 updateInputProcessor();
             }
         });
@@ -275,11 +308,8 @@ public class MenuScreen {
     public boolean isInventoryVisible() { return isInventoryVisible; }
 
     private void refreshInventory() {
-        inventoryWindow.clearChildren();
-
-        //Re ADDS Exit butt
-        new InventoryButton(inventoryWindow, () -> {isInventoryVisible = false; updateInputProcessor();});
-        inventoryWindow.row();
+        // Only clear the item rows — the exit button lives in inventoryWindow and is never touched
+        itemTable.clearChildren();
 
         //Check Items
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
@@ -289,18 +319,21 @@ public class MenuScreen {
         //DRAW PLEASEE
         if (inv != null && inv.hasItem("beep_card")) {
             Image icon = new Image(mainGame.getBeepRegion());
-            inventoryWindow.add(icon).size(64, 64).pad(20);
-            inventoryWindow.add(new com.badlogic.gdx.scenes.scene2d.ui.Label("Beep Card", new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(new com.badlogic.gdx.graphics.g2d.BitmapFont(), com.badlogic.gdx.graphics.Color.WHITE)));
+            
+            // Note: Expand X stops this single item from sticking exactly to the left edge if it's the only one,
+            // but since itemTable is left-aligned, it will start on the left.
+            itemTable.add(icon).size(64, 64).pad(20);
+            itemTable.add(new com.badlogic.gdx.scenes.scene2d.ui.Label("Beep Card", new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(new com.badlogic.gdx.graphics.g2d.BitmapFont(), com.badlogic.gdx.graphics.Color.WHITE))).padRight(20);
         }
     }
 
     // 1. Shows the Win/Lose screen
     public void showGameOver(boolean win) {
         if (isGameOver) return;
-        isGameOver = true;
+        isGameOver = true;                  // 1. Set flag first
 
-        uiStage.clear(); // Wipes the Settings/Inventory buttons
-        isSettingsVisible = false;
+        uiStage.clear();                    // 2. Wipe old HUD
+        isSettingsVisible = false;          // 3. Reset sub-states
         isInventoryVisible = false;
 
         // Dark Background
@@ -332,28 +365,27 @@ public class MenuScreen {
         table.add(label).padBottom(20).row();
         table.add(restartBtn).size(64, 64);
 
-        uiStage.addActor(table);
-        updateInputProcessor();
+        uiStage.addActor(table);            // 5. Add restart button to stage
+        updateInputProcessor();             // 6. Transfer input LAST, after stage is built
+
+        // B-5 Fix: Set keyboard focus on restart button so ENTER/SPACE works
+        uiStage.setKeyboardFocus(restartBtn);
     }
 
     // 2. Resets the UI back to normal
     public void resetUI() {
-        isGameOver = false;
+        isGameOver = false;          // MUST be first — clears the guard in updateInputProcessor()
+        isSettingsVisible = false;
+        isInventoryVisible = false;
         uiStage.clear();
 
         // RE-ADD YOUR HUD BUTTONS HERE (Settings & Inventory)
-        // (Copy the HUD setup code from your constructor and paste it here,
-        //  or move that code into a private setupHUD() method and call it.)
-
-        // ... Re-add Settings Button code ...
-        // ... Re-add Inventory Button code ...
-
         setupHUD();
-        updateInputProcessor();
+        setupGlobalListener();       // Re-attach TAB/F5 shortcut listener that uiStage.clear() deleted
+        updateInputProcessor();      // Now routes correctly to the HUD multiplexer
     }
 
     public boolean isGameOver() { return isGameOver; }
-
 
 
 
