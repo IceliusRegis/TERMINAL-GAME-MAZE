@@ -65,8 +65,15 @@ public class InteractionSystem extends EntitySystem {
 
             TransformComponent targetPos = transformMapper.get(target);
 
-            //Gets the distance between item and object
-            float dist = playerPos.pos.dst(targetPos.pos);
+            //Gets the distance between item and object (center-to-center)
+            float playerCenterX = playerPos.pos.x + (playerPos.width / 2f);
+            float playerCenterY = playerPos.pos.y + (playerPos.height / 2f);
+            float targetCenterX = targetPos.pos.x + (targetPos.width / 2f);
+            float targetCenterY = targetPos.pos.y + (targetPos.height / 2f);
+            float dist = (float) Math.sqrt(
+                Math.pow(playerCenterX - targetCenterX, 2) +
+                Math.pow(playerCenterY - targetCenterY, 2)
+            );
 
             if (dist <= interact.radius) {
                 // TODO: In the future, draw a "Press E" tooltip here!

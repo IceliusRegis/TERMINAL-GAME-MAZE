@@ -30,9 +30,9 @@ public class InventoryButton {
             }
         });
 
-        // Set the window alignment and add the button to the top right
-        window.top().left();
-        window.add(exitBtn).size(30, 30).pad(10);
+        // Set the window alignment (top) and add the button aligned left
+        window.top();
+        window.add(exitBtn).size(30, 30).pad(10).left();
     }
 
     // Call this from your MenuScreen dispose() to prevent memory leaks

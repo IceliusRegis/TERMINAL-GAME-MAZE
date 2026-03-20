@@ -28,6 +28,10 @@ public class EntitySpawner {
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
+    // Stable, hardcoded IDs. Change these only if you intentionally want to break old saves.
+    public static final String KEY_SAVE_ID  = "KEY_BEEP_MAIN";
+    public static final String DOOR_SAVE_ID = "DOOR_EXIT_MAIN";
+
     public static void spawnInitialEntities (PooledEngine engine,
                                              TextureRegion beepRegion, TextureRegion doorRegion,
                                              Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
@@ -142,10 +146,10 @@ public class EntitySpawner {
         //CREATE THE ENTITIES THROUGH ENTITY FACTORY
 
         //Create Beep
-        EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion);
+        EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion, KEY_SAVE_ID);
 
         //Create Door
-        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion);
+        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion, DOOR_SAVE_ID);
 
         //Create Player
         EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
@@ -165,8 +169,8 @@ public class EntitySpawner {
                                     Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
         EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 24f, 15f, walkAnimation, idleAnimation);
 
-        EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion);
-        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion);
+        EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion, KEY_SAVE_ID);
+        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion, DOOR_SAVE_ID);
 
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
 

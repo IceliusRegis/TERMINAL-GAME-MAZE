@@ -53,7 +53,7 @@ public class EntityFactory {
         engine.addEntity(player);
     }
 
-    public static  void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite) {
+    public static  void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
         Entity door = engine.createEntity();
 
         TransformComponent transform = engine.createComponent(TransformComponent.class);
@@ -71,13 +71,12 @@ public class EntityFactory {
         door.add(engine.createComponent(CollisionComponent.class));
         door.add(new InteractableComponent("door", 40f));
 
-        String uniqueID = "DOOR_" + (int)x + "_" + (int)y;
-        door.add(new PersistenceComponent("INTERACTABLE", uniqueID));
+        door.add(new PersistenceComponent("INTERACTABLE", saveId));
 
         engine.addEntity(door);
     }
 
-    public static void createKey (PooledEngine engine, float x, float y, TextureRegion beepRegion) {
+    public static void createKey (PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
         Entity beep = engine.createEntity();
 
         TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
@@ -94,8 +93,7 @@ public class EntityFactory {
         beep.add(beepSprite);
 
         beep.add(new InteractableComponent("beep", 40f));
-        String uniqueID = "KEY_" + x + "_" + y;
-        beep.add(new PersistenceComponent("INTERACTABLE", uniqueID));
+        beep.add(new PersistenceComponent("INTERACTABLE", saveId));
 
         engine.addEntity(beep);
     }
