@@ -28,6 +28,7 @@ public class SpriteComponent implements Component {
     public boolean isStatic = false;
 
     public boolean facingRight = true; // Default to facing right
+    public float facingAngle = 0f; // 0=Right, 90=Up, 180=Left, 270=Down
 
     public float drawWidth;
     public float drawHeight;
