@@ -243,9 +243,15 @@ public class Main extends ApplicationAdapter {
 
         for (Entity enemy : enemies) {
             TransformComponent t = enemy.getComponent(TransformComponent.class);
-
             t.pos.set(5 * 32f, 40 * 32f);
             t.updateBounds();
+
+            // Clear stale BFS path after teleporting enemy back to spawn
+            EnemyComponent ec = enemy.getComponent(EnemyComponent.class);
+            if (ec != null) {
+                ec.path.clear();
+                ec.pathTimer = 0f;
+            }
         }
 
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
@@ -292,6 +298,12 @@ public class Main extends ApplicationAdapter {
         }
 
         batch.end();
+
+        // 2.5. Debug BFS path lines (between sprites and lighting)
+        EnemySystem enemySystem = engine.getSystem(EnemySystem.class);
+        if (enemySystem != null) {
+            enemySystem.renderDebug(camera);
+        }
 
         // 3. Lighting overlay (outside SpriteBatch, after sprites)
         if (lightingSystem != null) {
