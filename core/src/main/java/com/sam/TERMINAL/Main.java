@@ -147,7 +147,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem(new InteractionSystem(doorOpenRegion, batch));
+        engine.addSystem(new InteractionSystem(doorOpenRegion));
 
         // Lighting system — stored in field so we can call render() and dispose()
         lightingSystem = new LightingSystem(camera);
@@ -275,12 +275,12 @@ public class Main extends ApplicationAdapter {
             return;
         }
 
-        // --- PASS 1: GROUND LAYER (behind sprites) ---
+        // --- NEW: DRAW TMX MAP FIRST ---
         if (mapManager != null) {
-            mapManager.renderBackground(camera);
+            mapManager.render(camera);
         }
 
-        // 2. Draw the Game World (Y-sorted ECS entities)
+        // 2. Draw the Game World (Walls, Player)
         viewport.apply();
         camera.update();
         batch.setProjectionMatrix(camera.combined);
@@ -290,22 +290,14 @@ public class Main extends ApplicationAdapter {
             engine.update(delta);
         } else {
             // When paused, we draw the last known state without moving anything
-            // In Ashley, we call update with 0 delta to "freeze" time:
+            // This is done by passing 0 to the engine update or calling specific render
+            // systems
+            // In Ashley, usually we just stop the update entirely to "freeze" time
+            // However, to keep things visible while frozen, we call update with 0 delta:
             engine.update(0);
         }
 
         batch.end();
-
-        // --- PASS 2: WALLS LAYER (in front of sprites, with dynamic opacity) ---
-        TransformComponent playerTransform = null;
-        ImmutableArray<Entity> players = engine.getEntitiesFor(
-            Family.all(com.sam.TERMINAL.components.PlayerComponent.class, TransformComponent.class).get());
-        if (players.size() > 0) {
-            playerTransform = players.first().getComponent(TransformComponent.class);
-        }
-        if (mapManager != null) {
-            mapManager.renderForeground(camera, playerTransform);
-        }
 
         // 2.5. Debug BFS path lines (between sprites and lighting)
         EnemySystem enemySystem = engine.getSystem(EnemySystem.class);
@@ -362,8 +354,6 @@ public class Main extends ApplicationAdapter {
     @Override
     public void dispose() {
         // Clean up resources to prevent memory leaks
-        InteractionSystem interactionSystem = engine.getSystem(InteractionSystem.class);
-        if (interactionSystem != null) interactionSystem.dispose();
         batch.dispose();
         if (mapManager != null) mapManager.dispose();
         if (lightingSystem != null) lightingSystem.dispose();
