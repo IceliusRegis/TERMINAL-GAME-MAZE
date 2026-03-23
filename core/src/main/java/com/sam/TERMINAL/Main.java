@@ -1,7 +1,9 @@
 package com.sam.TERMINAL;
 
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine;
+import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.*;
@@ -19,7 +21,6 @@ import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
 import com.sam.TERMINAL.screen.TitleScreen;
 import com.sam.TERMINAL.systems.*;
-import com.badlogic.ashley.core.Family;
 
 /**
  * Main - The entry point and central manager for TERMINAL.
@@ -46,6 +47,8 @@ public class Main extends ApplicationAdapter {
     private TitleScreen titleScreen;
     private boolean showingTitleScreen = true;
     private MapManager mapManager;
+    private LightingSystem lightingSystem;
+    private DebugManager debugManager;
 
     // Asset References (Fileds for Reset Logic and Disposal)
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
@@ -145,6 +148,12 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(doorOpenRegion));
+
+        // Lighting system — stored in field so we can call render() and dispose()
+        lightingSystem = new LightingSystem(camera);
+        engine.addSystem(lightingSystem);
+
+        debugManager = new DebugManager();
     }
 
     private void createUI() {
@@ -206,6 +215,13 @@ public class Main extends ApplicationAdapter {
             // Initial Save Mechanic
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
+        }
+
+        // Attach the player's ConeLight after all entities have been spawned
+        ImmutableArray<Entity> players = engine.getEntitiesFor(
+            Family.all(PlayerComponent.class).get());
+        if (players.size() > 0) {
+            lightingSystem.createPlayerLight(players.first());
         }
     }
 
@@ -277,6 +293,16 @@ public class Main extends ApplicationAdapter {
 
         batch.end();
 
+        // 3. Lighting overlay (outside SpriteBatch, after sprites)
+        if (lightingSystem != null) {
+            lightingSystem.render();
+        }
+
+        // --- DEBUG POLLING ---
+        if (debugManager != null) {
+            debugManager.update(lightingSystem);
+        }
+
         // 4. Draw the Menu (Drawn last so it sits on top of the character)
         menuScreen.render(delta);
 
@@ -318,6 +344,7 @@ public class Main extends ApplicationAdapter {
         // Clean up resources to prevent memory leaks
         batch.dispose();
         if (mapManager != null) mapManager.dispose();
+        if (lightingSystem != null) lightingSystem.dispose();
         if (titleScreen != null)
             titleScreen.dispose();
         if (menuScreen != null)

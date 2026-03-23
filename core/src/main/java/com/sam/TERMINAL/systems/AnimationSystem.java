@@ -38,11 +38,17 @@ public class AnimationSystem extends IteratingSystem{
         if (isMoving) {
             sprite.currentAnimation = sprite.walkAnimation;
 
-            //Flips
+            // Update facing direction and 4-way angle
             if (Gdx.input.isKeyPressed(Input.Keys.A)) {
                 sprite.facingRight = false;
+                sprite.facingAngle = 180f;
             } else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
                 sprite.facingRight = true;
+                sprite.facingAngle = 0f;
+            } else if (Gdx.input.isKeyPressed(Input.Keys.W)) {
+                sprite.facingAngle = 90f;
+            } else if (Gdx.input.isKeyPressed(Input.Keys.S)) {
+                sprite.facingAngle = 270f;
             }
         } else {
             sprite.currentAnimation = sprite.idleAnimation;
