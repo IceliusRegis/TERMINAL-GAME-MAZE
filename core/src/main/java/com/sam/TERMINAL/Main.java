@@ -275,12 +275,12 @@ public class Main extends ApplicationAdapter {
             return;
         }
 
-        // --- PASS 1: GROUND LAYER (behind sprites) ---
+        // --- MAP LAYER (behind sprites) ---
         if (mapManager != null) {
-            mapManager.renderBackground(camera);
+            mapManager.renderMap(camera);
         }
 
-        // 2. Draw the Game World (Y-sorted ECS entities)
+        // 2. Draw the Game World (ECS entities)
         viewport.apply();
         camera.update();
         batch.setProjectionMatrix(camera.combined);
@@ -296,16 +296,7 @@ public class Main extends ApplicationAdapter {
 
         batch.end();
 
-        // --- PASS 2: WALLS LAYER (in front of sprites, with dynamic opacity) ---
-        TransformComponent playerTransform = null;
-        ImmutableArray<Entity> players = engine.getEntitiesFor(
-            Family.all(com.sam.TERMINAL.components.PlayerComponent.class, TransformComponent.class).get());
-        if (players.size() > 0) {
-            playerTransform = players.first().getComponent(TransformComponent.class);
-        }
-        if (mapManager != null) {
-            mapManager.renderForeground(camera, playerTransform);
-        }
+        // Removed: PASS 2 WALLS LAYER
 
         // 2.5. Debug BFS path lines (between sprites and lighting)
         EnemySystem enemySystem = engine.getSystem(EnemySystem.class);
