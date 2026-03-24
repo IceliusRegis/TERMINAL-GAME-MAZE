@@ -85,8 +85,8 @@ public class EntityFactory {
 
         TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
         beepTrans.pos.set(x, y);
-        beepTrans.width = 40;
-        beepTrans.height = 30;
+        beepTrans.width = 16;
+        beepTrans.height = 16;
         beepTrans.updateBounds();
         beep.add(beepTrans);
 
@@ -121,35 +121,6 @@ public class EntityFactory {
 
         enemy.add(new EnemyComponent());
         engine.addEntity(enemy);
-    }
-
-    public static void createFlashlight(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
-        Entity flashlight = engine.createEntity();
-
-        // Position and Bounds
-        TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(x, y);
-        transform.width = 50;   // Slightly bigger than the beep card
-        transform.height = 50;
-        transform.updateBounds();
-        flashlight.add(transform);
-
-        // Visuals
-        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
-        sprite.staticSprite = texture;
-        sprite.isStatic = true;
-        sprite.drawWidth = 50;  // Visual scale
-        sprite.drawHeight = 50;
-        flashlight.add(sprite);
-
-        // Interaction - We name the interactable "flashlight" so the
-        // InteractionSystem knows to trigger the light when picked up.
-        flashlight.add(new InteractableComponent("flashlight", 45f));
-
-        // Persistence
-        flashlight.add(new PersistenceComponent("INTERACTABLE", saveId));
-
-        engine.addEntity(flashlight);
     }
 
     /**

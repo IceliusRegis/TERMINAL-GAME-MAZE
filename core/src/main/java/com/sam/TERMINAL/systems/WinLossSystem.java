@@ -1,7 +1,6 @@
 package com.sam.TERMINAL.systems;
 
 import com.badlogic.ashley.core.*;
-import com.badlogic.ashley.systems.IntervalSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.Gdx;
 import com.sam.TERMINAL.components.*;
@@ -21,6 +20,7 @@ public class WinLossSystem extends EntitySystem {
     public boolean win      = false;
 
     public WinLossSystem(Main main) {
+        // Priority 0 — runs in default order
         this.mainGame = main;
     }
 
@@ -57,10 +57,5 @@ public class WinLossSystem extends EntitySystem {
                 return;
             }
         }
-    }
-
-    public void reset() {
-        gameOver = false;
-        win = false;
     }
 }

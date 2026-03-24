@@ -1,16 +1,12 @@
 package com.sam.TERMINAL.systems;
 
-import com.badlogic.ashley.core.ComponentMapper;
-import com.badlogic.ashley.core.Entity;
-import com.badlogic.ashley.core.Family;
-import com.badlogic.ashley.core.Engine;
+import com.badlogic.ashley.core.*;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.graphics.Camera;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.GridPoint2;
-import com.badlogic.gdx.math.Vector2;
 import com.sam.TERMINAL.components.*;
 
 import java.util.*;
@@ -46,12 +42,8 @@ public class EnemySystem extends IteratingSystem {
     /** ShapeRenderer for drawing debug BFS path lines. */
     private ShapeRenderer debugRenderer;
 
-    private Runnable onCatch;
-    private boolean triggered = false;
-
-    public EnemySystem(Runnable onCatch) {
+    public EnemySystem() {
         super(Family.all(EnemyComponent.class, TransformComponent.class).get());
-        this.onCatch = onCatch;
     }
 
     // -----------------------------------------------------------------------
@@ -131,17 +123,6 @@ public class EnemySystem extends IteratingSystem {
 
             // CRITICAL: Always update bounds after moving
             enemyT.updateBounds();
-        }
-
-        // Check catch distance for jumpscare callback
-        float dx = playerT.pos.x - enemyT.pos.x;
-        float dy = playerT.pos.y - enemyT.pos.y;
-        float catchDist = new Vector2(dx, dy).len();
-        if (catchDist < 20f && !triggered) {
-            triggered = true;
-            if (onCatch != null) {
-                onCatch.run();
-            }
         }
     }
 
@@ -303,8 +284,4 @@ public class EnemySystem extends IteratingSystem {
             debugRenderer = null;
         }
     }
-
-    public void reset() {
-        triggered = false;
-    } // call this on game reset
 }

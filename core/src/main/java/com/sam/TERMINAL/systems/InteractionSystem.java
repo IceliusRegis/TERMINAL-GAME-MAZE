@@ -136,19 +136,6 @@ public class InteractionSystem extends EntitySystem {
                 }
                 break;
 
-            case "flashlight":
-                System.out.println("Picked up the FLASHLIGHT!");
-                if (inventory != null) {
-                    inventory.addItem("flashlight");
-                }
-                LightingSystem lightingSystem = getEngine().getSystem(LightingSystem.class);
-                if (lightingSystem != null) {
-                    lightingSystem.createPlayerLight(player, true);
-                }
-                target.remove(SpriteComponent.class);
-                typeData.isActive = false;
-                break;
-
             default:
                 System.out.println("Interacted with " + typeData.type);
         }
