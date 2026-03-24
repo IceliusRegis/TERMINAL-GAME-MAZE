@@ -35,6 +35,8 @@ public class InventoryButton {
         window.add(exitBtn).size(30, 30).pad(10).left();
     }
 
+    //heheheh
+
     // Call this from your MenuScreen dispose() to prevent memory leaks
     public void dispose() {
         if (exitTexture != null) exitTexture.dispose();

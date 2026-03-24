@@ -7,8 +7,6 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.sam.TERMINAL.components.CollisionComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
@@ -19,7 +17,7 @@ import com.sam.TERMINAL.components.*;
  *
  * Responsibilities:
  * 1. Checks distance between Player and all Interactable entities.
- * 2. Draws a "Press E" icon above any interactable within range.
+ * 2. Visualizes prompt (e.g. "Press E") if close enough (Future Todo).
  * 3. Listens for the 'E' key input.
  * 4. Executes specific logic based on item type (Key -> Pickup, Door -> Open).
  *
@@ -30,36 +28,20 @@ import com.sam.TERMINAL.components.*;
 public class InteractionSystem extends EntitySystem {
 
     private ComponentMapper<TransformComponent> transformMapper;
-    private ComponentMapper<InteractableComponent> interactMapper;
-    private ComponentMapper<InventoryComponent> inventoryMapper;
+    private  ComponentMapper<InteractableComponent> interactMapper;
+    private  ComponentMapper<InventoryComponent> inventoryMapper;
     private ComponentMapper<SpriteComponent> spriteMapper;
 
     private final TextureRegion openDoorSprite;
 
-    // Rendering context for the "Press E" prompt
-    private final SpriteBatch batch;
-    private Texture promptTexture;
-    private TextureRegion promptRegion;
 
-    private static final float PROMPT_WIDTH    = 24f;
-    private static final float PROMPT_HEIGHT   = 24f;
-    private static final float PROMPT_OFFSET_Y = 8f; // pixels above the entity top
-
-
-    public InteractionSystem(TextureRegion openDoorSprite, SpriteBatch batch) {
+    public InteractionSystem(TextureRegion openDoorSprite) {
         this.openDoorSprite = openDoorSprite;
-        this.batch = batch;
 
-        // Null-guarded asset load — game runs fine if the file is missing
-        if (Gdx.files.internal("ui/press_e.png").exists()) {
-            promptTexture = new Texture(Gdx.files.internal("ui/press_e.png"));
-            promptRegion  = new TextureRegion(promptTexture);
-        }
-
-        transformMapper  = ComponentMapper.getFor(TransformComponent.class);
-        interactMapper   = ComponentMapper.getFor(InteractableComponent.class);
-        inventoryMapper  = ComponentMapper.getFor(InventoryComponent.class);
-        spriteMapper     = ComponentMapper.getFor(SpriteComponent.class);
+        transformMapper = ComponentMapper.getFor(TransformComponent.class);
+        interactMapper = ComponentMapper.getFor(InteractableComponent.class);
+        inventoryMapper =  ComponentMapper.getFor(InventoryComponent.class);
+        spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     }
 
     @Override
@@ -67,13 +49,13 @@ public class InteractionSystem extends EntitySystem {
         //1.) Find the player tag and their position first
         ImmutableArray<Entity> players = getEngine().getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
 
-        //Make sure player is loaded first
+        //Mkake sures player is loaded first
         if (players.size() == 0) return;
         //Makes player the first in the list and gets their position
         Entity player = players.first();
         TransformComponent playerPos = transformMapper.get(player);
 
-        //2.) Find those with the interact tag and their position
+        //2.) Find the those with the interact tag and their position
         ImmutableArray<Entity> interactables = getEngine().getEntitiesFor(Family.all(InteractableComponent.class, TransformComponent.class).get());
 
         //3.) Check Distance of items from player using dst(built in libgdx)
@@ -94,12 +76,7 @@ public class InteractionSystem extends EntitySystem {
             );
 
             if (dist <= interact.radius) {
-                // Draw the "Press E" prompt above the entity center
-                if (promptRegion != null) {
-                    float promptX = targetCenterX - PROMPT_WIDTH  / 2f;
-                    float promptY = targetPos.pos.y + targetPos.height + PROMPT_OFFSET_Y;
-                    batch.draw(promptRegion, promptX, promptY, PROMPT_WIDTH, PROMPT_HEIGHT);
-                }
+                // TODO: In the future, draw a "Press E" tooltip here!
 
                 //4.) Receives Interact input
                 if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
@@ -136,21 +113,23 @@ public class InteractionSystem extends EntitySystem {
                 }
                 break;
 
+            case "flashlight":
+                System.out.println("Picked up the FLASHLIGHT!");
+                if (inventory != null) {
+                    inventory.addItem("flashlight");
+                }
+                LightingSystem lightingSystem = getEngine().getSystem(LightingSystem.class);
+                if (lightingSystem != null) {
+                    lightingSystem.createPlayerLight(player, true);
+                }
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
+                break;
+
             default:
                 System.out.println("Interacted with " + typeData.type);
         }
 
-    }
-
-    /**
-     * Disposes of the prompt texture to prevent memory leaks.
-     * Must be called from Main.dispose().
-     */
-    public void dispose() {
-        if (promptTexture != null) {
-            promptTexture.dispose();
-            promptTexture = null;
-        }
     }
 
 }
