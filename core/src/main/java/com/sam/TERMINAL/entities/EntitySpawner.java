@@ -8,17 +8,12 @@ import com.sam.TERMINAL.persistence.GameData;
 
 /**
  * EntitySpawner - Helper class to calculate spawn positions and create entities.
- *
- * Responsibilities:
- * - Encapsulates the algorithms for finding valid "Safe Spots" on the map.
- * - Delegates the actual object construction to EntityFactory.
- * - Ensures entities (like the Key) spawn at a fun distance from the player.
  */
-
 public class EntitySpawner {
 
-    // Helper coordinates (So we don't typo them)
     private static final float TILE_SIZE = 32f;
+
+    // Default hardcoded positions
     private static final float PLAYER_X = 5 * TILE_SIZE;
     private static final float PLAYER_Y = 5 * TILE_SIZE;
     private static final float KEY_X = 20 * TILE_SIZE;
@@ -28,155 +23,75 @@ public class EntitySpawner {
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
-    // Stable, hardcoded IDs. Change these only if you intentionally want to break old saves.
     public static final String KEY_SAVE_ID  = "KEY_BEEP_MAIN";
     public static final String DOOR_SAVE_ID = "DOOR_EXIT_MAIN";
+    public static final String FLASHLIGHT_SAVE_ID = "ITEM_FLASHLIGHT";
 
-    public static void spawnInitialEntities (PooledEngine engine,
-                                             TextureRegion beepRegion, TextureRegion doorRegion,
-                                             Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
+    public static void spawnInitialEntities(PooledEngine engine,
+                                            TextureRegion beepRegion, TextureRegion doorRegion,
+                                            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
+                                            TextureRegion enemyRegion, TextureRegion flashlightRegion) {
 
-       /* Disable complex spawn for noww
+        int mapWidth = 50;
+        int mapHeight = 50;
 
+        float pStartX = PLAYER_X;
+        float pStartY = PLAYER_Y;
+        int pTileX = (int)(pStartX / TILE_SIZE);
+        int pTileY = (int)(pStartY / TILE_SIZE);
 
-        //PLAYER SPAWN MECHANICS
+        // --- RANDOM FLASHLIGHT SPAWNING ---
+        int flSpawnX = 0;
+        int flSpawnY = 0;
+        boolean flSafeFound = false;
+        int minFlDist = 4;
+        int maxFlRadius = 12;
 
+        while (!flSafeFound) {
+            int offSetX = (int) (Math.random() * (maxFlRadius * 2 + 1)) - maxFlRadius;
+            int offSetY = (int) (Math.random() * (maxFlRadius * 2 + 1)) - maxFlRadius;
 
-        // 1.) Find Safe Spot for Player
-        int spawnTileX = 0;
-        int spawnTileY = 0;
-        boolean safeSpotFound = false;
+            int candidateX = pTileX + offSetX;
+            int candidateY = pTileY + offSetY;
 
-        //Keep Finding till we found a floor tile
-        while (!safeSpotFound) {
-            spawnTileX = (int) (Math.random() * 50);
-            spawnTileY = (int) (Math.random() * 50);
+            if (candidateX < 0 || candidateX >= mapWidth || candidateY < 0 || candidateY >= mapHeight) continue;
+            if (Math.abs(offSetX) + Math.abs(offSetY) < minFlDist) continue;
 
-            //Checks if the tile found is a floor
-            if (tileCom.map[spawnTileX][spawnTileY] == 2) {
-                safeSpotFound = true;
-            }
+            flSpawnX = candidateX;
+            flSpawnY = candidateY;
+            flSafeFound = true;
         }
 
-        //Convert found coordinates into Pixels
-        //(Example: Tile 5 * 32 pixels = Pixel 160)
-        float startPixelX = spawnTileX * 32f;
-        float startPixelY = spawnTileY * 32f;
+        float flPixelX = flSpawnX * TILE_SIZE;
+        float flPixelY = flSpawnY * TILE_SIZE;
 
-
-        //BEEP CARD SPAWNING MECHANICS
-
-        //Temporary Beep Spawning mechanics
-        int beepSpawnX = 0;
-        int beepSpawnY = 0;
-        boolean beepSafeSpawnFound = false;
-
-        int minDistance = 5;
-        int maxRadius = 15;
-
-        while (!beepSafeSpawnFound) {
-            // Picks a range between 5-15
-            int offSetX = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
-            int offSetY = (int) (Math.random() * (maxRadius * 2 + 1)) - maxRadius;
-
-            int beepCandidateX = spawnTileX + offSetX;
-            int beepCandidateY = spawnTileY + offSetY;
-
-            if (beepCandidateX < 0 || beepCandidateX >=50 || beepCandidateY < 0 || beepCandidateY >=50) {
-                //Do not spawn their since it is out of bounds
-                continue;
-            }
-
-            if (tileCom.map[beepCandidateX][beepCandidateY] != 2) {
-                //Dont spawn also here cause walls
-                continue;
-            }
-
-            if (Math.abs(offSetX) + Math.abs(offSetY) < minDistance) {
-                //Avoid Spawning too close to the player
-                continue;
-            }
-
-            //If all checks passed
-            beepSpawnX = beepCandidateX;
-            beepSpawnY = beepCandidateY;
-            beepSafeSpawnFound = true;
-
-        }
-
-        //DOOR SPAWNING
-        int doorSpawnX = 0;
-        int doorSpawnY = 0;
-        boolean doorSafeSpawnFound = false;
-
-        int minDoorDistance = 10;
-        int maxDoorRadius = 24;
-
-        while (!doorSafeSpawnFound) {
-            int offSetX = (int) (Math.random() * (maxDoorRadius * 2 + 1)) - maxDoorRadius;
-            int offSetY = (int) (Math.random() * (maxDoorRadius * 2 + 1)) - maxDoorRadius;
-
-            int doorCandidateX = spawnTileX + offSetX;
-            int doorCandidateY = spawnTileY + offSetY;
-
-            if (doorCandidateX < 0 || doorCandidateX >=50 || doorCandidateY < 0 || doorCandidateY >=50) {
-                //Do not spawn their since it is out of bounds
-                continue;
-            }
-
-            if (tileCom.map[doorCandidateX][doorCandidateY] != 2) {
-                //Dont spawn also here cause walls
-                continue;
-            }
-
-            if (Math.abs(offSetX) + Math.abs(offSetY) < minDoorDistance) {
-                //Avoid Spawning too close to the player
-                continue;
-            }
-
-            //If all checks passed
-            doorSpawnX = doorCandidateX;
-            doorSpawnY = doorCandidateY;
-            doorSafeSpawnFound = true;
-
-        }
-
-        **/
-
-        //CREATE THE ENTITIES THROUGH ENTITY FACTORY
-
-        //Create Beep
+        // --- ACTUAL CREATION ---
+        EntityFactory.createPlayer(engine, pStartX, pStartY, 24f, 15f, walkAnimation, idleAnimation);
         EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion, KEY_SAVE_ID);
 
-        //Create Door
+        // Using the specific flashlight factory method
+        EntityFactory.createFlashlight(engine, flPixelX, flPixelY, flashlightRegion, FLASHLIGHT_SAVE_ID);
+
         EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion, DOOR_SAVE_ID);
-
-        //Create Player
-        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
-
-        //Create Enemy
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
-
-        Gdx.app.log("TERMINAL", "Spawned Player at (" + PLAYER_X + "," + PLAYER_Y + ")");
-        Gdx.app.log("TERMINAL", "Spawned Key nearby at (" + KEY_X + "," + KEY_Y + ")");
-        Gdx.app.log("TERMINAL", "Spawned Door at (" + DOOR_X + "," + DOOR_Y + ")");
-        Gdx.app.log("TERMINAL", "Spawned Enemy at (" + ENEMY_X + "," + ENEMY_Y + ")");
-
     }
 
+    /**
+     * Updated spawnForLoad to accept flashlightRegion
+     */
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
                                     TextureRegion beepRegion, TextureRegion doorRegion,
-                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation, TextureRegion enemyRegion) {
+                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
+                                    TextureRegion enemyRegion, TextureRegion flashlightRegion) {
+
+        // Restore Player position from save
         EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 24f, 15f, walkAnimation, idleAnimation);
 
+        // Re-create items (SaveSystem will usually move/remove these if they were already picked up)
         EntityFactory.createKey(engine, KEY_X, KEY_Y, beepRegion, KEY_SAVE_ID);
+        EntityFactory.createFlashlight(engine, KEY_X + 32, KEY_Y, flashlightRegion, FLASHLIGHT_SAVE_ID);
+
         EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion, DOOR_SAVE_ID);
-
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
-
-        Gdx.app.log("SPAWNER", "Restored entities for Save Load.");
     }
-
-
-
 }

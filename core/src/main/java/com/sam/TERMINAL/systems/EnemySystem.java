@@ -1,13 +1,19 @@
 package com.sam.TERMINAL.systems;
 
-import com.badlogic.ashley.core.*;
+import com.badlogic.ashley.core.ComponentMapper;
+import com.badlogic.ashley.core.Engine;
+import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.graphics.Camera;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.GridPoint2;
-import com.sam.TERMINAL.components.*;
+import com.sam.TERMINAL.components.EnemyComponent;
+import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.components.TileWorldComponent;
+import com.sam.TERMINAL.components.TransformComponent;
 
 import java.util.*;
 
@@ -17,12 +23,13 @@ import java.util.*;
  * Each frame:
  * 1. Accumulates delta time against pathRecalcInterval.
  * 2. When the interval fires (or path is empty), runs BFS to find
- *    the shortest tile-path to the player.
+ * the shortest tile-path to the player.
  * 3. Moves the enemy pixel-by-pixel toward the next tile waypoint
- *    in the cached path queue.
+ * in the cached path queue.
  *
  * Architecture Notes:
- * - Reads TileWorldComponent.isSolid() for wall data. No direct tile array access.
+ * - Reads TileWorldComponent.isSolid() for wall data. No direct tile array
+ * access.
  * - Stores path in EnemyComponent.path — component isolation is maintained.
  * - Does NOT extend WinLossSystem or any other system.
  */
@@ -31,10 +38,9 @@ public class EnemySystem extends IteratingSystem {
     /** Pixels — "close enough" to a waypoint to snap and advance. */
     private static final float ARRIVAL_THRESHOLD = 4f;
 
-    private final ComponentMapper<TransformComponent> transformMapper =
-        ComponentMapper.getFor(TransformComponent.class);
-    private final ComponentMapper<EnemyComponent> enemyMapper =
-        ComponentMapper.getFor(EnemyComponent.class);
+    private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
+            .getFor(TransformComponent.class);
+    private final ComponentMapper<EnemyComponent> enemyMapper = ComponentMapper.getFor(EnemyComponent.class);
 
     /** Cached player entity — looked up once and reused until engine reset. */
     private Entity cachedPlayer;
@@ -47,7 +53,7 @@ public class EnemySystem extends IteratingSystem {
     }
 
     // -----------------------------------------------------------------------
-    //  PER-ENTITY UPDATE
+    // PER-ENTITY UPDATE
     // -----------------------------------------------------------------------
 
     @Override
@@ -56,38 +62,39 @@ public class EnemySystem extends IteratingSystem {
         // 1. Find player entity (cached after first frame)
         if (cachedPlayer == null) {
             ImmutableArray<Entity> players = getEngine()
-                .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
-            if (players.size() == 0) return;
+                    .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
+            if (players.size() == 0)
+                return;
             cachedPlayer = players.first();
         }
 
         // 2. Get components
-        EnemyComponent     enemy   = enemyMapper.get(entity);
-        TransformComponent enemyT  = transformMapper.get(entity);
+        EnemyComponent enemy = enemyMapper.get(entity);
+        TransformComponent enemyT = transformMapper.get(entity);
         TransformComponent playerT = transformMapper.get(cachedPlayer);
 
         // 3. Get world component (needed for BFS)
         TileWorldComponent world = getWorldComponent();
-        if (world == null) return; // Map not loaded yet — skip silently
+        if (world == null)
+            return; // Map not loaded yet — skip silently
 
         // 4. Accumulate timer; recalculate path when interval fires or path exhausted
         enemy.pathTimer += deltaTime;
         boolean shouldRepath = enemy.pathTimer >= enemy.pathRecalcInterval
-                               || enemy.path.isEmpty();
+                || enemy.path.isEmpty();
 
         if (shouldRepath) {
             enemy.pathTimer = 0f;
 
             // Convert pixel positions to tile coordinates
-            int startTileX = (int)(enemyT.pos.x / world.tileWidth);
-            int startTileY = (int)(enemyT.pos.y / world.tileHeight);
-            int goalTileX  = (int)(playerT.pos.x / world.tileWidth);
-            int goalTileY  = (int)(playerT.pos.y / world.tileHeight);
+            int startTileX = (int) (enemyT.pos.x / world.tileWidth);
+            int startTileY = (int) (enemyT.pos.y / world.tileHeight);
+            int goalTileX = (int) (playerT.pos.x / world.tileWidth);
+            int goalTileY = (int) (playerT.pos.y / world.tileHeight);
 
             // Run BFS and cache the result
             Queue<GridPoint2> newPath = findPath(
-                world, startTileX, startTileY, goalTileX, goalTileY
-            );
+                    world, startTileX, startTileY, goalTileX, goalTileY);
             enemy.path.clear();
             if (newPath != null) {
                 enemy.path.addAll(newPath);
@@ -100,14 +107,14 @@ public class EnemySystem extends IteratingSystem {
 
             // Target pixel: center of the next tile, offset by half entity size
             float targetX = nextTile.x * world.tileWidth
-                          + world.tileWidth  / 2f
-                          - enemyT.width  / 2f;
+                    + world.tileWidth / 2f
+                    - enemyT.width / 2f;
             float targetY = nextTile.y * world.tileHeight
-                          + world.tileHeight / 2f
-                          - enemyT.height / 2f;
+                    + world.tileHeight / 2f
+                    - enemyT.height / 2f;
 
-            float dx   = targetX - enemyT.pos.x;
-            float dy   = targetY - enemyT.pos.y;
+            float dx = targetX - enemyT.pos.x;
+            float dy = targetY - enemyT.pos.y;
             float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
             if (dist <= ARRIVAL_THRESHOLD) {
@@ -127,7 +134,7 @@ public class EnemySystem extends IteratingSystem {
     }
 
     // -----------------------------------------------------------------------
-    //  BFS HELPER
+    // BFS HELPER
     // -----------------------------------------------------------------------
 
     /**
@@ -143,8 +150,8 @@ public class EnemySystem extends IteratingSystem {
      *         goal (inclusive), or null if no path exists.
      */
     private Queue<GridPoint2> findPath(TileWorldComponent world,
-                                       int startX, int startY,
-                                       int goalX,  int goalY) {
+            int startX, int startY,
+            int goalX, int goalY) {
 
         // Edge case: already at goal
         if (startX == goalX && startY == goalY) {
@@ -157,18 +164,18 @@ public class EnemySystem extends IteratingSystem {
         }
 
         // BFS data structures
-        Queue<GridPoint2>           frontier = new LinkedList<>();
+        Queue<GridPoint2> frontier = new LinkedList<>();
         Map<GridPoint2, GridPoint2> cameFrom = new HashMap<>(); // child -> parent
 
         GridPoint2 start = new GridPoint2(startX, startY);
-        GridPoint2 goal  = new GridPoint2(goalX,  goalY);
+        GridPoint2 goal = new GridPoint2(goalX, goalY);
 
         frontier.add(start);
         cameFrom.put(start, null); // start has no parent
 
         // 4-directional BFS (no diagonal movement)
-        int[] dX = { 0,  0, -1, 1 };
-        int[] dY = { 1, -1,  0, 0 };
+        int[] dX = { 0, 0, -1, 1 };
+        int[] dY = { 1, -1, 0, 0 };
 
         boolean found = false;
 
@@ -186,15 +193,18 @@ public class EnemySystem extends IteratingSystem {
                 GridPoint2 neighbor = new GridPoint2(nx, ny);
 
                 // Skip if solid or already visited
-                if (world.isSolid(nx, ny)) continue;
-                if (cameFrom.containsKey(neighbor)) continue;
+                if (world.isSolid(nx, ny))
+                    continue;
+                if (cameFrom.containsKey(neighbor))
+                    continue;
 
                 cameFrom.put(neighbor, current);
                 frontier.add(neighbor);
             }
         }
 
-        if (!found) return null;
+        if (!found)
+            return null;
 
         // Reconstruct path by walking from goal back to start via cameFrom
         LinkedList<GridPoint2> path = new LinkedList<>();
@@ -209,7 +219,7 @@ public class EnemySystem extends IteratingSystem {
     }
 
     // -----------------------------------------------------------------------
-    //  DEBUG RENDERER
+    // DEBUG RENDERER
     // -----------------------------------------------------------------------
 
     /**
@@ -224,27 +234,29 @@ public class EnemySystem extends IteratingSystem {
         }
 
         TileWorldComponent world = getWorldComponent();
-        if (world == null) return;
+        if (world == null)
+            return;
 
         debugRenderer.setProjectionMatrix(camera.combined);
         debugRenderer.begin(ShapeRenderer.ShapeType.Line);
         debugRenderer.setColor(Color.YELLOW);
 
         ImmutableArray<Entity> enemies = getEngine()
-            .getEntitiesFor(Family.all(EnemyComponent.class, TransformComponent.class).get());
+                .getEntitiesFor(Family.all(EnemyComponent.class, TransformComponent.class).get());
 
         for (Entity entity : enemies) {
             EnemyComponent enemy = enemyMapper.get(entity);
-            if (enemy.path.isEmpty()) continue;
+            if (enemy.path.isEmpty())
+                continue;
 
             TransformComponent enemyT = transformMapper.get(entity);
 
             // Start line from the enemy's current pixel position (center)
-            float prevX = enemyT.pos.x + enemyT.width  / 2f;
+            float prevX = enemyT.pos.x + enemyT.width / 2f;
             float prevY = enemyT.pos.y + enemyT.height / 2f;
 
             for (GridPoint2 tile : enemy.path) {
-                float tilePixelX = tile.x * world.tileWidth  + world.tileWidth  / 2f;
+                float tilePixelX = tile.x * world.tileWidth + world.tileWidth / 2f;
                 float tilePixelY = tile.y * world.tileHeight + world.tileHeight / 2f;
 
                 debugRenderer.line(prevX, prevY, tilePixelX, tilePixelY);
@@ -258,7 +270,7 @@ public class EnemySystem extends IteratingSystem {
     }
 
     // -----------------------------------------------------------------------
-    //  HELPERS
+    // HELPERS
     // -----------------------------------------------------------------------
 
     /**
@@ -267,8 +279,9 @@ public class EnemySystem extends IteratingSystem {
      */
     private TileWorldComponent getWorldComponent() {
         ImmutableArray<Entity> worldEntities = getEngine()
-            .getEntitiesFor(Family.all(TileWorldComponent.class).get());
-        if (worldEntities.size() == 0) return null;
+                .getEntitiesFor(Family.all(TileWorldComponent.class).get());
+        if (worldEntities.size() == 0)
+            return null;
         return worldEntities.first().getComponent(TileWorldComponent.class);
     }
 

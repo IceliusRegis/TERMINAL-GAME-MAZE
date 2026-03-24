@@ -32,9 +32,7 @@ import com.sam.TERMINAL.systems.*;
  * - System Initialization: Sets up the ECS Engine, Camera, and Game Systems.
  * - State Orchestration: Decides whether to load a save file or start a new
  * game.
- * Hello this is a test
  */
-
 public class Main extends ApplicationAdapter {
 
     // Ashley ECS engine - manages all entities, components, rendering tools and
@@ -50,12 +48,12 @@ public class Main extends ApplicationAdapter {
     private LightingSystem lightingSystem;
     private DebugManager debugManager;
 
-    // Asset References (Fileds for Reset Logic and Disposal)
+    // Asset References (Fields for Reset Logic and Disposal)
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, doorOpenTexture, doorClosedTexture;
+    private Texture beepTexture, doorOpenTexture, doorClosedTexture, flashlightTexture;
 
     // Regions and Animation (Shared)
-    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion;
+    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion, flashlightRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -64,7 +62,6 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void create() {
-
         // 1.) Load Core Tools
         initEngine();
 
@@ -83,13 +80,14 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
         }
+
+        // UI must be created first so menuScreen can be injected into systems
+        createUI();
         initSystems();
 
         // 4.) Game start (New vs Load)
         handleGameStart();
 
-        // 5.) Starts Up UI
-        createUI();
         if (titleScreen != null) {
             titleScreen.dispose();
             titleScreen = null;
@@ -113,19 +111,22 @@ public class Main extends ApplicationAdapter {
         beepTexture = new Texture(Gdx.files.internal("sprites/beep.png"));
         beepRegion = new TextureRegion(beepTexture);
 
-        // Temp Door
+        // Doors
         doorOpenTexture = new Texture(Gdx.files.internal("environments/opendoor.png"));
         doorOpenRegion = new TextureRegion(doorOpenTexture);
 
         doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
         doorCloseRegion = new TextureRegion(doorClosedTexture);
 
+        // Flashlight
+        flashlightTexture = new Texture(Gdx.files.internal("sprites/flash_off.png"));
+        flashlightRegion = new TextureRegion(flashlightTexture);
+
         // UI
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
         // PLAYER SPRITES
         playerSpriteSheet = new Texture("sprites/MC (Walk).png");
-
         TextureRegion[][] frames = TextureRegion.split(playerSpriteSheet, 128, 250);
         walkAnimation = new Animation<>(0.1f, frames[0]);
 
@@ -136,12 +137,24 @@ public class Main extends ApplicationAdapter {
         // ENEMY
         enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
         enemyRegion = new TextureRegion(enemyTexture);
-
     }
 
     private void initSystems() {
-        engine.addSystem(new MovementSystem());
-        engine.addSystem(new EnemySystem());
+        // MovementSystem receives menuScreen for pause/settings awareness
+        MovementSystem moveSystem = new MovementSystem();
+        if (menuScreen != null) {
+            moveSystem.setMenuScreen(menuScreen);
+        }
+        engine.addSystem(moveSystem);
+
+        // EnemySystem fires jumpscare callback on catch
+        engine.addSystem(new EnemySystem(() -> {
+            Gdx.app.postRunnable(() -> {
+                if (menuScreen != null)
+                    menuScreen.showJumpscare();
+            });
+        }));
+
         engine.addSystem(new WinLossSystem(this));
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
@@ -151,13 +164,15 @@ public class Main extends ApplicationAdapter {
 
         // Lighting system — stored in field so we can call render() and dispose()
         lightingSystem = new LightingSystem(camera);
+        if (menuScreen != null) {
+            lightingSystem.setMenuScreen(menuScreen);
+        }
         engine.addSystem(lightingSystem);
 
         debugManager = new DebugManager();
     }
 
     private void createUI() {
-
         menuScreen = new MenuScreen(batch, engine, this);
     }
 
@@ -166,37 +181,30 @@ public class Main extends ApplicationAdapter {
         GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
         GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
 
-        // --- NEW MAP LOADING LOGIC ---
         mapManager = new MapManager(engine);
         mapManager.loadMap("maps/mapTest.tmx");
 
         // LOAD GAME
         if (mainSave != null) {
-
             // Checks ID of Temp and Main Save File
             boolean snapshotIsValid = false;
             if (tempSave != null && mainSave.runId != null && tempSave.runId.equals(mainSave.runId)) {
                 snapshotIsValid = true;
                 Gdx.app.log("TERMINAL", "Snapshot verified. Reset enabled.");
             } else {
-                Gdx.app.log("TERMINAL",
-                        "Snapshot missing or ID mismatch. Creating new safety snapshot from CURRENT loaded state.");
-                // NOTE: This isn't a "true" reset (it resets to this save, not the start of the
-                // game),
-                // but it prevents crashes if the player clicks Reset.
+                Gdx.app.log("TERMINAL", "Snapshot missing or ID mismatch. Creating new safety snapshot.");
             }
 
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
-                    enemyRegion);
+                    enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
                 engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             }
-
             Gdx.app.log("TERMINAL", "Save file loaded");
         } else {
             // NEW GAME
@@ -208,39 +216,36 @@ public class Main extends ApplicationAdapter {
             // Make new ID
             engine.getSystem(SaveSystem.class).generateNewRunId();
 
-            // EntitySpawner now spawns initial stuff
+            // EntitySpawner spawns initial entities
             EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
-                    enemyRegion);
+                    enemyRegion, flashlightRegion);
 
-            // Initial Save Mechanic
+            // Initial Save
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
 
         // Attach the player's ConeLight after all entities have been spawned
         ImmutableArray<Entity> players = engine.getEntitiesFor(
-            Family.all(PlayerComponent.class).get());
+                Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
-            lightingSystem.createPlayerLight(players.first());
+            lightingSystem.createPlayerLight(players.first(), false);
         }
     }
 
     public void resetGame() {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
 
-        // Locks all door before reset
-        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine
-                .getEntitiesFor(Family.all(InteractableComponent.class).get());
+        // Lock all doors before reset
+        ImmutableArray<Entity> doors = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
         for (Entity door : doors) {
-            door.getComponent(InteractableComponent.class).isActive = true; // Close it!
+            door.getComponent(InteractableComponent.class).isActive = true;
         }
 
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
-        // Hard Reset for enemy to avoid spawn killing
-        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine
-                .getEntitiesFor(Family.all(EnemyComponent.class).get());
-
+        // Hard reset enemy to avoid spawn killing
+        ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
         for (Entity enemy : enemies) {
             TransformComponent t = enemy.getComponent(TransformComponent.class);
             t.pos.set(5 * 32f, 40 * 32f);
@@ -254,18 +259,18 @@ public class Main extends ApplicationAdapter {
             }
         }
 
+        // Reset EnemySystem triggered flag so it can fire again
+        engine.getSystem(EnemySystem.class).reset();
+
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         wls.gameOver = false;
         wls.win = false;
 
-        // 4. Reset UI (NEW LINE)
         menuScreen.resetUI();
-
     }
 
     @Override
     public void render() {
-        // 1. Clear the screen
         float delta = Gdx.graphics.getDeltaTime();
         ScreenUtils.clear(0f, 0f, 0f, 1);
 
@@ -275,54 +280,51 @@ public class Main extends ApplicationAdapter {
             return;
         }
 
-        // --- MAP LAYER (behind sprites) ---
+        // Map layer (behind sprites)
         if (mapManager != null) {
             mapManager.renderMap(camera);
         }
 
-        // 2. Draw the Game World (ECS entities)
+        // Draw the Game World (ECS entities)
         viewport.apply();
         camera.update();
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
-        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver()) {
+        // Freeze engine during settings, game over, or jumpscare
+        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
             engine.update(delta);
         } else {
-            // When paused, we draw the last known state without moving anything
-            // In Ashley, we call update with 0 delta to "freeze" time:
             engine.update(0);
         }
 
         batch.end();
 
-        // Removed: PASS 2 WALLS LAYER
-
-        // 2.5. Debug BFS path lines (between sprites and lighting)
+        // Debug BFS path lines (between sprites and lighting)
         EnemySystem enemySystem = engine.getSystem(EnemySystem.class);
         if (enemySystem != null) {
             enemySystem.renderDebug(camera);
         }
 
-        // 3. Lighting overlay (outside SpriteBatch, after sprites)
+        // Lighting overlay (outside SpriteBatch, after sprites)
         if (lightingSystem != null) {
             lightingSystem.render();
         }
 
-        // --- DEBUG POLLING ---
+        // Debug polling
         if (debugManager != null) {
             debugManager.update(lightingSystem);
             debugManager.renderHitboxes(engine, camera);
         }
 
-        // 4. Draw the Menu (Drawn last so it sits on top of the character)
+        // Draw UI on top
         menuScreen.render(delta);
 
-        // Decides what outcome to render
+        // Win/loss check — guarded so jumpscare isn't interrupted
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
-        if (wls.win && !menuScreen.isGameOver()) {
+        if (wls.win && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
             menuScreen.showGameOver(true);
-        } else if (wls.gameOver && !menuScreen.isGameOver()) {
+        } else if (wls.gameOver && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
             menuScreen.showGameOver(false);
         }
 
@@ -353,13 +355,16 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void dispose() {
-        // Clean up resources to prevent memory leaks
         InteractionSystem interactionSystem = engine.getSystem(InteractionSystem.class);
-        if (interactionSystem != null) interactionSystem.dispose();
+        if (interactionSystem != null)
+            interactionSystem.dispose();
         batch.dispose();
-        if (mapManager != null) mapManager.dispose();
-        if (lightingSystem != null) lightingSystem.dispose();
-        if (debugManager != null) debugManager.dispose();
+        if (mapManager != null)
+            mapManager.dispose();
+        if (lightingSystem != null)
+            lightingSystem.dispose();
+        if (debugManager != null)
+            debugManager.dispose();
         if (titleScreen != null)
             titleScreen.dispose();
         if (menuScreen != null)
@@ -376,11 +381,16 @@ public class Main extends ApplicationAdapter {
             doorClosedTexture.dispose();
         if (enemyTexture != null)
             enemyTexture.dispose();
+        if (flashlightTexture != null)
+            flashlightTexture.dispose();
     }
 
-    // HELPER FUNC
+    // HELPER FUNCTIONS
     public TextureRegion getBeepRegion() {
         return beepRegion;
     }
 
+    public TextureRegion getFlashlightRegion() {
+        return flashlightRegion;
+    }
 }
