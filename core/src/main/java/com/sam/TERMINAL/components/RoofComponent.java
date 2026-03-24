@@ -14,5 +14,5 @@ import com.badlogic.ashley.core.Component;
  * No data fields are needed — the presence of this component is the tag.
  */
 public class RoofComponent implements Component {
-    // Intentionally empty — marker component only.
+    public float sortYShift = 0f;
 }

@@ -117,6 +117,23 @@ public class MapManager {
                                     wallEntity.add(engine.createComponent(WallComponent.class));
                                 }
 
+                                // Scan downwards to find the true bottom base of this wall column
+                                int baseY = y;
+                                while (baseY > 0 && hasStructuralTile(x, baseY - 1, allLayers)) {
+                                    baseY--;
+                                }
+                                float shiftAmount = (y - baseY) * tileLayer.getTileHeight();
+
+                                if (layerName.equals("Wall Roofs")) {
+                                    RoofComponent rc = engine.createComponent(RoofComponent.class);
+                                    rc.sortYShift = shiftAmount;
+                                    wallEntity.add(rc);
+                                } else {
+                                    WallComponent wc = engine.createComponent(WallComponent.class);
+                                    wc.sortYShift = shiftAmount;
+                                    wallEntity.add(wc);
+                                }
+
                                 engine.addEntity(wallEntity);
                                 wallEntities.add(wallEntity);
                             }
@@ -176,4 +193,15 @@ public class MapManager {
         }
         wallEntities.clear();
     }
+
+    private boolean hasStructuralTile(int x, int y, MapLayers layers) {
+        MapLayer wallsLayer = layers.get("Walls");
+        if (wallsLayer instanceof TiledMapTileLayer && ((TiledMapTileLayer) wallsLayer).getCell(x, y) != null)
+            return true;
+        MapLayer roofsLayer = layers.get("Wall Roofs");
+        if (roofsLayer instanceof TiledMapTileLayer && ((TiledMapTileLayer) roofsLayer).getCell(x, y) != null)
+            return true;
+        return false;
+    }
+
 }

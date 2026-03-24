@@ -7,4 +7,5 @@ import com.badlogic.ashley.core.Component;
  * Used primarily for Y-sorting occlusion checks.
  */
 public class WallComponent implements Component {
+    public float sortYShift = 0f;
 }

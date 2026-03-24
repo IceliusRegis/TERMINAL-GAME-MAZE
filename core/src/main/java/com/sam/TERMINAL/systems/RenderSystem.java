@@ -42,17 +42,35 @@ public class RenderSystem extends SortedIteratingSystem {
             TransformComponent t1 = e1.getComponent(TransformComponent.class);
             TransformComponent t2 = e2.getComponent(TransformComponent.class);
 
-            // Get the base Y sort positions
             float y1 = t1.pos.y;
             float y2 = t2.pos.y;
 
-            // Shift the Y-sort origin for Roof tiles to match the wall beneath them
-            if (e1.getComponent(RoofComponent.class) != null)
-                y1 -= 32f;
-            if (e2.getComponent(RoofComponent.class) != null)
-                y2 -= 32f;
+            // Apply the new anchor shifts
+            WallComponent w1 = e1.getComponent(WallComponent.class);
+            if (w1 != null)
+                y1 -= w1.sortYShift;
+            RoofComponent r1 = e1.getComponent(RoofComponent.class);
+            if (r1 != null)
+                y1 -= r1.sortYShift;
 
-            // Higher Y drawn first = descending sort.
+            WallComponent w2 = e2.getComponent(WallComponent.class);
+            if (w2 != null)
+                y2 -= w2.sortYShift;
+            RoofComponent r2 = e2.getComponent(RoofComponent.class);
+            if (r2 != null)
+                y2 -= r2.sortYShift;
+
+            // TIE BREAKER: If Y is identical, force the static wall to draw AFTER the
+            // player (occluding them)
+            if (y1 == y2) {
+                boolean e1IsStatic = (w1 != null || r1 != null);
+                boolean e2IsStatic = (w2 != null || r2 != null);
+                if (e1IsStatic && !e2IsStatic)
+                    return 1;
+                if (!e1IsStatic && e2IsStatic)
+                    return -1;
+            }
+
             return Float.compare(y2, y1);
         }
     }
@@ -93,8 +111,11 @@ public class RenderSystem extends SortedIteratingSystem {
         // If occluded, we skip the normal opaque draw pass so the entire sprite
         // can be drawn exclusively as a translucent silhouette in the secondary pass.
         boolean isPlayer = playerMapper.has(entity);
-        if (isPlayer && silhouettesEnabled && isPlayerOccluded(entity)) {
-            return;
+        if (isPlayer && silhouettesEnabled) {
+            if (getPlayerOcclusionState(entity) == 1) {
+                // Skip the normal opaque draw ONLY if fully occluded (State 1)
+                return;
+            }
         }
 
         TextureRegion currentFrame = getFrame(sprite);
@@ -147,35 +168,60 @@ public class RenderSystem extends SortedIteratingSystem {
     }
 
     /**
-     * Determines if the player is visually occluded by any wall tile.
-     *
-     * Uses a strict "Point vs. Box" containment check: calculates the center
-     * point of the player's torso (horizontal and vertical midpoint of bounds)
-     * and checks whether that single point falls inside any occluding wall's
-     * bounding box. This eliminates false positives from invisible texture
-     * boundaries that a rectangle-overlap approach would catch.
+     * Returns:
+     * 0 = Visible OR Partially Covered (Normal Draw - Y-sorting clips the legs
+     * naturally)
+     * 1 = Fully Occluded (Silhouette Draw)
      */
-    private boolean isPlayerOccluded(Entity player) {
+    private int getPlayerOcclusionState(Entity player) {
         TransformComponent pTransform = transformMapper.get(player);
         Rectangle pBounds = pTransform.bounds;
 
-        // Single torso center-point derived from the player's collision bounds
+        // 1. Torso point (bottom/center)
         float torsoX = pBounds.x + pBounds.width / 2f;
         float torsoY = pBounds.y + pBounds.height / 2f;
 
+        // 2. Head point
+        // 60f represents roughly 60 pixels above the feet. Adjust if it triggers too
+        // early/late!
+        float headX = torsoX;
+        float headY = torsoY + 60f;
+
         com.badlogic.ashley.utils.ImmutableArray<Entity> walls = getEngine().getEntitiesFor(
                 Family.all(WallComponent.class, TransformComponent.class).get());
+        com.badlogic.ashley.utils.ImmutableArray<Entity> roofs = getEngine().getEntitiesFor(
+                Family.all(RoofComponent.class, TransformComponent.class).get());
 
+        boolean isTorsoHidden = isPointBehindWalls(torsoX, torsoY, pTransform.pos.y, walls, roofs);
+        boolean isHeadHidden = isPointBehindWalls(headX, headY, pTransform.pos.y, walls, roofs);
+
+        // ONLY go transparent if BOTH the head and feet are behind the wall
+        if (isTorsoHidden && isHeadHidden) {
+            return 1; // Silhouette
+        } else {
+            return 0; // Normal draw
+        }
+    }
+
+    private boolean isPointBehindWalls(float px, float py, float playerY,
+            com.badlogic.ashley.utils.ImmutableArray<Entity> walls,
+            com.badlogic.ashley.utils.ImmutableArray<Entity> roofs) {
+        // Check Wall Faces
         for (int j = 0; j < walls.size(); ++j) {
             Entity wall = walls.get(j);
             TransformComponent wTransform = transformMapper.get(wall);
-
-            // Player must be behind the wall (higher base Y) AND the torso
-            // center-point must be inside the wall's bounding box.
-            if (pTransform.pos.y > wTransform.pos.y
-                    && wTransform.bounds.contains(torsoX, torsoY)) {
+            float anchorY = wTransform.pos.y - wall.getComponent(WallComponent.class).sortYShift;
+            if (playerY > anchorY && wTransform.bounds.contains(px, py))
                 return true;
-            }
+        }
+
+        // Check Roofs
+        for (int j = 0; j < roofs.size(); ++j) {
+            Entity roof = roofs.get(j);
+            TransformComponent rTransform = transformMapper.get(roof);
+            float anchorY = rTransform.pos.y - roof.getComponent(RoofComponent.class).sortYShift;
+            if (playerY > anchorY && rTransform.bounds.contains(px, py))
+                return true;
         }
 
         return false;
@@ -192,7 +238,9 @@ public class RenderSystem extends SortedIteratingSystem {
             Entity player = players.get(i);
 
             // Render the silhouette only if the player is currently occluded
-            if (isPlayerOccluded(player)) {
+            // Render the silhouette ONLY if the player is partially occluded (State 1)
+            // If State is 2, it bypasses this entirely, staying invisible.
+            if (getPlayerOcclusionState(player) == 1) {
                 TransformComponent pTransform = transformMapper.get(player);
                 SpriteComponent pSprite = spriteMapper.get(player);
                 TextureRegion frame = getFrame(pSprite);
