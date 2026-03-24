@@ -92,8 +92,8 @@ public class RenderSystem extends SortedIteratingSystem {
         float height = (sprite.drawHeight > 0) ? sprite.drawHeight : transform.height;
 
         // === 2. CENTER THE IMAGE ===
-        float drawX = transform.pos.x - (width - transform.width) / 2;
-        float drawY = transform.pos.y - (height - transform.height) / 2;
+        float drawX = transform.pos.x - (width - transform.width) / 2 + sprite.offsetX;
+        float drawY = transform.pos.y - (height - transform.height) / 2 + sprite.offsetY;
 
         // Draw
         if (currentFrame != null) {
@@ -188,8 +188,8 @@ public class RenderSystem extends SortedIteratingSystem {
                 if (frame != null) {
                     float width = (pSprite.drawWidth > 0) ? pSprite.drawWidth : pTransform.width;
                     float height = (pSprite.drawHeight > 0) ? pSprite.drawHeight : pTransform.height;
-                    float drawX = pTransform.pos.x - (width - pTransform.width) / 2;
-                    float drawY = pTransform.pos.y - (height - pTransform.height) / 2;
+                    float drawX = pTransform.pos.x - (width - pTransform.width) / 2 + pSprite.offsetX;
+                    float drawY = pTransform.pos.y - (height - pTransform.height) / 2 + pSprite.offsetY;
 
                     boolean flipX = !pSprite.facingRight;
                     if (frame.isFlipX()) {

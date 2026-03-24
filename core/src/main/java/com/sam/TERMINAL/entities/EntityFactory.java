@@ -45,6 +45,10 @@ public class EntityFactory {
         sprite.drawWidth = 128f;
         sprite.drawHeight = 250f;
 
+        // Offset visual sprite upwards slowly until foot is in the hitbox
+        // 117.5 was too high, putting it outside the sprite bounds.
+        sprite.offsetY = 24f;
+
         player.add(engine.createComponent(PlayerComponent.class));
 
         // Persistence Data this is where player position is saved
