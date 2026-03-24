@@ -21,7 +21,8 @@ public class EntityFactory {
      * @param walkAnimation The player's walking animation
      * @param idleAnimation
      */
-    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
+    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight,
+            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
@@ -40,20 +41,23 @@ public class EntityFactory {
         sprite.looping = true;
         player.add(sprite);
 
-
         // The actual size of the sprite frame HITBOX
         sprite.drawWidth = 128f;
         sprite.drawHeight = 250f;
 
+        // Offset visual sprite upwards slowly until foot is in the hitbox
+        // 117.5 was too high, putting it outside the sprite bounds.
+        sprite.offsetY = 24f;
+
         player.add(engine.createComponent(PlayerComponent.class));
 
-        //Persistence Data this is where player position is saved
+        // Persistence Data this is where player position is saved
         player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
         player.add(engine.createComponent(InventoryComponent.class));
         engine.addEntity(player);
     }
 
-    public static  void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
+    public static void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
         Entity door = engine.createEntity();
 
         TransformComponent transform = engine.createComponent(TransformComponent.class);
@@ -76,21 +80,21 @@ public class EntityFactory {
         engine.addEntity(door);
     }
 
-    public static void createKey (PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
+    public static void createKey(PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
         Entity beep = engine.createEntity();
 
         TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
         beepTrans.pos.set(x, y);
-        beepTrans.width = 40;
-        beepTrans.height = 30;
+        beepTrans.width = 16;
+        beepTrans.height = 16;
         beepTrans.updateBounds();
         beep.add(beepTrans);
 
         SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
         beepSprite.staticSprite = beepRegion;
         beepSprite.isStatic = true;
-        beepSprite.drawWidth = 40;
-        beepSprite.drawHeight = 30;
+        beepSprite.drawHeight = 16;
+        beepSprite.drawWidth = 16;
         beep.add(beepSprite);
 
         beep.add(new InteractableComponent("beep", 40f));
@@ -102,49 +106,22 @@ public class EntityFactory {
     public static void createEnemy(PooledEngine engine, float x, float y, TextureRegion texture) {
         Entity enemy = engine.createEntity();
         TransformComponent t = engine.createComponent(TransformComponent.class);
-        t.pos.set(x, y); t.width = 32; t.height = 32; t.updateBounds();
+        t.pos.set(x, y);
+        t.width = 32;
+        t.height = 32;
+        t.updateBounds();
         enemy.add(t);
 
         SpriteComponent s = engine.createComponent(SpriteComponent.class);
-        s.staticSprite = texture; s.isStatic = true; s.drawWidth = 32; s.drawHeight = 32;
+        s.staticSprite = texture;
+        s.isStatic = true;
+        s.drawWidth = 32;
+        s.drawHeight = 32;
         enemy.add(s);
 
         enemy.add(new EnemyComponent());
         engine.addEntity(enemy);
     }
-
-    public static void createFlashlight(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
-        Entity flashlight = engine.createEntity();
-
-        // Position and Bounds
-        TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(x, y);
-        transform.width = 50;   // Slightly bigger than the beep card
-        transform.height = 50;
-        transform.updateBounds();
-        flashlight.add(transform);
-
-        // Visuals
-        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
-        sprite.staticSprite = texture;
-        sprite.isStatic = true;
-        sprite.drawWidth = 50;  // Visual scale
-        sprite.drawHeight = 50;
-        flashlight.add(sprite);
-
-        // Interaction - We name the interactable "flashlight" so the
-        // InteractionSystem knows to trigger the light when picked up.
-        flashlight.add(new InteractableComponent("flashlight", 45f));
-
-        // Persistence
-        flashlight.add(new PersistenceComponent("INTERACTABLE", saveId));
-
-        engine.addEntity(flashlight);
-    }
-
-
-
-
 
     /**
      * TODO: Future entity creation methods
