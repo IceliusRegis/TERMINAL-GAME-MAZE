@@ -21,7 +21,8 @@ public class EntityFactory {
      * @param walkAnimation The player's walking animation
      * @param idleAnimation
      */
-    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight, Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
+    public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight,
+            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
@@ -40,20 +41,19 @@ public class EntityFactory {
         sprite.looping = true;
         player.add(sprite);
 
-
         // The actual size of the sprite frame HITBOX
         sprite.drawWidth = 128f;
         sprite.drawHeight = 250f;
 
         player.add(engine.createComponent(PlayerComponent.class));
 
-        //Persistence Data this is where player position is saved
+        // Persistence Data this is where player position is saved
         player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
         player.add(engine.createComponent(InventoryComponent.class));
         engine.addEntity(player);
     }
 
-    public static  void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
+    public static void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
         Entity door = engine.createEntity();
 
         TransformComponent transform = engine.createComponent(TransformComponent.class);
@@ -76,7 +76,7 @@ public class EntityFactory {
         engine.addEntity(door);
     }
 
-    public static void createKey (PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
+    public static void createKey(PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
         Entity beep = engine.createEntity();
 
         TransformComponent beepTrans = engine.createComponent(TransformComponent.class);
@@ -89,7 +89,8 @@ public class EntityFactory {
         SpriteComponent beepSprite = engine.createComponent(SpriteComponent.class);
         beepSprite.staticSprite = beepRegion;
         beepSprite.isStatic = true;
-        beepSprite.drawHeight = 16; beepSprite.drawWidth = 16;
+        beepSprite.drawHeight = 16;
+        beepSprite.drawWidth = 16;
         beep.add(beepSprite);
 
         beep.add(new InteractableComponent("beep", 40f));
@@ -101,20 +102,22 @@ public class EntityFactory {
     public static void createEnemy(PooledEngine engine, float x, float y, TextureRegion texture) {
         Entity enemy = engine.createEntity();
         TransformComponent t = engine.createComponent(TransformComponent.class);
-        t.pos.set(x, y); t.width = 32; t.height = 32; t.updateBounds();
+        t.pos.set(x, y);
+        t.width = 32;
+        t.height = 32;
+        t.updateBounds();
         enemy.add(t);
 
         SpriteComponent s = engine.createComponent(SpriteComponent.class);
-        s.staticSprite = texture; s.isStatic = true; s.drawWidth = 32; s.drawHeight = 32;
+        s.staticSprite = texture;
+        s.isStatic = true;
+        s.drawWidth = 32;
+        s.drawHeight = 32;
         enemy.add(s);
 
         enemy.add(new EnemyComponent());
         engine.addEntity(enemy);
     }
-
-
-
-
 
     /**
      * TODO: Future entity creation methods

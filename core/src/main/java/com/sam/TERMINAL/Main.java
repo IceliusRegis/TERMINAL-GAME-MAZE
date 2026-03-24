@@ -312,6 +312,7 @@ public class Main extends ApplicationAdapter {
         // --- DEBUG POLLING ---
         if (debugManager != null) {
             debugManager.update(lightingSystem);
+            debugManager.renderHitboxes(engine, camera);
         }
 
         // 4. Draw the Menu (Drawn last so it sits on top of the character)
@@ -358,6 +359,7 @@ public class Main extends ApplicationAdapter {
         batch.dispose();
         if (mapManager != null) mapManager.dispose();
         if (lightingSystem != null) lightingSystem.dispose();
+        if (debugManager != null) debugManager.dispose();
         if (titleScreen != null)
             titleScreen.dispose();
         if (menuScreen != null)
