@@ -6,13 +6,17 @@ import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputMultiplexer;
+import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -20,46 +24,20 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.sam.TERMINAL.Main;
 import com.sam.TERMINAL.components.InventoryComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.systems.LightingSystem;
 import com.sam.TERMINAL.systems.SaveSystem;
-import com.sam.TERMINAL.Main;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 
 /**
- * MenuScreen — Owns all in-game UI stages: HUD, Settings overlay, Inventory
- * overlay,
+ * MenuScreen — Owns all in-game UI stages: HUD, Settings overlay, Inventory overlay,
  * and the Win/Lose screen.
  *
- * ── Bug fixes in this revision
- * ────────────────────────────────────────────────
- *
- * BUG 1 — "Return" button unresponsive after Settings opened (Priority 2)
- * Root cause: In updateInputProcessor() the uiStage was added to the
- * InputMultiplexer FIRST. Because the Settings gear icon on uiStage occupies
- * the same top-left screen position as the Back button on settingsStage,
- * uiStage consumed every click in that region before settingsStage could
- * see it — causing the gear to re-open Settings and the Back button to
- * never fire.
- * Fix: overlay stages (settingsStage / inventoryStage) are now added FIRST in
- * the multiplexer so they have input priority. uiStage is added second as a
- * fallback (it still receives global keyboard shortcuts via its listener).
- *
+ * ── Bug fixes in this revision ────────────────────────────────────────────────
+ * BUG 1 — "Return" button unresponsive after Settings opened
  * BUG 2 — Duplicate global listeners accumulating across resets
- * Root cause: setupGlobalListener() created a new local InputListener each
- * call and tried to remove() it (removing the brand-new instance, which was
- * never added), then added the new one — leaving the old one still attached.
- * After each resetUI() the stage had one extra TAB/F5 listener.
- * Fix: globalListener is stored as a field; setupGlobalListener() removes the
- * stored reference before creating and registering the new one.
- *
  * BUG 3 — SettingsButton textures never disposed
- * Root cause: The SettingsButton instance was never stored, so dispose() was
- * never reachable.
- * Fix: settingsButtonWidget is stored as a field and disposed in dispose().
- *
- * ─────────────────────────────────────────────────────────────────────────────
  */
 public class MenuScreen {
 
@@ -73,14 +51,15 @@ public class MenuScreen {
     private Texture whitePixel;
     private Texture invTexture;
     private Texture restartTexture;
-    // NOTE: backTexture was declared but never initialised in the original code.
-    // It has been removed to eliminate dead fields and a potential NPE.
+    private Texture jumpscareTexture;
+    private Sound jumpscareSound;
 
     // ── State flags ───────────────────────────────────────────────────────────
     private boolean isSettingsVisible = false;
     private boolean isInventoryVisible = false;
     private boolean isGameOver = false;
-
+    private boolean isJumpscaring = false;
+    
     // ── UI components ─────────────────────────────────────────────────────────
     private BitmapFont font;
     private Table inventoryWindow;
@@ -91,11 +70,10 @@ public class MenuScreen {
     private final PooledEngine engine;
     private final Main mainGame;
 
-    // ── BUG 2 FIX: store the global listener so it can be removed before
-    // being re-added (prevents accumulation across resetUI() calls).
+    // ── BUG 2 FIX: store the global listener
     private InputListener globalListener;
 
-    // ── BUG 3 FIX: store the SettingsButton so dispose() can be called on it.
+    // ── BUG 3 FIX: store the SettingsButton
     private SettingsButton settingsButtonWidget;
 
     // =========================================================================
@@ -119,6 +97,7 @@ public class MenuScreen {
         restartTexture = new Texture(Gdx.files.internal("ui/Restart.png"));
         settingsTexture = new Texture(Gdx.files.internal("ui/settings.png"));
         invTexture = new Texture(Gdx.files.internal("ui/inventory.png"));
+        jumpscareSound = Gdx.audio.newSound(Gdx.files.internal("sfx/jumpscare.mp3"));
 
         createDimmerTexture();
 
@@ -192,6 +171,7 @@ public class MenuScreen {
             isInventoryVisible = false;
             updateInputProcessor();
         });
+
         inventoryWindow.getCells().peek().left().expandX();
         inventoryWindow.row();
 
@@ -209,44 +189,21 @@ public class MenuScreen {
     // Input Routing
     // =========================================================================
 
-    /**
-     * Routes raw input to the correct stage(s).
-     *
-     * ── BUG 1 FIX ─────────────────────────────────────────────────────────────
-     * Overlay stages (settingsStage / inventoryStage) are now added to the
-     * InputMultiplexer FIRST so they receive priority for mouse/touch events.
-     *
-     * Previously uiStage was first, which meant the Settings gear icon on uiStage
-     * intercepted clicks intended for the Back button on settingsStage (both live
-     * at the top-left corner of the screen). By giving the overlay stage priority,
-     * the Back button now correctly receives its click and fires onClose.
-     *
-     * uiStage is still included second so it continues to receive keyboard events
-     * (TAB, F5) via the global listener attached to it.
-     * ──────────────────────────────────────────────────────────────────────────
-     */
     private void updateInputProcessor() {
-        // B-5 Guard: while the game-over screen is active, uiStage owns input
-        // exclusively.
-        if (isGameOver) {
+        if (isGameOver || isJumpscaring) {
             Gdx.input.setInputProcessor(uiStage);
             return;
         }
 
         if (isSettingsVisible) {
             InputMultiplexer multiplexer = new InputMultiplexer();
-            // FIRST: settings overlay — must intercept clicks before uiStage so
-            // the Back/Return button is not blocked by the gear icon beneath it.
             multiplexer.addProcessor(settingsStage);
-            // SECOND: HUD stage — fallback for global keyboard shortcuts (TAB, F5).
             multiplexer.addProcessor(uiStage);
             Gdx.input.setInputProcessor(multiplexer);
 
         } else if (isInventoryVisible) {
             InputMultiplexer multiplexer = new InputMultiplexer();
-            // FIRST: inventory overlay gets priority for its close button / item clicks.
             multiplexer.addProcessor(inventoryStage);
-            // SECOND: HUD stage — fallback for global keyboard shortcuts (TAB to close).
             multiplexer.addProcessor(uiStage);
             Gdx.input.setInputProcessor(multiplexer);
 
@@ -255,18 +212,7 @@ public class MenuScreen {
         }
     }
 
-    /**
-     * Registers global keyboard shortcuts (TAB → toggle inventory, F5 → save).
-     *
-     * ── BUG 2 FIX ─────────────────────────────────────────────────────────────
-     * The listener is stored in the {@code globalListener} field. Before adding a
-     * new listener, the old one is explicitly removed from all three stages. This
-     * prevents duplicate listeners from accumulating every time resetUI() is
-     * called.
-     * ──────────────────────────────────────────────────────────────────────────
-     */
     private void setupGlobalListener() {
-        // Remove the previously registered listener (if any) before re-adding.
         if (globalListener != null) {
             uiStage.removeListener(globalListener);
             settingsStage.removeListener(globalListener);
@@ -282,9 +228,20 @@ public class MenuScreen {
                         isSettingsVisible = false;
                     updateInputProcessor();
                     return true;
-                }
-                if (keycode == Input.Keys.F5) {
+                } if (keycode == Input.Keys.F5) {
                     saveMapLogic();
+                    return true;
+                } if (keycode == Input.Keys.F1) {
+                    LightingSystem lightSys = engine.getSystem(LightingSystem.class);
+                    if (lightSys != null) {
+                        lightSys.lightingEnabled = !lightSys.lightingEnabled;
+                        Gdx.app.log("DEBUG", "Lighting Enabled: " + lightSys.lightingEnabled);
+                    }
+                    return true;
+                } if (keycode == Input.Keys.ESCAPE) {
+                    isSettingsVisible = !isSettingsVisible;
+                    if (isSettingsVisible) isInventoryVisible = false;
+                    updateInputProcessor();
                     return true;
                 }
                 return false;
@@ -309,7 +266,6 @@ public class MenuScreen {
             settingsStage.act(delta);
             settingsStage.draw();
         } else if (isInventoryVisible) {
-            // Refresh item list from live ECS state every frame the panel is visible.
             refreshInventory();
             drawInventoryDim(inventoryStage);
             inventoryStage.act(delta);
@@ -318,10 +274,9 @@ public class MenuScreen {
     }
 
     // =========================================================================
-    // Win / Lose Screen
+    // Win / Lose / Jumpscare Screen
     // =========================================================================
 
-    /** Shows the Win ("YOU ESCAPED!") or Lose ("YOU DIED") end screen. */
     public void showGameOver(boolean win) {
         if (isGameOver)
             return;
@@ -330,13 +285,11 @@ public class MenuScreen {
         isInventoryVisible = false;
         uiStage.clear();
 
-        // Dark background
         Image dimmer = new Image(whitePixel);
         dimmer.setColor(0, 0, 0, 0.8f);
         dimmer.setFillParent(true);
         uiStage.addActor(dimmer);
 
-        // Centred text + restart button
         Table table = new Table();
         table.setFillParent(true);
         table.center();
@@ -360,31 +313,67 @@ public class MenuScreen {
 
         uiStage.addActor(table);
         updateInputProcessor();
-        uiStage.setKeyboardFocus(restartBtn); // ENTER/SPACE triggers restart
+        uiStage.setKeyboardFocus(restartBtn);
     }
 
-    /**
-     * Resets the UI back to the normal in-game HUD (called by Main.resetGame()).
-     */
-    public void resetUI() {
-        isGameOver = false; // Must be first — clears the guard in updateInputProcessor()
+    public void showJumpscare() {
+        isJumpscaring = true;
+
+        if (jumpscareTexture != null) jumpscareTexture.dispose();
+        jumpscareTexture = new Texture(Gdx.files.internal("ui/jumpscare.jpeg"));
+
+        uiStage.clear();
         isSettingsVisible = false;
         isInventoryVisible = false;
+
+        Image blackOverlay = new Image(whitePixel);
+        blackOverlay.setColor(Color.BLACK);
+        blackOverlay.setFillParent(true);
+        uiStage.addActor(blackOverlay);
+
+        Image jumpscareImg = new Image(jumpscareTexture);
+        jumpscareImg.setFillParent(true);
+        uiStage.addActor(jumpscareImg);
+
+        if (jumpscareSound != null) {
+            jumpscareSound.play(1.0f);
+        }
+
+        jumpscareImg.addAction(Actions.sequence(
+            Actions.delay(3.0f),
+            Actions.fadeOut(1.0f),
+            Actions.run(() -> {
+                isJumpscaring = false;
+                if (jumpscareTexture != null) {
+                    jumpscareTexture.dispose();
+                    jumpscareTexture = null;
+                }
+                showGameOver(false);
+            })
+        ));
+
+        Gdx.input.setInputProcessor(uiStage);
+    }
+
+    public void resetUI() {
+        isGameOver = false;
+        isSettingsVisible = false;
+        isInventoryVisible = false;
+        isJumpscaring = false;
         uiStage.clear();
 
         setupHUD();
-        setupGlobalListener(); // Re-attach shortcuts (uiStage.clear() removed them)
+        setupGlobalListener();
         updateInputProcessor();
     }
 
     // =========================================================================
-    // HUD Builder (used by constructor and resetUI)
+    // HUD Builder
     // =========================================================================
 
     private void setupHUD() {
         uiStage.clear();
 
-        // Top-left: Settings gear
         Table mainRoot = new Table();
         mainRoot.setFillParent(true);
         mainRoot.top().left();
@@ -400,7 +389,6 @@ public class MenuScreen {
         mainRoot.add(settingsBtn).size(40, 40).pad(10);
         uiStage.addActor(mainRoot);
 
-        // Bottom-center: Inventory button
         Table localBottomTable = new Table();
         localBottomTable.setFillParent(true);
         localBottomTable.bottom();
@@ -424,10 +412,11 @@ public class MenuScreen {
     // =========================================================================
 
     private void refreshInventory() {
-        itemTable.clearChildren(); // Only clears item rows; exit button is untouched.
+        itemTable.clearChildren();
 
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0)
             return;
+        
         Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
         InventoryComponent inv = player.getComponent(InventoryComponent.class);
 
@@ -436,11 +425,17 @@ public class MenuScreen {
             itemTable.add(icon).size(64, 64).pad(20);
             itemTable.add(new Label(
                     "Beep Card",
-                    new Label.LabelStyle(
-                            new BitmapFont(),
-                            Color.WHITE)))
+                    new Label.LabelStyle(font, Color.WHITE)))
                     .padRight(20);
+        } 
+        
+        if (inv != null && inv.hasItem("flashlight")) {
+            Image icon = new Image(mainGame.getFlashlightRegion());
+            itemTable.add(icon).size(64, 64).pad(10);
+            itemTable.add(new Label("Flashlight",
+                new Label.LabelStyle(font, Color.WHITE))).padRight(20);
         }
+        itemTable.invalidateHierarchy();
     }
 
     // =========================================================================
@@ -509,14 +504,16 @@ public class MenuScreen {
         whitePixel.dispose();
         invTexture.dispose();
         restartTexture.dispose();
+        font.dispose();
 
-        // BUG 3 FIX: dispose SettingsButton textures via stored reference.
+        if (jumpscareTexture != null) jumpscareTexture.dispose();
+        if (jumpscareSound != null) jumpscareSound.dispose();
+        
         if (settingsButtonWidget != null) {
             settingsButtonWidget.dispose();
         }
     }
 
-    // ── State accessors ───────────────────────────────────────────────────────
     public boolean isSettingsVisible() {
         return isSettingsVisible;
     }
@@ -527,5 +524,9 @@ public class MenuScreen {
 
     public boolean isGameOver() {
         return isGameOver;
+    }
+
+    public boolean isJumpscaring() {
+        return isJumpscaring;
     }
 }
