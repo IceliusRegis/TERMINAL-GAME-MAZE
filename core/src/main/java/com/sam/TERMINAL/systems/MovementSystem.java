@@ -6,10 +6,8 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.sam.TERMINAL.components.CollisionComponent;
-import com.sam.TERMINAL.components.PlayerComponent;
-import com.sam.TERMINAL.components.TileWorldComponent;
-import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.*;
+
 /**
  * MovementSystem - Handles player input, physics, and collision.
  *
@@ -23,40 +21,58 @@ public class MovementSystem extends IteratingSystem {
 
     // ComponentMapper provides fast access to components
     private ComponentMapper<TransformComponent> transformMapper;
+    private ComponentMapper<SpriteComponent> spriteMapper;
     /** Movement speed in pixels per second */
     private static final float PLAYER_SPEED = 200f;
+    private com.sam.TERMINAL.buttons.MenuScreen menuScreen;
 
     public MovementSystem() {
         // Only process entities with Transform AND Player components
         super(Family.all(TransformComponent.class, PlayerComponent.class).get());
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
+        spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     }
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        if (menuScreen != null && (menuScreen.isSettingsVisible() || menuScreen.isInventoryVisible())) {
+            return;
+        }
+
         TransformComponent transform = transformMapper.get(entity);
+        // Need this to update the flashlight direction
+        SpriteComponent sprite = spriteMapper.get(entity);
 
-        //Calculate how much we want to move
-        float xMove = 0;
-        float yMove = 0;
-        // Calculate movement based on deltaTime for smooth, framerate-independent motion
-        float speed = PLAYER_SPEED * deltaTime;
+        // Calculate how much we want to move
+        float xInput = 0;
+        float yInput = 0;
 
-        // Handle WASD input (Velocity)
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) {
-            yMove += speed;
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) {
-            yMove -= speed;
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) {
-            xMove -= speed;
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) {
-            xMove += speed;
+        // Handle WASD input
+        if (Gdx.input.isKeyPressed(Input.Keys.W)) yInput += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.S)) yInput -= 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.A)) xInput -= 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.D)) xInput += 1;
+
+        // --- NEW: 8-DIRECTIONAL ANGLE & NORMALIZATION ---
+        if (xInput != 0 || yInput != 0) {
+            // Calculate diagonal angle (e.g., W+D = 45 degrees)
+            float angle = (float) Math.toDegrees(Math.atan2(yInput, xInput));
+            if (angle < 0) angle += 360;
+            sprite.facingAngle = angle;
+
+            // Normalizing speed so diagonals aren't faster (Speed * 0.707)
+            if (xInput != 0 && yInput != 0) {
+                float length = (float) Math.sqrt(xInput * xInput + yInput * yInput);
+                xInput /= length;
+                yInput /= length;
+            }
         }
 
-        // Get Map Data so that we know where the walls at
+        float xMove = xInput * PLAYER_SPEED * deltaTime;
+        float yMove = yInput * PLAYER_SPEED * deltaTime;
+        // -----------------------------------------------
+
+        // Get Map Data
         TileWorldComponent world = null;
         if (getEngine().getEntitiesFor(Family.all(TileWorldComponent.class).get()).size() > 0) {
             Entity worldEntity = getEngine().getEntitiesFor(Family.all(TileWorldComponent.class).get()).first();
@@ -64,23 +80,20 @@ public class MovementSystem extends IteratingSystem {
         }
 
         // == X-Axis ==
+        float oldX = transform.pos.x;
+        transform.pos.x += xMove;
+        transform.updateBounds();
 
-        float oldX = transform.pos.x; // Store old position for collision rollback
-        transform.pos.x += xMove; //Player is moving
-        transform.updateBounds(); //Updates hixbox
-
-        //Checks if we hit anything on the x-axis
         if(checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
             transform.pos.x = oldX;
             transform.updateBounds();
         }
 
-        //== Y-Axis ==
-        float oldY = transform.pos.y; // Store old position for collision rollback
-        transform.pos.y += yMove; //Player is moving
-        transform.updateBounds(); //Updates hixbox
+        // == Y-Axis ==
+        float oldY = transform.pos.y;
+        transform.pos.y += yMove;
+        transform.updateBounds();
 
-        //Checks if we hit anything on the y-axis
         if(checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
             transform.pos.y = oldY;
             transform.updateBounds();
@@ -133,5 +146,9 @@ public class MovementSystem extends IteratingSystem {
             }
             return false;
         }
+
+    public void setMenuScreen(com.sam.TERMINAL.buttons.MenuScreen menuScreen) {
+        this.menuScreen = menuScreen;
+    }
     }
 

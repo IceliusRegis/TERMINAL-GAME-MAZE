@@ -16,7 +16,7 @@ public class SpriteComponent implements Component {
     public Animation<TextureRegion> walkAnimation;
     public Animation<TextureRegion> idleAnimation;
 
-    // Track which Animation is playing
+    //Track which Animation is playing
     public Animation<TextureRegion> currentAnimation;
 
     /** Tracks elapsed time for animation frame switching */
@@ -32,10 +32,4 @@ public class SpriteComponent implements Component {
 
     public float drawWidth;
     public float drawHeight;
-
-    public float offsetX = 0f;
-    public float offsetY = 0f;
-
-    public boolean flipX = false;
-    public boolean flipY = false;
 }

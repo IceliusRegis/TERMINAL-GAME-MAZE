@@ -3,9 +3,7 @@ package com.sam.TERMINAL.systems;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
-import com.badlogic.ashley.systems.SortedIteratingSystem;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -14,23 +12,17 @@ import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.components.RoofComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
-import com.sam.TERMINAL.components.WallComponent;
-
-import java.util.Comparator;
 
 /**
  * RenderSystem - Draws all entities with sprites to the screen.
  *
  * Processes entities that have Transform + Sprite components.
- * Y-sorts entities so that those with a higher Y coordinate are drawn first
- * (behind).
- * Also performs a second pass to render player silhouettes when occluded by
- * walls.
+ * Advances animation frames and renders them at entity positions.
  */
-public class RenderSystem extends SortedIteratingSystem {
+public class RenderSystem extends IteratingSystem {
 
     private final SpriteBatch batch;
-    private final OrthographicCamera camera;
+    private final OrthographicCamera camera; // Add this
     private ComponentMapper<TransformComponent> transformMapper;
     private ComponentMapper<SpriteComponent> spriteMapper;
     private ComponentMapper<PlayerComponent> playerMapper;
@@ -51,57 +43,12 @@ public class RenderSystem extends SortedIteratingSystem {
             float y1 = t1.pos.y;
             float y2 = t2.pos.y;
 
-            // Apply the new anchor shifts
-            WallComponent w1 = e1.getComponent(WallComponent.class);
-            if (w1 != null)
-                y1 -= w1.sortYShift;
-            RoofComponent r1 = e1.getComponent(RoofComponent.class);
-            if (r1 != null)
-                y1 -= r1.sortYShift;
-
-            WallComponent w2 = e2.getComponent(WallComponent.class);
-            if (w2 != null)
-                y2 -= w2.sortYShift;
-            RoofComponent r2 = e2.getComponent(RoofComponent.class);
-            if (r2 != null)
-                y2 -= r2.sortYShift;
-
-            // TIE BREAKER: If Y is identical, force the static wall to draw AFTER the
-            // player (occluding them)
-            if (y1 == y2) {
-                boolean e1IsStatic = (w1 != null || r1 != null);
-                boolean e2IsStatic = (w2 != null || r2 != null);
-                if (e1IsStatic && !e2IsStatic)
-                    return 1;
-                if (!e1IsStatic && e2IsStatic)
-                    return -1;
-            }
-
-            return Float.compare(y2, y1);
-        }
-    }
-
-    public RenderSystem(SpriteBatch batch, OrthographicCamera camera) {
-        super(Family.all(TransformComponent.class, SpriteComponent.class).get(), new YComparator());
+    public RenderSystem(SpriteBatch batch, OrthographicCamera camera) { // Add camera here
+        super(Family.all(TransformComponent.class, SpriteComponent.class).get());
         this.batch = batch;
-        this.camera = camera;
+        this.camera = camera; // Initialize it
         this.transformMapper = ComponentMapper.getFor(TransformComponent.class);
         this.spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
-        this.playerMapper = ComponentMapper.getFor(PlayerComponent.class);
-    }
-
-    @Override
-    public void update(float deltaTime) {
-        // Force sort the backing array every frame to adjust for moving entities
-        forceSort();
-
-        // Render all sorted entities normally
-        super.update(deltaTime);
-
-        // Secondary pass for silhouettes
-        if (silhouettesEnabled) {
-            renderSilhouettes();
-        }
     }
 
     @Override
@@ -109,7 +56,7 @@ public class RenderSystem extends SortedIteratingSystem {
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
 
-        if (!sprite.isStatic) {
+        if (!sprite.isStatic){
             sprite.stateTime += deltaTime;
         }
 
@@ -120,41 +67,44 @@ public class RenderSystem extends SortedIteratingSystem {
                 // Skip the normal opaque draw ONLY if fully occluded (State 1)
                 return;
             }
+        TextureRegion currentFrame = null;
+
+        //Advance timer for animation to play
+        if (sprite.isStatic) {
+            currentFrame = sprite.staticSprite;
+        } else if (sprite.currentAnimation != null) {   // If we have a specific animation set (Walk or Idle), use it.
+            currentFrame = sprite.currentAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
+        }else { // If not (fallback), use walk.
+            currentFrame = sprite.walkAnimation.getKeyFrame(sprite.stateTime, sprite.looping);
         }
 
-        TextureRegion currentFrame = getFrame(sprite);
-
         // === 1. GET SIZES ===
+        // If drawWidth is 0 (forgot to set it), fallback to transform width
         float width = (sprite.drawWidth > 0) ? sprite.drawWidth : transform.width;
         float height = (sprite.drawHeight > 0) ? sprite.drawHeight : transform.height;
 
         // === 2. CENTER THE IMAGE ===
-        float drawX = transform.pos.x - (width - transform.width) / 2 + sprite.offsetX;
-        float drawY = transform.pos.y - (height - transform.height) / 2 + sprite.offsetY;
+        // We calculate where to draw so the image is centered over the hitbox
+        // Logic: (HitboxX) - (ExtraWidth / 2)
+        float drawX = transform.pos.x - (width - transform.width) / 2;
+        float drawY = transform.pos.y - (height - transform.height) / 2;
 
         // Draw
         if (currentFrame != null) {
             float scaleX;
             float scaleY;
+            boolean flipX = !sprite.facingRight; // if sprite is facing left this decides it
 
-            if (sprite.isStatic) {
-                scaleX = sprite.flipX ? -1f : 1f;
-                scaleY = sprite.flipY ? -1f : 1f;
-            } else {
-                boolean flipX = !sprite.facingRight;
-                if (currentFrame.isFlipX()) {
-                    flipX = !flipX;
-                }
-                scaleX = flipX ? -1f : 1f;
-                scaleY = 1f;
+            if (currentFrame.isFlipX()) {
+                flipX = !flipX; //if player chaarcter is already facing left, it toggles it
             }
 
-            batch.draw(currentFrame,
-                    drawX, drawY,
-                    width / 2f, height / 2f,
-                    width, height,
-                    scaleX, scaleY,
-                    0f);
+           batch.draw(currentFrame,
+               drawX, drawY, //Position
+               width / 2f, height /2f, //Center of Cam
+               width, height, //How large to draw
+               flipX ? -1f : 1f, 1f, //Draws the flipped version if facing left
+               0f); //Rotate in place, or just dont rotate
         }
     }
 
