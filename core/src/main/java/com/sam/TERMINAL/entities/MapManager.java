@@ -7,11 +7,14 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapLayers;
 import com.badlogic.gdx.maps.tiled.TiledMap;
+import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
-import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.utils.Array;
+import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.WallComponent;
 
 /**
  * MapManager - Owns the TiledMap lifecycle and layered rendering.
@@ -19,11 +22,10 @@ import com.sam.TERMINAL.components.TransformComponent;
  * Responsibilities:
  * - Loads the .tmx file from disk.
  * - Creates the TileWorldComponent and adds it to the ECS Engine.
- * - Renders map layers in two passes (Ground behind sprites, Walls in front)
- *   to produce correct depth ordering with Y-sorted ECS entities.
- * - Dynamically fades the Walls layer when the player is behind it, so the
- *   player sprite remains visible underneath.
- * - Safely disposes of heavy map assets to prevent memory leaks.
+ * - Renders map background layers (Ground).
+ * - Extracts the "Walls" layer and creates static Ashley entities
+ * to allow proper Y-sorting with dynamic entities like the player.
+ * - Safely disposes of heavy map assets and generated wall entities.
  */
 public class MapManager {
 
@@ -31,6 +33,8 @@ public class MapManager {
     private OrthogonalTiledMapRenderer mapRenderer;
     private Entity mapEntity;
     private PooledEngine engine;
+    private int[] backgroundLayers;
+    private Array<Entity> wallEntities = new Array<>();
 
     public MapManager(PooledEngine engine) {
         this.engine = engine;
@@ -47,13 +51,72 @@ public class MapManager {
             // 3. Create the LibGDX renderer for this specific map
             mapRenderer = new OrthogonalTiledMapRenderer(tiledMap, 1f);
 
-            // 4. Log layer findings
+            // 4. Log layer findings and setup background rendering
             MapLayers allLayers = tiledMap.getLayers();
             MapLayer groundLayer = allLayers.get("Ground");
-            MapLayer wallsLayer  = allLayers.get("Walls");
+            MapLayer wallsLayer = allLayers.get("Walls");
 
-            Gdx.app.log("MAP_MANAGER", "Ground layer: " + (groundLayer != null ? "found" : "MISSING"));
-            Gdx.app.log("MAP_MANAGER", "Walls layer: "  + (wallsLayer  != null ? "found" : "MISSING"));
+            int groundIndex = allLayers.getIndex(groundLayer);
+            if (groundIndex != -1) {
+                backgroundLayers = new int[] { groundIndex };
+                Gdx.app.log("MAP_MANAGER", "Ground layer: found at index " + groundIndex);
+            } else {
+                backgroundLayers = new int[0];
+                Gdx.app.log("MAP_MANAGER", "Ground layer: MISSING");
+            }
+
+            // Extract Walls layer into Ashley entities
+            if (wallsLayer instanceof TiledMapTileLayer) {
+                TiledMapTileLayer tileLayer = (TiledMapTileLayer) wallsLayer;
+                int tileWidth = tileLayer.getTileWidth();
+                int tileHeight = tileLayer.getTileHeight();
+
+                for (int x = 0; x < tileLayer.getWidth(); x++) {
+                    for (int y = 0; y < tileLayer.getHeight(); y++) {
+                        TiledMapTileLayer.Cell cell = tileLayer.getCell(x, y);
+                        // Inside your nested x/y loop:
+                        if (cell != null && cell.getTile() != null) {
+                            Entity wallEntity = engine.createEntity();
+                            TransformComponent transform = engine.createComponent(TransformComponent.class);
+                            SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+
+                            // 1. Get the actual texture region first
+                            sprite.staticSprite = cell.getTile().getTextureRegion();
+                            sprite.isStatic = true;
+
+                            // 1b. Capture Tiled flip metadata from the Cell
+                            sprite.flipX = cell.getFlipHorizontally();
+                            sprite.flipY = cell.getFlipVertically();
+
+                            // 2. Use the TEXTURE's true dimensions, not the grid's dimensions
+                            float actualWidth = sprite.staticSprite.getRegionWidth();
+                            float actualHeight = sprite.staticSprite.getRegionHeight();
+
+                            // 3. Add Tiled's native offsets to prevent shifting
+                            float offsetX = cell.getTile().getOffsetX();
+                            float offsetY = cell.getTile().getOffsetY();
+
+                            // 4. Set the transform
+                            transform.pos.set((x * tileLayer.getTileWidth()) + offsetX,
+                                    (y * tileLayer.getTileHeight()) + offsetY);
+                            transform.width = actualWidth;
+                            transform.height = actualHeight;
+                            transform.updateBounds();
+
+                            wallEntity.add(transform);
+                            wallEntity.add(sprite);
+                            wallEntity.add(engine.createComponent(WallComponent.class));
+
+                            engine.addEntity(wallEntity);
+                            wallEntities.add(wallEntity);
+                        }
+                    }
+                }
+                Gdx.app.log("MAP_MANAGER",
+                        "Walls layer: found and converted to " + wallEntities.size + " static entities");
+            } else {
+                Gdx.app.log("MAP_MANAGER", "Walls layer: MISSING or not a TileLayer");
+            }
 
             // 5. Create your new TileWorldComponent
             TileWorldComponent worldComp = new TileWorldComponent(tiledMap);
@@ -64,7 +127,7 @@ public class MapManager {
             engine.addEntity(mapEntity);
 
             Gdx.app.log("MAP_MANAGER", "Successfully loaded map: " + tmxPath +
-                " (" + worldComp.mapWidthTiles + "x" + worldComp.mapHeightTiles + " tiles)");
+                    " (" + worldComp.mapWidthTiles + "x" + worldComp.mapHeightTiles + " tiles)");
 
         } catch (Exception e) {
             Gdx.app.error("MAP_MANAGER", "Failed to load map: " + tmxPath, e);
@@ -72,14 +135,15 @@ public class MapManager {
     }
 
     /**
-     * Renders the entire map in one single pass.
+     * Renders only the background layers (Ground).
      * Call this BEFORE the SpriteBatch / ECS entity rendering.
      */
     public void renderMap(OrthographicCamera camera) {
-        if (mapRenderer == null) return;
+        if (mapRenderer == null || backgroundLayers == null)
+            return;
 
         mapRenderer.setView(camera);
-        mapRenderer.render();
+        mapRenderer.render(backgroundLayers);
     }
 
     public void dispose() {
@@ -95,5 +159,11 @@ public class MapManager {
             engine.removeEntity(mapEntity);
             mapEntity = null;
         }
+        if (engine != null) {
+            for (Entity wall : wallEntities) {
+                engine.removeEntity(wall);
+            }
+        }
+        wallEntities.clear();
     }
 }
