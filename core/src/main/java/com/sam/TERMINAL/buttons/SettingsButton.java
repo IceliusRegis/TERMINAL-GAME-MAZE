@@ -55,11 +55,11 @@ public class SettingsButton {
         // This is your actual Restart/Refresh button in the center
         ImageButton refreshBtn = createBtn("ui/refresh.png");
         refreshBtn.addListener(new ClickListener() {
-                                   @Override
-                                   public void clicked(InputEvent event, float x, float y) {
-                                       onReset.run();
-                                   }
-                               });
+            @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    onReset.run();
+                }
+        });
 
         ImageButton quitBtn = createBtn("ui/quit.png");
         quitBtn.addListener(new ClickListener() {

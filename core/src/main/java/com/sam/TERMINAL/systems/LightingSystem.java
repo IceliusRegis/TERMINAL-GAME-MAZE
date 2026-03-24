@@ -3,10 +3,7 @@ package com.sam.TERMINAL.systems;
 import box2dLight.ConeLight;
 import box2dLight.PointLight;
 import box2dLight.RayHandler;
-import com.badlogic.ashley.core.ComponentMapper;
-import com.badlogic.ashley.core.Engine;
-import com.badlogic.ashley.core.Entity;
-import com.badlogic.ashley.core.Family;
+import com.badlogic.ashley.core.*;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -54,6 +51,7 @@ public class LightingSystem extends IteratingSystem {
     private final ComponentMapper<LightComponent> lightMapper = ComponentMapper.getFor(LightComponent.class);
 
     public boolean lightingEnabled = true;
+    private com.sam.TERMINAL.buttons.MenuScreen menuScreen;
 
     public LightingSystem(OrthographicCamera camera) {
         super(Family.all(
@@ -83,75 +81,93 @@ public class LightingSystem extends IteratingSystem {
      *                     SpriteComponent)
      * @return The newly created LightComponent for reference
      */
-    public LightComponent createPlayerLight(Entity playerEntity) {
+    public LightComponent createPlayerLight(Entity playerEntity, boolean hasFlashlight) {
         TransformComponent transform = transformMapper.get(playerEntity);
 
-        ConeLight cone = new ConeLight(
-                rayHandler,
-                RAY_COUNT,
-                CONE_COLOR,
-                CONE_DISTANCE,
-                transform.pos.x + transform.width / 2f, // initial X center
-                transform.pos.y + transform.height / 2f, // initial Y center
-                0f, // initial direction (updated each frame)
-                CONE_DEGREES / 2f // half-angle (Box2DLights uses half the FOV)
-        );
-        cone.setSoft(false); // Hard shadows — critical for horror atmosphere
+        // --- LIGHT CONFIGURATION ---
+        // If no flashlight, the cone is tiny/invisible. If hasFlashlight, it's your 90+80 degree beam.
+        float finalDistance = hasFlashlight ? (CONE_DISTANCE + 100f) : 0f;
+        float finalDegrees = hasFlashlight ? (CONE_DEGREES + 80f) : 0f;
 
+        // The "Small Circle" around the player
+        // We make it slightly larger if they don't have a flashlight so they can at least see their feet.
+        float finalPointRadius = hasFlashlight ? 150f : 300f;
+        float brightness = hasFlashlight ? 0.2f : 0.5f;
+
+        // Cleanup old light
+        if (lightMapper.has(playerEntity)) {
+            LightComponent oldLight = lightMapper.get(playerEntity);
+            if (oldLight.cone != null) oldLight.cone.remove();
+            if (oldLight.pointLight != null) oldLight.pointLight.remove();
+            playerEntity.remove(LightComponent.class);
+        }
+
+        // Create the Cone (Flashlight Beam)
+        ConeLight cone = new ConeLight(
+            rayHandler,
+            RAY_COUNT,
+            CONE_COLOR,
+            finalDistance,
+            transform.pos.x + transform.width / 2f,
+            transform.pos.y + transform.height / 2f,
+            0f,
+            finalDegrees / 2f
+        );
+        cone.setSoft(false);
+        // If no flashlight, make the cone effectively inactive
+        cone.setActive(hasFlashlight);
+
+        // Create the PointLight (The "Small Circle" around player)
         PointLight point = new PointLight(
-                rayHandler,
-                30, // even fewer rays needed for a blur
-                new Color(1f, 1f, 1f, 0.15f), // incredibly dim, highly subtle white glow
-                82f, // radius just covers the immediate area
-                transform.pos.x + transform.width / 2f,
-                transform.pos.y + transform.height / 2f);
-        point.setXray(true); // Passes through walls so it explicitly NEVER casts physical shadows
-        point.setSoft(true); // Enables edge blurring
-        point.setSoftnessLength(45f); // Massive blur to eliminate the harsh circle edge completely
+            rayHandler,
+            30,
+            new Color(1f, 1f, 1f, brightness), // Very dim white
+            finalPointRadius,
+            transform.pos.x + transform.width / 2f,
+            transform.pos.y + transform.height / 2f
+        );
+
+        point.setXray(true);
+        point.setSoft(true);
+        point.setSoftnessLength(45f);
 
         LightComponent lightComponent = new LightComponent(cone, point);
         playerEntity.add(lightComponent);
+
         return lightComponent;
     }
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        // 1. Menu check
+        if (menuScreen != null && (menuScreen.isSettingsVisible() || menuScreen.isInventoryVisible())) {
+            return;
+        }
+
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
         LightComponent light = lightMapper.get(entity);
 
-        if (light == null || light.cone == null) {
-            return;
-        }
+        if (light == null || light.cone == null) return;
 
-        // 1. Calculate entity center
+        // 2. Update Position to Player Center
         float centerX = transform.pos.x + transform.width / 2f;
         float centerY = transform.pos.y + transform.height / 2f;
+        light.cone.setPosition(centerX, centerY);
 
-        // Center the dim PointLight on the player
+        // 3. --- ADD THE SMOOTH TURNING CODE HERE ---
+        float targetAngle = sprite.facingAngle; // The angle from MovementSystem
+        float currentDir = light.cone.getDirection();
+
+        // 0.15f is the speed (1.0f is instant, 0.01f is very slow)
+        float smoothAngle = com.badlogic.gdx.math.MathUtils.lerpAngleDeg(currentDir, targetAngle, 0.15f);
+
+        light.cone.setDirection(smoothAngle);
+        // --------------------------------------------
+
         if (light.pointLight != null) {
             light.pointLight.setPosition(centerX, centerY);
         }
-
-        // 2. Update cone position with a recalculated offset
-        // 10f appropriately anchors the origin of the cone to the chest/hand area
-        float offset = 10f;
-        float coneX = centerX;
-        float coneY = centerY;
-        float angle = sprite.facingAngle;
-
-        if (angle == 0f) { // Right
-            coneX += offset;
-        } else if (angle == 180f) { // Left
-            coneX -= offset;
-        } else if (angle == 90f) { // Up
-            coneY += offset;
-        } else if (angle == 270f) { // Down
-            coneY -= offset;
-        }
-
-        light.cone.setPosition(coneX, coneY);
-        light.cone.setDirection(angle);
     }
 
     /**
@@ -185,4 +201,9 @@ public class LightingSystem extends IteratingSystem {
         rayHandler.dispose();
         box2dWorld.dispose();
     }
+
+    public void setMenuScreen(com.sam.TERMINAL.buttons.MenuScreen menuScreen) {
+        this.menuScreen = menuScreen;
+    }
+
 }
