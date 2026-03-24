@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
-import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
@@ -59,7 +58,6 @@ public class TitleScreen {
     private Texture scrollBarKnobTexture;
     private Texture scrollBarBgTexture;
 
-    private Music backgroundMusic;
     private Sound soundSelect;
     private Sound soundConfirm;
     private Sound soundReturn;
@@ -81,8 +79,6 @@ public class TitleScreen {
         bodyFont = loadFont("fonts/Abaddon Light.ttf", 22);
 
         loadSounds();
-        loadBackgroundMusic();
-
         rootTable = new Table();
         rootTable.setFillParent(true);
         rootTable.center();
@@ -99,19 +95,6 @@ public class TitleScreen {
         });
         multi.addProcessor(stage);
         Gdx.input.setInputProcessor(multi);
-    }
-
-    private void loadBackgroundMusic() {
-        if (!Gdx.files.internal("music/TSMusic.wav").exists()) return;
-        try {
-            backgroundMusic = Gdx.audio.newMusic(Gdx.files.internal("music/TSMusic.wav"));
-            backgroundMusic.setLooping(true);
-            backgroundMusic.setVolume(0.6f);
-            backgroundMusic.play();
-        } catch (com.badlogic.gdx.utils.GdxRuntimeException e) {
-            // WAV must be 8 or 16-bit; 24-bit or other formats will throw. Skip music.
-            Gdx.app.log("TitleScreen", "Could not load TSMusic.wav: " + e.getMessage());
-        }
     }
 
     private void loadSounds() {
@@ -168,7 +151,7 @@ public class TitleScreen {
 
     private int getOptionsCount() {
         switch (currentScreen) {
-            case MAIN: return 3;  // NEW GAME, CONTINUE, OPTIONS (CONTINUE disabled when no save)
+            case MAIN: return 3;
             case OPTIONS: return 4;
             case CONTROLS: case ABOUT: return 1;
             case CREDITS: return 1;
@@ -274,12 +257,10 @@ public class TitleScreen {
         return group;
     }
 
-    /** Wraps a shadow-label group so Table can size it; use when adding to a table. */
     private Container<Group> wrapForTable(Group shadowGroup) {
         return new Container<>(shadowGroup).size(shadowGroup.getWidth(), shadowGroup.getHeight());
     }
 
-    /** Menu option with fixed-width selector slot: ">" appears/disappears in the slot, button text stays fixed. */
     private Group createMenuOptionWithSelector(String buttonText, boolean selected, Color textColor) {
         float selectorWidth = new GlyphLayout(menuFont, "> ").width;
         Group selector = createLabelWithShadow(selected ? "> " : "", menuFont, textColor, BLACK, Align.left);
@@ -465,10 +446,6 @@ public class TitleScreen {
     }
 
     public void dispose() {
-        if (backgroundMusic != null) {
-            backgroundMusic.stop();
-            backgroundMusic.dispose();
-        }
         stage.dispose();
         backgroundTexture.dispose();
         if (scrollBarKnobTexture != null) scrollBarKnobTexture.dispose();
