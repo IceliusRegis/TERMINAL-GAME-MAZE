@@ -23,6 +23,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.sam.TERMINAL.components.InventoryComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.systems.LightingSystem;
 import com.sam.TERMINAL.systems.SaveSystem;
 import com.sam.TERMINAL.Main;
 import com.badlogic.gdx.graphics.Color;
@@ -152,9 +153,20 @@ public class MenuScreen {
                     if (isInventoryVisible) isSettingsVisible = false;
                     updateInputProcessor();
                     return true;
-                }
-                if (keycode == Input.Keys.F5) {
+                } if (keycode == Input.Keys.F5) {
                     saveMapLogic();
+                    return true;
+                } if (keycode == Input.Keys.F1) {
+                    LightingSystem lightSys = engine.getSystem(LightingSystem.class);
+                    if (lightSys != null) {
+                        lightSys.lightingEnabled = !lightSys.lightingEnabled;
+                        Gdx.app.log("DEBUG", "Lighting Enabled: " + lightSys.lightingEnabled);
+                    }
+                    return true;
+                } if (keycode == Input.Keys.ESCAPE) {
+                    isSettingsVisible = !isSettingsVisible; // Toggle on/off
+                    if (isSettingsVisible) isInventoryVisible = false; // Close inventory if opening settings
+                    updateInputProcessor();
                     return true;
                 }
                 return false;
@@ -306,8 +318,13 @@ public class MenuScreen {
             Image icon = new Image(mainGame.getBeepRegion());
             itemTable.add(icon).size(64, 64).pad(20);
             itemTable.add(new com.badlogic.gdx.scenes.scene2d.ui.Label("Beep Card", new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(new com.badlogic.gdx.graphics.g2d.BitmapFont(), com.badlogic.gdx.graphics.Color.WHITE))).padRight(20);
-            itemTable.invalidateHierarchy();
+        } if (inv.hasItem("flashlight")) {
+            Image icon = new Image(mainGame.getFlashlightRegion());
+            itemTable.add(icon).size(64, 64).pad(10);
+            itemTable.add(new com.badlogic.gdx.scenes.scene2d.ui.Label("Flashlight",
+                new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(new com.badlogic.gdx.graphics.g2d.BitmapFont(), com.badlogic.gdx.graphics.Color.WHITE))).padRight(20);
         }
+            itemTable.invalidateHierarchy();
     }
 
     public void showGameOver(boolean win) {
@@ -358,22 +375,30 @@ public class MenuScreen {
         isSettingsVisible = false;
         isInventoryVisible = false;
 
+        // 1. Create a solid black background so it doesn't fade into the game world
+        Image blackOverlay = new Image(whitePixel);
+        blackOverlay.setColor(Color.BLACK);
+        blackOverlay.setFillParent(true);
+        uiStage.addActor(blackOverlay);
+
+        // 2. Create the jumpscare image
         Image jumpscareImg = new Image(jumpscareTexture);
         jumpscareImg.setFillParent(true);
         uiStage.addActor(jumpscareImg);
 
-        jumpscareSound.play(1.0f); // ← play sound at full volume
+        jumpscareSound.play(1.0f);
 
-        // Action on the ACTOR not the stage — actors process actions, stages don't
+        // 3. Sequence: Stay full alpha -> Fade out -> Clean up & Game Over
         jumpscareImg.addAction(Actions.sequence(
-            Actions.delay(3f),
+            Actions.delay(3.0f),              // Show jumpscare for 2 seconds
+            Actions.fadeOut(1.0f),            // Fade to black over 1 second
             Actions.run(() -> {
                 isJumpscaring = false;
                 if (jumpscareTexture != null) {
                     jumpscareTexture.dispose();
                     jumpscareTexture = null;
                 }
-                showGameOver(false);
+                showGameOver(false);         // Trigger the death screen
             })
         ));
 

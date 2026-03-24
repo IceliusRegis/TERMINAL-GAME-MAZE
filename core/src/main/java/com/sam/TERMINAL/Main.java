@@ -37,10 +37,10 @@ public class Main extends ApplicationAdapter {
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, doorOpenTexture, doorClosedTexture;
+    private Texture beepTexture, doorOpenTexture, doorClosedTexture, flashlightTexture;
 
     // Regions and Animation
-    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion;
+    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion, flashlightRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -60,9 +60,9 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
         }
+        createUI();
         initSystems();
         handleGameStart();
-        createUI();
         if (titleScreen != null) {
             titleScreen.dispose();
             titleScreen = null;
@@ -89,6 +89,9 @@ public class Main extends ApplicationAdapter {
         doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
         doorCloseRegion = new TextureRegion(doorClosedTexture);
 
+        flashlightTexture = new Texture(Gdx.files.internal("sprites/flash_off.png"));
+        flashlightRegion = new TextureRegion(flashlightTexture);
+
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
         playerSpriteSheet = new Texture("sprites/MC (Walk).png");
@@ -104,13 +107,20 @@ public class Main extends ApplicationAdapter {
     }
 
     private void initSystems() {
-        engine.addSystem(new MovementSystem());
+        // --- MOVEMENT SYSTEM LINKING ---
+        MovementSystem moveSystem = new MovementSystem();
+        if (menuScreen != null) {
+            moveSystem.setMenuScreen(menuScreen);
+        }
+        engine.addSystem(moveSystem);
+        // -------------------------------
+
         engine.addSystem(new EnemySystem(() -> {
-            // Called from Ashley thread — post to main thread for safety
             Gdx.app.postRunnable(() -> {
                 if (menuScreen != null) menuScreen.showJumpscare();
             });
         }));
+
         engine.addSystem(new WinLossSystem(this));
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
@@ -118,8 +128,10 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(doorOpenRegion));
 
-        // Lighting system — stored in field so we can call render() and dispose()
         lightingSystem = new LightingSystem(camera);
+        if (menuScreen != null) {
+            lightingSystem.setMenuScreen(menuScreen); // Add this line!
+        }
         engine.addSystem(lightingSystem);
 
         debugManager = new DebugManager();
@@ -148,7 +160,7 @@ public class Main extends ApplicationAdapter {
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -159,7 +171,7 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
-            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion);
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
@@ -168,7 +180,7 @@ public class Main extends ApplicationAdapter {
         ImmutableArray<Entity> players = engine.getEntitiesFor(
             Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
-            lightingSystem.createPlayerLight(players.first());
+            lightingSystem.createPlayerLight(players.first(), false);
         }
     }
 
@@ -288,7 +300,10 @@ public class Main extends ApplicationAdapter {
         if (doorOpenTexture != null) doorOpenTexture.dispose();
         if (doorClosedTexture != null) doorClosedTexture.dispose();
         if (enemyTexture != null) enemyTexture.dispose();
+        if (flashlightTexture != null) flashlightTexture.dispose();
     }
 
     public TextureRegion getBeepRegion() { return beepRegion; }
+    public TextureRegion getFlashlightRegion() { return flashlightRegion; }
 }
+
