@@ -20,8 +20,10 @@ import java.util.Comparator;
  * RenderSystem - Draws all entities with sprites to the screen.
  *
  * Processes entities that have Transform + Sprite components.
- * Y-sorts entities so that those with a higher Y coordinate are drawn first (behind).
- * Also performs a second pass to render player silhouettes when occluded by walls.
+ * Y-sorts entities so that those with a higher Y coordinate are drawn first
+ * (behind).
+ * Also performs a second pass to render player silhouettes when occluded by
+ * walls.
  */
 public class RenderSystem extends SortedIteratingSystem {
 
@@ -31,7 +33,7 @@ public class RenderSystem extends SortedIteratingSystem {
     private ComponentMapper<SpriteComponent> spriteMapper;
     private ComponentMapper<PlayerComponent> playerMapper;
 
-
+    public boolean silhouettesEnabled = true;
 
     private static class YComparator implements Comparator<Entity> {
         @Override
@@ -61,7 +63,9 @@ public class RenderSystem extends SortedIteratingSystem {
         super.update(deltaTime);
 
         // Secondary pass for silhouettes
-        renderSilhouettes();
+        if (silhouettesEnabled) {
+            renderSilhouettes();
+        }
     }
 
     @Override
@@ -69,7 +73,7 @@ public class RenderSystem extends SortedIteratingSystem {
         TransformComponent transform = transformMapper.get(entity);
         SpriteComponent sprite = spriteMapper.get(entity);
 
-        if (!sprite.isStatic){
+        if (!sprite.isStatic) {
             sprite.stateTime += deltaTime;
         }
 
@@ -77,7 +81,7 @@ public class RenderSystem extends SortedIteratingSystem {
         // If occluded, we skip the normal opaque draw pass so the entire sprite
         // can be drawn exclusively as a translucent silhouette in the secondary pass.
         boolean isPlayer = playerMapper.has(entity);
-        if (isPlayer && isPlayerOccluded(entity)) {
+        if (isPlayer && silhouettesEnabled && isPlayerOccluded(entity)) {
             return;
         }
 
@@ -112,11 +116,11 @@ public class RenderSystem extends SortedIteratingSystem {
             }
 
             batch.draw(currentFrame,
-                drawX, drawY,
-                width / 2f, height / 2f,
-                width, height,
-                scaleX, scaleY,
-                0f);
+                    drawX, drawY,
+                    width / 2f, height / 2f,
+                    width, height,
+                    scaleX, scaleY,
+                    0f);
         }
     }
 
@@ -136,7 +140,7 @@ public class RenderSystem extends SortedIteratingSystem {
      * Uses a strict "Point vs. Box" containment check: calculates the center
      * point of the player's torso (horizontal and vertical midpoint of bounds)
      * and checks whether that single point falls inside any occluding wall's
-     * bounding box.  This eliminates false positives from invisible texture
+     * bounding box. This eliminates false positives from invisible texture
      * boundaries that a rectangle-overlap approach would catch.
      */
     private boolean isPlayerOccluded(Entity player) {
@@ -148,8 +152,7 @@ public class RenderSystem extends SortedIteratingSystem {
         float torsoY = pBounds.y + pBounds.height / 2f;
 
         com.badlogic.ashley.utils.ImmutableArray<Entity> walls = getEngine().getEntitiesFor(
-                Family.all(WallComponent.class, TransformComponent.class).get()
-        );
+                Family.all(WallComponent.class, TransformComponent.class).get());
 
         for (int j = 0; j < walls.size(); ++j) {
             Entity wall = walls.get(j);
@@ -168,32 +171,33 @@ public class RenderSystem extends SortedIteratingSystem {
 
     private void renderSilhouettes() {
         com.badlogic.ashley.utils.ImmutableArray<Entity> players = getEngine().getEntitiesFor(
-                Family.all(PlayerComponent.class, TransformComponent.class, SpriteComponent.class).get()
-        );
+                Family.all(PlayerComponent.class, TransformComponent.class, SpriteComponent.class).get());
 
-        if (players.size() == 0) return;
+        if (players.size() == 0)
+            return;
 
         for (int i = 0; i < players.size(); ++i) {
             Entity player = players.get(i);
-            
+
             // Render the silhouette only if the player is currently occluded
             if (isPlayerOccluded(player)) {
                 TransformComponent pTransform = transformMapper.get(player);
                 SpriteComponent pSprite = spriteMapper.get(player);
                 TextureRegion frame = getFrame(pSprite);
-                
+
                 if (frame != null) {
                     float width = (pSprite.drawWidth > 0) ? pSprite.drawWidth : pTransform.width;
                     float height = (pSprite.drawHeight > 0) ? pSprite.drawHeight : pTransform.height;
                     float drawX = pTransform.pos.x - (width - pTransform.width) / 2;
                     float drawY = pTransform.pos.y - (height - pTransform.height) / 2;
-                    
+
                     boolean flipX = !pSprite.facingRight;
                     if (frame.isFlipX()) {
                         flipX = !flipX;
                     }
 
-                    // Render as a faint translucent silhouette (white with 40% opacity) over the wall
+                    // Render as a faint translucent silhouette (white with 40% opacity) over the
+                    // wall
                     batch.setColor(1f, 1f, 1f, 0.4f);
                     batch.draw(frame, drawX, drawY, width / 2f, height / 2f, width, height, flipX ? -1f : 1f, 1f, 0f);
                     batch.setColor(Color.WHITE); // Reset immediately
