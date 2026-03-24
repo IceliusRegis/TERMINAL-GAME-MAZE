@@ -9,6 +9,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.utils.FloatArray;
 import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.components.RoofComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
@@ -35,6 +36,11 @@ public class RenderSystem extends SortedIteratingSystem {
     private ComponentMapper<PlayerComponent> playerMapper;
 
     public boolean silhouettesEnabled = true;
+
+    // Arrays to store the anchorY of any wall covering specific body parts
+    private final FloatArray feetAnchors = new FloatArray();
+    private final FloatArray torsoAnchors = new FloatArray();
+    private final FloatArray headAnchors = new FloatArray();
 
     private static class YComparator implements Comparator<Entity> {
         @Override
@@ -108,8 +114,6 @@ public class RenderSystem extends SortedIteratingSystem {
         }
 
         // Check if the entity is the player and if it is occluded by a wall.
-        // If occluded, we skip the normal opaque draw pass so the entire sprite
-        // can be drawn exclusively as a translucent silhouette in the secondary pass.
         boolean isPlayer = playerMapper.has(entity);
         if (isPlayer && silhouettesEnabled) {
             if (getPlayerOcclusionState(entity) == 1) {
@@ -130,9 +134,6 @@ public class RenderSystem extends SortedIteratingSystem {
 
         // Draw
         if (currentFrame != null) {
-            // Determine flip axes:
-            // Static tiles use Tiled editor metadata (sprite.flipX / flipY).
-            // Animated sprites use the runtime facingRight direction.
             float scaleX;
             float scaleY;
 
@@ -177,54 +178,88 @@ public class RenderSystem extends SortedIteratingSystem {
         TransformComponent pTransform = transformMapper.get(player);
         Rectangle pBounds = pTransform.bounds;
 
-        // 1. Torso point (bottom/center)
-        float torsoX = pBounds.x + pBounds.width / 2f;
-        float torsoY = pBounds.y + pBounds.height / 2f;
+        // --- THE FIX: Adjusted measurements to match visual character height ---
+        // The visual character is roughly ~96 pixels tall.
 
-        // 2. Head point
-        // 60f represents roughly 60 pixels above the feet. Adjust if it triggers too
-        // early/late!
-        float headX = torsoX;
-        float headY = torsoY + 60f;
+        float feetX = pBounds.x + pBounds.width / 2f;
+        float feetY = pBounds.y + 2f; // Base level
+
+        float torsoX = feetX;
+        float torsoY = pBounds.y + 45f; // Middle of character (~1.5 tiles up)
+
+        float headX = feetX;
+        float headY = pBounds.y + 90f; // Top of character's head (~3 tiles up)
+        // --------------------------------------------------------------------
+
+        float playerY = pTransform.pos.y;
 
         com.badlogic.ashley.utils.ImmutableArray<Entity> walls = getEngine().getEntitiesFor(
                 Family.all(WallComponent.class, TransformComponent.class).get());
         com.badlogic.ashley.utils.ImmutableArray<Entity> roofs = getEngine().getEntitiesFor(
                 Family.all(RoofComponent.class, TransformComponent.class).get());
 
-        boolean isTorsoHidden = isPointBehindWalls(torsoX, torsoY, pTransform.pos.y, walls, roofs);
-        boolean isHeadHidden = isPointBehindWalls(headX, headY, pTransform.pos.y, walls, roofs);
+        // 1. Gather anchor points for walls covering the feet
+        feetAnchors.clear();
+        getOccludingAnchors(feetX, feetY, playerY, walls, roofs, feetAnchors);
+        if (feetAnchors.isEmpty())
+            return 0; // Quick exit if feet aren't hidden
 
-        // ONLY go transparent if BOTH the head and feet are behind the wall
-        if (isTorsoHidden && isHeadHidden) {
-            return 1; // Silhouette
-        } else {
-            return 0; // Normal draw
+        // 2. Gather anchor points for walls covering the torso
+        torsoAnchors.clear();
+        getOccludingAnchors(torsoX, torsoY, playerY, walls, roofs, torsoAnchors);
+        if (torsoAnchors.isEmpty())
+            return 0; // Quick exit if torso isn't hidden
+
+        // 3. Gather anchor points for walls covering the head
+        headAnchors.clear();
+        getOccludingAnchors(headX, headY, playerY, walls, roofs, headAnchors);
+        if (headAnchors.isEmpty())
+            return 0; // Quick exit if head isn't hidden
+
+        // 4. CHECK CONTIGUOUS STRUCTURE:
+        // If any anchorY from the feet matches an anchorY in the torso AND head,
+        // they are blocked by the SAME contiguous wall structure.
+        for (int i = 0; i < feetAnchors.size; i++) {
+            float anchor = feetAnchors.items[i];
+            if (torsoAnchors.contains(anchor) && headAnchors.contains(anchor)) {
+                return 1; // Silhouette ON
+            }
         }
+
+        // Points are covered, but by completely different walls (Corridor condition)
+        return 0; // Normal Draw
     }
 
-    private boolean isPointBehindWalls(float px, float py, float playerY,
+    /**
+     * Populates a FloatArray with the anchorY values of any walls that overlap a
+     * specific point.
+     */
+    private void getOccludingAnchors(float px, float py, float playerY,
             com.badlogic.ashley.utils.ImmutableArray<Entity> walls,
-            com.badlogic.ashley.utils.ImmutableArray<Entity> roofs) {
+            com.badlogic.ashley.utils.ImmutableArray<Entity> roofs,
+            FloatArray outAnchors) {
+
         // Check Wall Faces
         for (int j = 0; j < walls.size(); ++j) {
             Entity wall = walls.get(j);
-            TransformComponent wTransform = transformMapper.get(wall);
-            float anchorY = wTransform.pos.y - wall.getComponent(WallComponent.class).sortYShift;
-            if (playerY > anchorY && wTransform.bounds.contains(px, py))
-                return true;
+            TransformComponent wTrans = transformMapper.get(wall);
+            float anchorY = wTrans.pos.y - wall.getComponent(WallComponent.class).sortYShift;
+            if (playerY > anchorY && wTrans.bounds.contains(px, py)) {
+                if (!outAnchors.contains(anchorY))
+                    outAnchors.add(anchorY);
+            }
         }
 
         // Check Roofs
         for (int j = 0; j < roofs.size(); ++j) {
             Entity roof = roofs.get(j);
-            TransformComponent rTransform = transformMapper.get(roof);
-            float anchorY = rTransform.pos.y - roof.getComponent(RoofComponent.class).sortYShift;
-            if (playerY > anchorY && rTransform.bounds.contains(px, py))
-                return true;
+            TransformComponent rTrans = transformMapper.get(roof);
+            float anchorY = rTrans.pos.y - roof.getComponent(RoofComponent.class).sortYShift;
+            if (playerY > anchorY && rTrans.bounds.contains(px, py)) {
+                if (!outAnchors.contains(anchorY))
+                    outAnchors.add(anchorY);
+            }
         }
-
-        return false;
     }
 
     private void renderSilhouettes() {
@@ -237,9 +272,7 @@ public class RenderSystem extends SortedIteratingSystem {
         for (int i = 0; i < players.size(); ++i) {
             Entity player = players.get(i);
 
-            // Render the silhouette only if the player is currently occluded
-            // Render the silhouette ONLY if the player is partially occluded (State 1)
-            // If State is 2, it bypasses this entirely, staying invisible.
+            // Render the silhouette ONLY if fully occluded (State 1)
             if (getPlayerOcclusionState(player) == 1) {
                 TransformComponent pTransform = transformMapper.get(player);
                 SpriteComponent pSprite = spriteMapper.get(player);
@@ -256,9 +289,8 @@ public class RenderSystem extends SortedIteratingSystem {
                         flipX = !flipX;
                     }
 
-                    // Render as a faint translucent silhouette (white with 40% opacity) over the
-                    // wall
-                    batch.setColor(1f, 1f, 1f, 0.4f);
+                    // Dark tint at ~55% opacity
+                    batch.setColor(0.1f, 0.1f, 0.15f, 0.55f);
                     batch.draw(frame, drawX, drawY, width / 2f, height / 2f, width, height, flipX ? -1f : 1f, 1f, 0f);
                     batch.setColor(Color.WHITE); // Reset immediately
                 }

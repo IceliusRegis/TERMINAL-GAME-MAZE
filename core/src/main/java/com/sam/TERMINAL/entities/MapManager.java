@@ -19,14 +19,6 @@ import com.sam.TERMINAL.components.WallComponent;
 
 /**
  * MapManager - Owns the TiledMap lifecycle and layered rendering.
- *
- * Responsibilities:
- * - Loads the .tmx file from disk.
- * - Creates the TileWorldComponent and adds it to the ECS Engine.
- * - Renders map background layers (Ground).
- * - Extracts the "Walls" layer and creates static Ashley entities
- * to allow proper Y-sorting with dynamic entities like the player.
- * - Safely disposes of heavy map assets and generated wall entities.
  */
 public class MapManager {
 
@@ -44,14 +36,11 @@ public class MapManager {
     public void loadMap(String tmxPath) {
         // 1. Clean up any existing map before loading a new one
         this.dispose();
-
         try {
             // 2. Load the actual TMX file from assets
             tiledMap = new TmxMapLoader().load(tmxPath);
-
             // 3. Create the LibGDX renderer for this specific map
             mapRenderer = new OrthogonalTiledMapRenderer(tiledMap, 1f);
-
             // 4. Log layer findings and setup background rendering
             MapLayers allLayers = tiledMap.getLayers();
             MapLayer groundLayer = allLayers.get("Ground");
@@ -68,17 +57,13 @@ public class MapManager {
 
             // --- UPDATED WALL & ROOF EXTRACTION LOGIC ---
             String[] structuralLayers = { "Walls", "Wall Roofs" };
-
             for (String layerName : structuralLayers) {
                 MapLayer layer = allLayers.get(layerName);
-
                 if (layer instanceof TiledMapTileLayer) {
                     TiledMapTileLayer tileLayer = (TiledMapTileLayer) layer;
-
                     for (int x = 0; x < tileLayer.getWidth(); x++) {
                         for (int y = 0; y < tileLayer.getHeight(); y++) {
                             TiledMapTileLayer.Cell cell = tileLayer.getCell(x, y);
-
                             if (cell != null && cell.getTile() != null) {
                                 Entity wallEntity = engine.createEntity();
                                 TransformComponent transform = engine.createComponent(TransformComponent.class);
@@ -117,13 +102,31 @@ public class MapManager {
                                     wallEntity.add(engine.createComponent(WallComponent.class));
                                 }
 
+                                // ── NEW SMART SCANNING LOGIC ─────────────────────────────
                                 // Scan downwards to find the true bottom base of this wall column
                                 int baseY = y;
-                                while (baseY > 0 && hasStructuralTile(x, baseY - 1, allLayers)) {
-                                    baseY--;
-                                }
-                                float shiftAmount = (y - baseY) * tileLayer.getTileHeight();
+                                while (baseY > 0) {
+                                    boolean currentIsWall = isTileInLayer(x, baseY, allLayers, "Walls");
+                                    boolean nextIsWall = isTileInLayer(x, baseY - 1, allLayers, "Walls");
+                                    boolean nextIsRoof = isTileInLayer(x, baseY - 1, allLayers, "Wall Roofs");
 
+                                    if (nextIsWall) {
+                                        baseY--; // Always link downwards into a wall face
+                                    } else if (nextIsRoof) {
+                                        if (!currentIsWall) {
+                                            baseY--; // Link Roof to Roof (for multi-tile tall roofs)
+                                        } else {
+                                            // DANGER: We found a Roof directly under a Wall Face.
+                                            // This means it's a completely different wall behind the corridor!
+                                            break;
+                                        }
+                                    } else {
+                                        break; // Empty floor
+                                    }
+                                }
+                                // ─────────────────────────────────────────────────────────
+
+                                float shiftAmount = (y - baseY) * tileLayer.getTileHeight();
                                 if (layerName.equals("Wall Roofs")) {
                                     RoofComponent rc = engine.createComponent(RoofComponent.class);
                                     rc.sortYShift = shiftAmount;
@@ -147,7 +150,6 @@ public class MapManager {
 
             // 5. Create your new TileWorldComponent
             TileWorldComponent worldComp = new TileWorldComponent(tiledMap);
-
             // 6. Create an Ashley Entity to hold the map data
             mapEntity = engine.createEntity();
             mapEntity.add(worldComp);
@@ -155,20 +157,14 @@ public class MapManager {
 
             Gdx.app.log("MAP_MANAGER", "Successfully loaded map: " + tmxPath +
                     " (" + worldComp.mapWidthTiles + "x" + worldComp.mapHeightTiles + " tiles)");
-
         } catch (Exception e) {
             Gdx.app.error("MAP_MANAGER", "Failed to load map: " + tmxPath, e);
         }
     }
 
-    /**
-     * Renders only the background layers (Ground).
-     * Call this BEFORE the SpriteBatch / ECS entity rendering.
-     */
     public void renderMap(OrthographicCamera camera) {
         if (mapRenderer == null || backgroundLayers == null)
             return;
-
         mapRenderer.setView(camera);
         mapRenderer.render(backgroundLayers);
     }
@@ -194,14 +190,12 @@ public class MapManager {
         wallEntities.clear();
     }
 
-    private boolean hasStructuralTile(int x, int y, MapLayers layers) {
-        MapLayer wallsLayer = layers.get("Walls");
-        if (wallsLayer instanceof TiledMapTileLayer && ((TiledMapTileLayer) wallsLayer).getCell(x, y) != null)
-            return true;
-        MapLayer roofsLayer = layers.get("Wall Roofs");
-        if (roofsLayer instanceof TiledMapTileLayer && ((TiledMapTileLayer) roofsLayer).getCell(x, y) != null)
-            return true;
+    // --- HELPER METHOD TO CHECK TILE LAYERS SAFELY ---
+    private boolean isTileInLayer(int x, int y, MapLayers layers, String layerName) {
+        MapLayer layer = layers.get(layerName);
+        if (layer instanceof TiledMapTileLayer) {
+            return ((TiledMapTileLayer) layer).getCell(x, y) != null;
+        }
         return false;
     }
-
 }
