@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.components.RoofComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.components.WallComponent;
@@ -40,8 +41,19 @@ public class RenderSystem extends SortedIteratingSystem {
         public int compare(Entity e1, Entity e2) {
             TransformComponent t1 = e1.getComponent(TransformComponent.class);
             TransformComponent t2 = e2.getComponent(TransformComponent.class);
+
+            // Get the base Y sort positions
+            float y1 = t1.pos.y;
+            float y2 = t2.pos.y;
+
+            // Shift the Y-sort origin for Roof tiles to match the wall beneath them
+            if (e1.getComponent(RoofComponent.class) != null)
+                y1 -= 32f;
+            if (e2.getComponent(RoofComponent.class) != null)
+                y2 -= 32f;
+
             // Higher Y drawn first = descending sort.
-            return Float.compare(t2.pos.y, t1.pos.y);
+            return Float.compare(y2, y1);
         }
     }
 

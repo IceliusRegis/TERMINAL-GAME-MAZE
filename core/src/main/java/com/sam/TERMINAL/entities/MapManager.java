@@ -11,6 +11,7 @@ import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.utils.Array;
+import com.sam.TERMINAL.components.RoofComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.TransformComponent;
@@ -65,57 +66,66 @@ public class MapManager {
                 Gdx.app.log("MAP_MANAGER", "Ground layer: MISSING");
             }
 
-            // Extract Walls layer into Ashley entities
-            if (wallsLayer instanceof TiledMapTileLayer) {
-                TiledMapTileLayer tileLayer = (TiledMapTileLayer) wallsLayer;
-                int tileWidth = tileLayer.getTileWidth();
-                int tileHeight = tileLayer.getTileHeight();
+            // --- UPDATED WALL & ROOF EXTRACTION LOGIC ---
+            String[] structuralLayers = { "Walls", "Wall Roofs" };
 
-                for (int x = 0; x < tileLayer.getWidth(); x++) {
-                    for (int y = 0; y < tileLayer.getHeight(); y++) {
-                        TiledMapTileLayer.Cell cell = tileLayer.getCell(x, y);
-                        // Inside your nested x/y loop:
-                        if (cell != null && cell.getTile() != null) {
-                            Entity wallEntity = engine.createEntity();
-                            TransformComponent transform = engine.createComponent(TransformComponent.class);
-                            SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+            for (String layerName : structuralLayers) {
+                MapLayer layer = allLayers.get(layerName);
 
-                            // 1. Get the actual texture region first
-                            sprite.staticSprite = cell.getTile().getTextureRegion();
-                            sprite.isStatic = true;
+                if (layer instanceof TiledMapTileLayer) {
+                    TiledMapTileLayer tileLayer = (TiledMapTileLayer) layer;
 
-                            // 1b. Capture Tiled flip metadata from the Cell
-                            sprite.flipX = cell.getFlipHorizontally();
-                            sprite.flipY = cell.getFlipVertically();
+                    for (int x = 0; x < tileLayer.getWidth(); x++) {
+                        for (int y = 0; y < tileLayer.getHeight(); y++) {
+                            TiledMapTileLayer.Cell cell = tileLayer.getCell(x, y);
 
-                            // 2. Use the TEXTURE's true dimensions, not the grid's dimensions
-                            float actualWidth = sprite.staticSprite.getRegionWidth();
-                            float actualHeight = sprite.staticSprite.getRegionHeight();
+                            if (cell != null && cell.getTile() != null) {
+                                Entity wallEntity = engine.createEntity();
+                                TransformComponent transform = engine.createComponent(TransformComponent.class);
+                                SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
 
-                            // 3. Add Tiled's native offsets to prevent shifting
-                            float offsetX = cell.getTile().getOffsetX();
-                            float offsetY = cell.getTile().getOffsetY();
+                                // 1. Get the actual texture region first
+                                sprite.staticSprite = cell.getTile().getTextureRegion();
+                                sprite.isStatic = true;
 
-                            // 4. Set the transform
-                            transform.pos.set((x * tileLayer.getTileWidth()) + offsetX,
-                                    (y * tileLayer.getTileHeight()) + offsetY);
-                            transform.width = actualWidth;
-                            transform.height = actualHeight;
-                            transform.updateBounds();
+                                // 1b. Capture Tiled flip metadata from the Cell
+                                sprite.flipX = cell.getFlipHorizontally();
+                                sprite.flipY = cell.getFlipVertically();
 
-                            wallEntity.add(transform);
-                            wallEntity.add(sprite);
-                            wallEntity.add(engine.createComponent(WallComponent.class));
+                                // 2. Use the TEXTURE's true dimensions
+                                float actualWidth = sprite.staticSprite.getRegionWidth();
+                                float actualHeight = sprite.staticSprite.getRegionHeight();
 
-                            engine.addEntity(wallEntity);
-                            wallEntities.add(wallEntity);
+                                // 3. Add Tiled's native offsets to prevent shifting
+                                float offsetX = cell.getTile().getOffsetX();
+                                float offsetY = cell.getTile().getOffsetY();
+
+                                // 4. Set the transform
+                                transform.pos.set((x * tileLayer.getTileWidth()) + offsetX,
+                                        (y * tileLayer.getTileHeight()) + offsetY);
+                                transform.width = actualWidth;
+                                transform.height = actualHeight;
+                                transform.updateBounds();
+
+                                wallEntity.add(transform);
+                                wallEntity.add(sprite);
+
+                                // === THE NEW IMPLEMENTATION ===
+                                if (layerName.equals("Wall Roofs")) {
+                                    wallEntity.add(engine.createComponent(RoofComponent.class));
+                                } else {
+                                    wallEntity.add(engine.createComponent(WallComponent.class));
+                                }
+
+                                engine.addEntity(wallEntity);
+                                wallEntities.add(wallEntity);
+                            }
                         }
                     }
+                    Gdx.app.log("MAP_MANAGER", layerName + " layer: found and converted to static entities");
+                } else {
+                    Gdx.app.log("MAP_MANAGER", layerName + " layer: MISSING or not a TileLayer");
                 }
-                Gdx.app.log("MAP_MANAGER",
-                        "Walls layer: found and converted to " + wallEntities.size + " static entities");
-            } else {
-                Gdx.app.log("MAP_MANAGER", "Walls layer: MISSING or not a TileLayer");
             }
 
             // 5. Create your new TileWorldComponent
