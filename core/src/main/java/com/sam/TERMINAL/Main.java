@@ -117,16 +117,21 @@ public class Main extends ApplicationAdapter {
 
         engine.addSystem(new EnemySystem(() -> {
             Gdx.app.postRunnable(() -> {
-                if (menuScreen != null) menuScreen.showJumpscare();
+                if (menuScreen != null)
+                    menuScreen.showJumpscare();
             });
         }));
 
-        engine.addSystem(new WinLossSystem(this));
+        WinLossSystem winLossSystem = new WinLossSystem(this);
+        if (menuScreen != null) {
+            winLossSystem.setMenuScreen(menuScreen);
+        }
+        engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem(new InteractionSystem(doorOpenRegion));
+        engine.addSystem(new InteractionSystem(doorOpenRegion, batch));
 
         lightingSystem = new LightingSystem(camera);
         if (menuScreen != null) {
@@ -160,7 +165,8 @@ public class Main extends ApplicationAdapter {
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion, flashlightRegion);
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
+                    enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -171,14 +177,15 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
-            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation, enemyRegion, flashlightRegion);
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
+                    enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
 
         // Attach the player's ConeLight after all entities have been spawned
         ImmutableArray<Entity> players = engine.getEntitiesFor(
-            Family.all(PlayerComponent.class).get());
+                Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             lightingSystem.createPlayerLight(players.first(), false);
         }
@@ -188,7 +195,7 @@ public class Main extends ApplicationAdapter {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
 
         com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine
-            .getEntitiesFor(Family.all(InteractableComponent.class).get());
+                .getEntitiesFor(Family.all(InteractableComponent.class).get());
         for (Entity door : doors) {
             door.getComponent(InteractableComponent.class).isActive = true;
         }
@@ -196,11 +203,18 @@ public class Main extends ApplicationAdapter {
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
         com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine
-            .getEntitiesFor(Family.all(EnemyComponent.class).get());
+                .getEntitiesFor(Family.all(EnemyComponent.class).get());
         for (Entity enemy : enemies) {
             TransformComponent t = enemy.getComponent(TransformComponent.class);
             t.pos.set(5 * 32f, 40 * 32f);
             t.updateBounds();
+
+            // Clear stale BFS path after teleporting enemy back to spawn
+            EnemyComponent ec = enemy.getComponent(EnemyComponent.class);
+            if (ec != null) {
+                ec.path.clear();
+                ec.pathTimer = 0f;
+            }
         }
 
         // Reset EnemySystem triggered flag so it can fire again
@@ -224,12 +238,12 @@ public class Main extends ApplicationAdapter {
             return;
         }
 
-        // Draw map
+        // --- MAP LAYER (behind sprites) ---
         if (mapManager != null) {
-            mapManager.render(camera);
+            mapManager.renderMap(camera);
         }
 
-        // Update viewport and camera
+        // 2. Draw the Game World (ECS entities)
         viewport.apply();
         camera.update();
         batch.setProjectionMatrix(camera.combined);
@@ -239,9 +253,19 @@ public class Main extends ApplicationAdapter {
         if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
             engine.update(delta);
         } else {
+            // When paused, we draw the last known state without moving anything
+            // In Ashley, we call update with 0 delta to "freeze" time:
             engine.update(0);
         }
         batch.end();
+
+        // Removed: PASS 2 WALLS LAYER
+
+        // 2.5. Debug BFS path lines (between sprites and lighting)
+        EnemySystem enemySystem = engine.getSystem(EnemySystem.class);
+        if (enemySystem != null) {
+            enemySystem.renderDebug(camera);
+        }
 
         // 3. Lighting overlay (outside SpriteBatch, after sprites)
         if (lightingSystem != null) {
@@ -251,17 +275,22 @@ public class Main extends ApplicationAdapter {
         // --- DEBUG POLLING ---
         if (debugManager != null) {
             debugManager.update(lightingSystem);
+            debugManager.renderHitboxes(engine, camera);
         }
 
         // Draw UI on top
         menuScreen.render(delta);
 
-        // Check win/loss — guarded so jumpscare isn't interrupted
+        // Check win/loss — guarded so jumpscare isn't interrupted.
+        // During a jumpscare, showGameOver() is called by the jumpscare's own
+        // fade-out action — do NOT call it here or it races the animation.
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
-        if (wls.win && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
-            menuScreen.showGameOver(true);
-        } else if (wls.gameOver && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
-            menuScreen.showGameOver(false);
+        if (!menuScreen.isJumpscaring()) {
+            if (wls.win && !menuScreen.isGameOver()) {
+                menuScreen.showGameOver(true);
+            } else if (wls.gameOver && !menuScreen.isGameOver()) {
+                menuScreen.showGameOver(false);
+            }
         }
 
         drawCursor();
@@ -283,27 +312,50 @@ public class Main extends ApplicationAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, false);
-        if (titleScreen != null) titleScreen.resize(width, height);
-        if (menuScreen != null) menuScreen.resize(width, height);
+        if (titleScreen != null)
+            titleScreen.resize(width, height);
+        if (menuScreen != null)
+            menuScreen.resize(width, height);
     }
 
     @Override
     public void dispose() {
+        // Clean up resources to prevent memory leaks
+        InteractionSystem interactionSystem = engine.getSystem(InteractionSystem.class);
+        if (interactionSystem != null)
+            interactionSystem.dispose();
         batch.dispose();
-        if (mapManager != null) mapManager.dispose();
-        if (lightingSystem != null) lightingSystem.dispose();
-        if (titleScreen != null) titleScreen.dispose();
-        if (menuScreen != null) menuScreen.dispose();
-        if (playerSpriteSheet != null) playerSpriteSheet.dispose();
-        if (cursorTexture != null) cursorTexture.dispose();
-        if (beepTexture != null) beepTexture.dispose();
-        if (doorOpenTexture != null) doorOpenTexture.dispose();
-        if (doorClosedTexture != null) doorClosedTexture.dispose();
-        if (enemyTexture != null) enemyTexture.dispose();
-        if (flashlightTexture != null) flashlightTexture.dispose();
+        if (mapManager != null)
+            mapManager.dispose();
+        if (lightingSystem != null)
+            lightingSystem.dispose();
+        if (debugManager != null)
+            debugManager.dispose();
+        if (titleScreen != null)
+            titleScreen.dispose();
+        if (menuScreen != null)
+            menuScreen.dispose();
+        if (playerSpriteSheet != null)
+            playerSpriteSheet.dispose();
+        if (cursorTexture != null)
+            cursorTexture.dispose();
+        if (beepTexture != null)
+            beepTexture.dispose();
+        if (doorOpenTexture != null)
+            doorOpenTexture.dispose();
+        if (doorClosedTexture != null)
+            doorClosedTexture.dispose();
+        if (enemyTexture != null)
+            enemyTexture.dispose();
+        if (flashlightTexture != null)
+            flashlightTexture.dispose();
     }
 
-    public TextureRegion getBeepRegion() { return beepRegion; }
-    public TextureRegion getFlashlightRegion() { return flashlightRegion; }
-}
+    public TextureRegion getBeepRegion() {
+        return beepRegion;
+    }
 
+    public TextureRegion getFlashlightRegion() {
+        return flashlightRegion;
+    }
+}

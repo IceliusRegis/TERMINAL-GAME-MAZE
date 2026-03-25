@@ -22,11 +22,22 @@ public class TransformComponent implements Component {
     public float width = 32;
     public float height = 32;
 
+    public float collisionWidth = 0;
+    public float collisionHeight = 0;
+    public float collisionOffsetX = 0;
+    public float collisionOffsetY = 0;
+
     /**
      * Updates the collision bounds to match current position.
      * Call this after modifying pos.
      */
     public void updateBounds() {
-        bounds.set(pos.x, pos.y, width, height);
+        float bw = (collisionWidth > 0) ? collisionWidth : width;
+        float bh = (collisionHeight > 0) ? collisionHeight : height;
+        bounds.set(
+                pos.x + collisionOffsetX,
+                pos.y + collisionOffsetY,
+                bw,
+                bh);
     }
 }
