@@ -18,8 +18,15 @@ import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.components.WallComponent;
 
 /**
- * MapManager - Owns the TiledMap lifecycle and layered rendering.
+ * MapManager - Owns the TiledMap lifecycle and rendering.
+ *
+ * Responsibilities:
+ * - Loads the .tmx file from disk.
+ * - Creates the TileWorldComponent and adds it to the ECS Engine.
+ * - Renders the visual map layers independently of the main SpriteBatch.
+ * - Safely disposes of heavy map assets to prevent memory leaks.
  */
+
 public class MapManager {
 
     private TiledMap tiledMap;
@@ -27,7 +34,7 @@ public class MapManager {
     private Entity mapEntity;
     private PooledEngine engine;
     private int[] backgroundLayers;
-    private Array<Entity> wallEntities = new Array<>();
+    private final Array<Entity> wallEntities = new Array<>();
 
     public MapManager(PooledEngine engine) {
         this.engine = engine;
@@ -162,11 +169,14 @@ public class MapManager {
         }
     }
 
-    public void renderMap(OrthographicCamera camera) {
-        if (mapRenderer == null || backgroundLayers == null)
+    public void render(OrthographicCamera camera) {
+        // Guard clause: Don't render if the map hasn't loaded yet
+        if (mapRenderer == null)
             return;
+
+        // Tell the renderer what the camera is looking at, then draw the tiles
         mapRenderer.setView(camera);
-        mapRenderer.render(backgroundLayers);
+        mapRenderer.render();
     }
 
     public void dispose() {
