@@ -6,13 +6,17 @@ import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputMultiplexer;
+import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -22,15 +26,13 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.sam.TERMINAL.components.InventoryComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
+import com.sam.TERMINAL.systems.LightingSystem;
 import com.sam.TERMINAL.systems.SaveSystem;
 import com.sam.TERMINAL.Main;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 
 /**
  * MenuScreen — Owns all in-game UI stages: HUD, Settings overlay, Inventory
- * overlay,
- * and the Win/Lose screen.
+ * overlay, and the Win/Lose screen.
  *
  * ── Bug fixes in this revision
  * ────────────────────────────────────────────────
@@ -73,13 +75,13 @@ public class MenuScreen {
     private Texture whitePixel;
     private Texture invTexture;
     private Texture restartTexture;
-    // NOTE: backTexture was declared but never initialised in the original code.
-    // It has been removed to eliminate dead fields and a potential NPE.
+    private Texture jumpscareTexture;
 
     // ── State flags ───────────────────────────────────────────────────────────
     private boolean isSettingsVisible = false;
     private boolean isInventoryVisible = false;
     private boolean isGameOver = false;
+    private boolean isJumpscaring = false;
 
     // ── UI components ─────────────────────────────────────────────────────────
     private BitmapFont font;
@@ -90,6 +92,9 @@ public class MenuScreen {
     // ── ECS / Game references ─────────────────────────────────────────────────
     private final PooledEngine engine;
     private final Main mainGame;
+
+    // ── Audio ─────────────────────────────────────────────────────────────────
+    private Sound jumpscareSound;
 
     // ── BUG 2 FIX: store the global listener so it can be removed before
     // being re-added (prevents accumulation across resetUI() calls).
@@ -119,6 +124,7 @@ public class MenuScreen {
         restartTexture = new Texture(Gdx.files.internal("ui/Restart.png"));
         settingsTexture = new Texture(Gdx.files.internal("ui/settings.png"));
         invTexture = new Texture(Gdx.files.internal("ui/inventory.png"));
+        jumpscareSound = Gdx.audio.newSound(Gdx.files.internal("sfx/jumpscare.mp3"));
 
         createDimmerTexture();
 
@@ -282,9 +288,20 @@ public class MenuScreen {
                         isSettingsVisible = false;
                     updateInputProcessor();
                     return true;
-                }
-                if (keycode == Input.Keys.F5) {
+                } if (keycode == Input.Keys.F5) {
                     saveMapLogic();
+                    return true;
+                } if (keycode == Input.Keys.F1) {
+                    LightingSystem lightSys = engine.getSystem(LightingSystem.class);
+                    if (lightSys != null) {
+                        lightSys.lightingEnabled = !lightSys.lightingEnabled;
+                        Gdx.app.log("DEBUG", "Lighting Enabled: " + lightSys.lightingEnabled);
+                    }
+                    return true;
+                } if (keycode == Input.Keys.ESCAPE) {
+                    isSettingsVisible = !isSettingsVisible; // Toggle on/off
+                    if (isSettingsVisible) isInventoryVisible = false; // Close inventory if opening settings
+                    updateInputProcessor();
                     return true;
                 }
                 return false;
@@ -301,6 +318,7 @@ public class MenuScreen {
     // =========================================================================
 
     public void render(float delta) {
+        // Always act and draw uiStage — keeps the jumpscare timer ticking
         uiStage.act(delta);
         uiStage.draw();
 
@@ -363,6 +381,50 @@ public class MenuScreen {
         uiStage.setKeyboardFocus(restartBtn); // ENTER/SPACE triggers restart
     }
 
+    // =========================================================================
+    // Jumpscare
+    // =========================================================================
+
+    public void showJumpscare() {
+        isJumpscaring = true;
+
+        if (jumpscareTexture != null) jumpscareTexture.dispose();
+        jumpscareTexture = new Texture(Gdx.files.internal("ui/jumpscare.jpeg"));
+
+        uiStage.clear();
+        isSettingsVisible = false;
+        isInventoryVisible = false;
+
+        // 1. Create a solid black background so it doesn't fade into the game world
+        Image blackOverlay = new Image(whitePixel);
+        blackOverlay.setColor(Color.BLACK);
+        blackOverlay.setFillParent(true);
+        uiStage.addActor(blackOverlay);
+
+        // 2. Create the jumpscare image
+        Image jumpscareImg = new Image(jumpscareTexture);
+        jumpscareImg.setFillParent(true);
+        uiStage.addActor(jumpscareImg);
+
+        jumpscareSound.play(1.0f);
+
+        // 3. Sequence: Stay full alpha -> Fade out -> Clean up & Game Over
+        jumpscareImg.addAction(Actions.sequence(
+            Actions.delay(3.0f),              // Show jumpscare for 3 seconds
+            Actions.fadeOut(1.0f),            // Fade to black over 1 second
+            Actions.run(() -> {
+                isJumpscaring = false;
+                if (jumpscareTexture != null) {
+                    jumpscareTexture.dispose();
+                    jumpscareTexture = null;
+                }
+                showGameOver(false);         // Trigger the death screen
+            })
+        ));
+
+        Gdx.input.setInputProcessor(uiStage);
+    }
+
     /**
      * Resets the UI back to the normal in-game HUD (called by Main.resetGame()).
      */
@@ -370,6 +432,7 @@ public class MenuScreen {
         isGameOver = false; // Must be first — clears the guard in updateInputProcessor()
         isSettingsVisible = false;
         isInventoryVisible = false;
+        isJumpscaring = false;
         uiStage.clear();
 
         setupHUD();
@@ -441,6 +504,17 @@ public class MenuScreen {
                             Color.WHITE)))
                     .padRight(20);
         }
+        if (inv != null && inv.hasItem("flashlight")) {
+            Image icon = new Image(mainGame.getFlashlightRegion());
+            itemTable.add(icon).size(64, 64).pad(10);
+            itemTable.add(new Label(
+                    "Flashlight",
+                    new Label.LabelStyle(
+                            new BitmapFont(),
+                            Color.WHITE)))
+                    .padRight(20);
+        }
+        itemTable.invalidateHierarchy();
     }
 
     // =========================================================================
@@ -509,11 +583,14 @@ public class MenuScreen {
         whitePixel.dispose();
         invTexture.dispose();
         restartTexture.dispose();
+        font.dispose();
 
         // BUG 3 FIX: dispose SettingsButton textures via stored reference.
         if (settingsButtonWidget != null) {
             settingsButtonWidget.dispose();
         }
+        if (jumpscareTexture != null) jumpscareTexture.dispose();
+        if (jumpscareSound != null) jumpscareSound.dispose();
     }
 
     // ── State accessors ───────────────────────────────────────────────────────
@@ -527,5 +604,9 @@ public class MenuScreen {
 
     public boolean isGameOver() {
         return isGameOver;
+    }
+
+    public boolean isJumpscaring() {
+        return isJumpscaring;
     }
 }
