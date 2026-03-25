@@ -37,6 +37,7 @@ public class TutorialScene {
         "Interact with nearby objects using E.",
         "Open inventory using TAB.",
         "Use ESC to open settings.",
+        "To quickly save your progress use F5.",
         "Tutorial complete. Entering the maze..."
     };
 
