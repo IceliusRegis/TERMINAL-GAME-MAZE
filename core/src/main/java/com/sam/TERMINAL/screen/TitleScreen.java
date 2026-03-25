@@ -318,7 +318,7 @@ public class TitleScreen {
         rootTable.clear();
 
         SubmenuPanel panel = new SubmenuPanel(24f);
-        Group controlsBody = createLabelWithShadow("WASD / Arrows - Move\nE / SPACE - Interact\nTAB - Inventory\nF5 - Quick Save\nESC - (in-game) Settings", bodyFont, WHITE, BLACK, Align.center);
+        Group controlsBody = createLabelWithShadow("WASD - Move\nE - Interact\nX - Continue\nTAB - Inventory\nF5 - Quick Save\nESC - (in-game) Settings", bodyFont, WHITE, BLACK, Align.center);
         panel.add(wrapForTable(controlsBody)).center().padBottom(24f).row();
         Group back = createMenuOptionWithSelector("BACK", true, WHITE);
         back.addListener(new ClickListener() {
