@@ -211,22 +211,27 @@ public class MenuScreen {
             public boolean keyDown(InputEvent event, int keycode) {
                 if (keycode == Input.Keys.TAB) {
                     isInventoryVisible = !isInventoryVisible;
-                    if (isInventoryVisible) isSettingsVisible = false;
+                    if (isInventoryVisible)
+                        isSettingsVisible = false;
                     updateInputProcessor();
                     return true;
-                } if (keycode == Input.Keys.F5) {
+                }
+                if (keycode == Input.Keys.F5) {
                     saveMapLogic();
                     return true;
-                } if (keycode == Input.Keys.F1) {
+                }
+                if (keycode == Input.Keys.F1) {
                     LightingSystem lightSys = engine.getSystem(LightingSystem.class);
                     if (lightSys != null) {
                         lightSys.lightingEnabled = !lightSys.lightingEnabled;
                         Gdx.app.log("DEBUG", "Lighting Enabled: " + lightSys.lightingEnabled);
                     }
                     return true;
-                } if (keycode == Input.Keys.ESCAPE) {
+                }
+                if (keycode == Input.Keys.ESCAPE) {
                     isSettingsVisible = !isSettingsVisible; // Toggle on/off
-                    if (isSettingsVisible) isInventoryVisible = false; // Close inventory if opening settings
+                    if (isSettingsVisible)
+                        isInventoryVisible = false; // Close inventory if opening settings
                     updateInputProcessor();
                     return true;
                 }
@@ -355,7 +360,8 @@ public class MenuScreen {
     public void showJumpscare() {
         isJumpscaring = true;
 
-        if (jumpscareTexture != null) jumpscareTexture.dispose();
+        if (jumpscareTexture != null)
+            jumpscareTexture.dispose();
         jumpscareTexture = new Texture(Gdx.files.internal("ui/jumpscare.jpeg"));
 
         uiStage.clear();
@@ -373,24 +379,23 @@ public class MenuScreen {
         jumpscareImg.setFillParent(true);
         uiStage.addActor(jumpscareImg);
 
-        jumpscareSound.play(1.0f);
+        jumpscareSound.play(0.6f);
 
         // 3. Sequence: Stay full alpha -> Fade out -> Clean up & Game Over
         jumpscareImg.addAction(Actions.sequence(
-            Actions.delay(3.0f),              // Show jumpscare for 3 seconds
-            Actions.fadeOut(1.0f),            // Fade to black over 1 second
-            Actions.run(() -> {
-                isJumpscaring = false;
-                if (jumpscareTexture != null) {
-                    jumpscareTexture.dispose();
-                    jumpscareTexture = null;
-                }
-                // Reset the guard so showGameOver() rebuilds the UI even if
-                // WinLossSystem set gameOver = true in an earlier frame.
-                isGameOver = false;
-                showGameOver(false);         // Trigger the death screen
-            })
-        ));
+                Actions.delay(3.0f), // Show jumpscare for 3 seconds
+                Actions.fadeOut(1.0f), // Fade to black over 1 second
+                Actions.run(() -> {
+                    isJumpscaring = false;
+                    if (jumpscareTexture != null) {
+                        jumpscareTexture.dispose();
+                        jumpscareTexture = null;
+                    }
+                    // Reset the guard so showGameOver() rebuilds the UI even if
+                    // WinLossSystem set gameOver = true in an earlier frame.
+                    isGameOver = false;
+                    showGameOver(false); // Trigger the death screen
+                })));
 
         Gdx.input.setInputProcessor(uiStage);
     }
@@ -535,8 +540,10 @@ public class MenuScreen {
         if (settingsButtonWidget != null) {
             settingsButtonWidget.dispose();
         }
-        if (jumpscareTexture != null) jumpscareTexture.dispose();
-        if (jumpscareSound != null) jumpscareSound.dispose();
+        if (jumpscareTexture != null)
+            jumpscareTexture.dispose();
+        if (jumpscareSound != null)
+            jumpscareSound.dispose();
     }
 
     // ── State accessors ───────────────────────────────────────────────────────

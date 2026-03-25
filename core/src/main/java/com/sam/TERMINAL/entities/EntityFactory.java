@@ -45,6 +45,8 @@ public class EntityFactory {
         sprite.drawWidth = 128f;
         sprite.drawHeight = 250f;
 
+        sprite.offsetY = 24f;
+
         player.add(engine.createComponent(PlayerComponent.class));
 
         // Persistence Data this is where player position is saved

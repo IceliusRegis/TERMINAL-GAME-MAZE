@@ -232,7 +232,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem(new InteractionSystem(doorOpenRegion));
+        engine.addSystem(new InteractionSystem(doorOpenRegion, batch));
 
         lightingSystem = new LightingSystem(camera);
         if (menuScreen != null) {
@@ -375,9 +375,18 @@ public class Main extends ApplicationAdapter {
             lightingSystem.render();
         }
 
-        // --- DEBUG POLLING ---
+        // --- DEBUG POLLING & HITBOX RENDERING ---
         if (debugManager != null) {
             debugManager.update(lightingSystem);
+            debugManager.renderHitboxes(engine, camera);
+
+            // Draw BFS path lines when debug hitboxes are visible
+            if (debugManager.showHitboxes) {
+                EnemySystem enemySys = engine.getSystem(EnemySystem.class);
+                if (enemySys != null) {
+                    enemySys.renderDebug(camera);
+                }
+            }
         }
 
         // Draw UI on top
@@ -430,7 +439,7 @@ public class Main extends ApplicationAdapter {
         batch.dispose();
         if (mapManager != null) mapManager.dispose();
         if (lightingSystem != null) lightingSystem.dispose();
-        debugManager = null;
+        if (debugManager != null) debugManager.dispose();
         if (openingScene != null) openingScene.dispose();
         if (titleScreen != null) titleScreen.dispose();
         if (tutorialScene != null) tutorialScene.dispose();
