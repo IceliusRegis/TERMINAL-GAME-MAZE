@@ -64,16 +64,10 @@ import com.sam.TERMINAL.Main;
  * ─────────────────────────────────────────────────────────────────────────────
  */
 public class MenuScreen {
-
-    // ── Stages ────────────────────────────────────────────────────────────────
-    private final Stage uiStage;
-    private final Stage settingsStage;
-    private final Stage inventoryStage;
-
-    // ── Textures ──────────────────────────────────────────────────────────────
-    private Texture settingsTexture;
-    private Texture whitePixel;
-    private Texture invTexture;
+    private Stage uiStage;
+    private Stage settingsStage;
+    private Stage inventoryStage;
+    private Texture settingsTexture, backTexture, whitePixel, invTexture;
     private Texture restartTexture;
     private Texture jumpscareTexture;
 
@@ -110,7 +104,6 @@ public class MenuScreen {
     public MenuScreen(SpriteBatch batch, final PooledEngine engine, final Main mainGame) {
         this.engine = engine;
         this.mainGame = mainGame;
-
         float w = Gdx.graphics.getWidth();
         float h = Gdx.graphics.getHeight();
 
@@ -120,7 +113,6 @@ public class MenuScreen {
 
         font = new BitmapFont();
         font.getData().setScale(2f);
-
         restartTexture = new Texture(Gdx.files.internal("ui/Restart.png"));
         settingsTexture = new Texture(Gdx.files.internal("ui/settings.png"));
         invTexture = new Texture(Gdx.files.internal("ui/inventory.png"));
@@ -128,7 +120,7 @@ public class MenuScreen {
 
         createDimmerTexture();
 
-        // ── HUD: Settings gear (top-left) ─────────────────────────────────────
+        // --- HUD SETUP ---
         Table mainRoot = new Table();
         mainRoot.setFillParent(true);
         mainRoot.top().left();
@@ -144,7 +136,7 @@ public class MenuScreen {
         mainRoot.add(settingsBtn).size(40, 40).pad(10);
         uiStage.addActor(mainRoot);
 
-        // ── Settings overlay ─────────────────────────────────────────────────
+        // --- SETTINGS WINDOW SETUP ---
         Table settingsRoot = new Table();
         settingsRoot.setFillParent(true);
         settingsStage.addActor(settingsRoot);
@@ -165,9 +157,8 @@ public class MenuScreen {
                     updateInputProcessor();
                 });
 
-        // ── HUD: Inventory button (bottom-center) ─────────────────────────────
-        ImageButton inventoryBtn = new ImageButton(
-                new TextureRegionDrawable(new TextureRegion(invTexture)));
+        // --- INVENTORY SETUP ---
+        ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
         bottomTable = new Table();
         bottomTable.setFillParent(true);
         bottomTable.bottom();
@@ -182,15 +173,12 @@ public class MenuScreen {
             }
         });
 
-        // ── Inventory overlay ─────────────────────────────────────────────────
         Table inventoryRoot = new Table();
         inventoryRoot.setFillParent(true);
         inventoryStage.addActor(inventoryRoot);
-
         inventoryWindow = new Table();
         TextureRegionDrawable windowBg = new TextureRegionDrawable(new TextureRegion(whitePixel));
-        inventoryWindow.setBackground(
-                windowBg.tint(new Color(0.8f, 0.8f, 0.8f, 0.15f)));
+        inventoryWindow.setBackground(windowBg.tint(new com.badlogic.gdx.graphics.Color(0.8f, 0.8f, 0.8f, 0.15f)));
         inventoryRoot.center().add(inventoryWindow).size(500, 400);
 
         // The exit (close) button lives in inventoryWindow and is never cleared.
@@ -206,73 +194,12 @@ public class MenuScreen {
         itemTable.top().left();
         inventoryWindow.add(itemTable).expand().fill();
 
-        // ── Global keyboard shortcuts (TAB / F5) ──────────────────────────────
         setupGlobalListener();
         updateInputProcessor();
     }
 
-    // =========================================================================
-    // Input Routing
-    // =========================================================================
-
-    /**
-     * Routes raw input to the correct stage(s).
-     *
-     * ── BUG 1 FIX ─────────────────────────────────────────────────────────────
-     * Overlay stages (settingsStage / inventoryStage) are now added to the
-     * InputMultiplexer FIRST so they receive priority for mouse/touch events.
-     *
-     * Previously uiStage was first, which meant the Settings gear icon on uiStage
-     * intercepted clicks intended for the Back button on settingsStage (both live
-     * at the top-left corner of the screen). By giving the overlay stage priority,
-     * the Back button now correctly receives its click and fires onClose.
-     *
-     * uiStage is still included second so it continues to receive keyboard events
-     * (TAB, F5) via the global listener attached to it.
-     * ──────────────────────────────────────────────────────────────────────────
-     */
-    private void updateInputProcessor() {
-        // B-5 Guard: while the game-over screen is active, uiStage owns input
-        // exclusively.
-        if (isGameOver) {
-            Gdx.input.setInputProcessor(uiStage);
-            return;
-        }
-
-        if (isSettingsVisible) {
-            InputMultiplexer multiplexer = new InputMultiplexer();
-            // FIRST: settings overlay — must intercept clicks before uiStage so
-            // the Back/Return button is not blocked by the gear icon beneath it.
-            multiplexer.addProcessor(settingsStage);
-            // SECOND: HUD stage — fallback for global keyboard shortcuts (TAB, F5).
-            multiplexer.addProcessor(uiStage);
-            Gdx.input.setInputProcessor(multiplexer);
-
-        } else if (isInventoryVisible) {
-            InputMultiplexer multiplexer = new InputMultiplexer();
-            // FIRST: inventory overlay gets priority for its close button / item clicks.
-            multiplexer.addProcessor(inventoryStage);
-            // SECOND: HUD stage — fallback for global keyboard shortcuts (TAB to close).
-            multiplexer.addProcessor(uiStage);
-            Gdx.input.setInputProcessor(multiplexer);
-
-        } else {
-            Gdx.input.setInputProcessor(uiStage);
-        }
-    }
-
-    /**
-     * Registers global keyboard shortcuts (TAB → toggle inventory, F5 → save).
-     *
-     * ── BUG 2 FIX ─────────────────────────────────────────────────────────────
-     * The listener is stored in the {@code globalListener} field. Before adding a
-     * new listener, the old one is explicitly removed from all three stages. This
-     * prevents duplicate listeners from accumulating every time resetUI() is
-     * called.
-     * ──────────────────────────────────────────────────────────────────────────
-     */
     private void setupGlobalListener() {
-        // Remove the previously registered listener (if any) before re-adding.
+        // BUG 2 FIX: remove the old listener before creating a new one.
         if (globalListener != null) {
             uiStage.removeListener(globalListener);
             settingsStage.removeListener(globalListener);
@@ -284,8 +211,7 @@ public class MenuScreen {
             public boolean keyDown(InputEvent event, int keycode) {
                 if (keycode == Input.Keys.TAB) {
                     isInventoryVisible = !isInventoryVisible;
-                    if (isInventoryVisible)
-                        isSettingsVisible = false;
+                    if (isInventoryVisible) isSettingsVisible = false;
                     updateInputProcessor();
                     return true;
                 } if (keycode == Input.Keys.F5) {
@@ -311,6 +237,47 @@ public class MenuScreen {
         uiStage.addListener(globalListener);
         settingsStage.addListener(globalListener);
         inventoryStage.addListener(globalListener);
+    }
+
+    // =========================================================================
+    // Helper Methods
+    // =========================================================================
+
+    private void saveMapLogic() {
+        if (engine != null) {
+            SaveSystem saveSys = engine.getSystem(SaveSystem.class);
+            if (saveSys != null)
+                saveSys.triggerManualSave("saveFile.json");
+        }
+    }
+
+    private void createDimmerTexture() {
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pixmap.setColor(1, 1, 1, 1);
+        pixmap.fill();
+        whitePixel = new Texture(pixmap);
+        pixmap.dispose();
+    }
+
+    private void updateInputProcessor() {
+        if (isGameOver) {
+            Gdx.input.setInputProcessor(uiStage);
+            return;
+        }
+
+        if (isSettingsVisible) {
+            InputMultiplexer multiplexer = new InputMultiplexer();
+            multiplexer.addProcessor(settingsStage);
+            multiplexer.addProcessor(uiStage);
+            Gdx.input.setInputProcessor(multiplexer);
+        } else if (isInventoryVisible) {
+            InputMultiplexer multiplexer = new InputMultiplexer();
+            multiplexer.addProcessor(inventoryStage);
+            multiplexer.addProcessor(uiStage);
+            Gdx.input.setInputProcessor(multiplexer);
+        } else {
+            Gdx.input.setInputProcessor(uiStage);
+        }
     }
 
     // =========================================================================
@@ -444,8 +411,41 @@ public class MenuScreen {
     }
 
     // =========================================================================
-    // HUD Builder (used by constructor and resetUI)
+    // Dimmer / Overlay Helpers
     // =========================================================================
+
+    private void drawDim(Stage stage) {
+        stage.getBatch().setProjectionMatrix(stage.getCamera().combined);
+        stage.getBatch().begin();
+        stage.getBatch().setColor(0, 0, 0, 0.6f);
+        stage.getBatch().draw(whitePixel, 0, 0,
+                stage.getViewport().getWorldWidth(),
+                stage.getViewport().getWorldHeight());
+        stage.getBatch().setColor(1, 1, 1, 1);
+        stage.getBatch().end();
+    }
+
+    private void drawInventoryDim(Stage stage) {
+        stage.getBatch().setProjectionMatrix(stage.getCamera().combined);
+        stage.getBatch().begin();
+        stage.getBatch().setColor(0, 0, 0, 0.5f);
+        stage.getBatch().draw(whitePixel,
+                (stage.getViewport().getWorldWidth() - 500) / 2f,
+                (stage.getViewport().getWorldHeight() - 400) / 2f,
+                500, 400);
+        stage.getBatch().setColor(1, 1, 1, 1);
+        stage.getBatch().end();
+    }
+
+    // =========================================================================
+    // Resize / Dispose / Accessors
+    // =========================================================================
+
+    public void resize(int width, int height) {
+        uiStage.getViewport().update(width, height, true);
+        settingsStage.getViewport().update(width, height, true);
+        inventoryStage.getViewport().update(width, height, true);
+    }
 
     private void setupHUD() {
         uiStage.clear();
@@ -518,63 +518,6 @@ public class MenuScreen {
                     .padRight(20);
         }
         itemTable.invalidateHierarchy();
-    }
-
-    // =========================================================================
-    // Dimmer / Overlay Helpers
-    // =========================================================================
-
-    private void createDimmerTexture() {
-        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(1, 1, 1, 1);
-        pixmap.fill();
-        whitePixel = new Texture(pixmap);
-        pixmap.dispose();
-    }
-
-    private void drawDim(Stage stage) {
-        stage.getBatch().setProjectionMatrix(stage.getCamera().combined);
-        stage.getBatch().begin();
-        stage.getBatch().setColor(0, 0, 0, 0.6f);
-        stage.getBatch().draw(whitePixel, 0, 0,
-                stage.getViewport().getWorldWidth(),
-                stage.getViewport().getWorldHeight());
-        stage.getBatch().setColor(1, 1, 1, 1);
-        stage.getBatch().end();
-    }
-
-    private void drawInventoryDim(Stage stage) {
-        stage.getBatch().setProjectionMatrix(stage.getCamera().combined);
-        stage.getBatch().begin();
-        stage.getBatch().setColor(0, 0, 0, 0.5f);
-        stage.getBatch().draw(whitePixel,
-                (stage.getViewport().getWorldWidth() - 500) / 2f,
-                (stage.getViewport().getWorldHeight() - 400) / 2f,
-                500, 400);
-        stage.getBatch().setColor(1, 1, 1, 1);
-        stage.getBatch().end();
-    }
-
-    // =========================================================================
-    // Save Helper
-    // =========================================================================
-
-    private void saveMapLogic() {
-        if (engine != null) {
-            SaveSystem saveSys = engine.getSystem(SaveSystem.class);
-            if (saveSys != null)
-                saveSys.triggerManualSave("saveFile.json");
-        }
-    }
-
-    // =========================================================================
-    // Resize / Dispose / Accessors
-    // =========================================================================
-
-    public void resize(int width, int height) {
-        uiStage.getViewport().update(width, height, true);
-        settingsStage.getViewport().update(width, height, true);
-        inventoryStage.getViewport().update(width, height, true);
     }
 
     public void dispose() {

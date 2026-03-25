@@ -33,9 +33,6 @@ public class SpriteComponent implements Component {
     public float drawWidth;
     public float drawHeight;
 
-    public float offsetX = 0f;
-    public float offsetY = 0f;
-
     public boolean flipX = false;
     public boolean flipY = false;
 }

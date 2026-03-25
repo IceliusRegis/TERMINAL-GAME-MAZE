@@ -100,16 +100,16 @@ public class MovementSystem extends IteratingSystem {
         }
     }
 
-        private boolean checkEntityCollison(Entity player, TransformComponent playerTransfrom) {
-            for (Entity wall : getEngine().getEntitiesFor(Family.all(CollisionComponent.class).get())) {
-                if (wall == player) continue;
-                TransformComponent wallTransform = transformMapper.get(wall);
-                if (playerTransfrom.bounds.overlaps(wallTransform.bounds)) {
-                    return true;
-                }
+    private boolean checkEntityCollison(Entity player, TransformComponent playerTransfrom) {
+        for (Entity wall : getEngine().getEntitiesFor(Family.all(CollisionComponent.class).get())) {
+            if (wall == player) continue;
+            TransformComponent wallTransform = transformMapper.get(wall);
+            if (playerTransfrom.bounds.overlaps(wallTransform.bounds)) {
+                return true;
             }
-            return  false;
         }
+        return  false;
+    }
 
         private boolean checkTileCollision (TransformComponent transform, TileWorldComponent world) {
             if (world == null) return false;

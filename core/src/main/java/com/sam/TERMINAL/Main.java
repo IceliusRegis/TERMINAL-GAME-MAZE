@@ -6,6 +6,7 @@ import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -19,21 +20,32 @@ import com.sam.TERMINAL.entities.EntitySpawner;
 import com.sam.TERMINAL.entities.MapManager;
 import com.sam.TERMINAL.persistence.GameData;
 import com.sam.TERMINAL.persistence.SaveManager;
+import com.sam.TERMINAL.screen.OpeningScene;
+import com.sam.TERMINAL.screen.TutorialScene;
 import com.sam.TERMINAL.screen.TitleScreen;
 import com.sam.TERMINAL.systems.*;
 
 public class Main extends ApplicationAdapter {
+    private enum FlowState {
+        OPENING, TITLE, TUTORIAL, GAME
+    }
 
     private PooledEngine engine;
     private SpriteBatch batch;
     private OrthographicCamera camera;
     private Viewport viewport;
     private MenuScreen menuScreen;
+    private OpeningScene openingScene;
     private TitleScreen titleScreen;
-    private boolean showingTitleScreen = true;
+    private TutorialScene tutorialScene;
+    private FlowState flowState = FlowState.OPENING;
     private MapManager mapManager;
     private LightingSystem lightingSystem;
     private DebugManager debugManager;
+    private Music titleMusic;
+    private Music tutorialMusic;
+    private float titleMusicDelayTimer;
+    private boolean titleMusicStarted;
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
@@ -51,23 +63,63 @@ public class Main extends ApplicationAdapter {
     public void create() {
         initEngine();
         loadAssets();
+        loadTitleMusic();
+        openingScene = new OpeningScene(batch, this::onOpeningComplete);
+        flowState = FlowState.OPENING;
+    }
+
+    private void onOpeningComplete() {
+        if (openingScene != null) {
+            openingScene.dispose();
+            openingScene = null;
+        }
         boolean hasSave = SaveManager.load(MAIN_SAVE_FILE) != null;
         titleScreen = new TitleScreen(batch, hasSave, this::onTitleScreenChoice);
+        flowState = FlowState.TITLE;
     }
 
     private void onTitleScreenChoice(boolean loadExisting) {
-        if (!loadExisting) {
-            SaveManager.delete(MAIN_SAVE_FILE);
-            SaveManager.delete(TEMP_SAVE_FILE);
-        }
-        createUI();
-        initSystems();
-        handleGameStart();
         if (titleScreen != null) {
             titleScreen.dispose();
             titleScreen = null;
         }
-        showingTitleScreen = false;
+
+        if (loadExisting) {
+            startGameProper();
+        } else {
+            SaveManager.delete(MAIN_SAVE_FILE);
+            SaveManager.delete(TEMP_SAVE_FILE);
+            startTutorial();
+        }
+
+    }
+
+    private void startTutorial() {
+        stopTitleMusic();
+        playTutorialMusic();
+        tutorialScene = new TutorialScene(batch, this::onTutorialComplete);
+        flowState = FlowState.TUTORIAL;
+    }
+
+    private void onTutorialComplete() {
+        // Never dispose the tutorial Stage or swap game state from inside Scene2D
+        // input;
+        // that re-enters Stage and can crash. Run after the frame/input stack unwinds.
+        Gdx.app.postRunnable(() -> {
+            if (tutorialScene != null) {
+                tutorialScene.dispose();
+                tutorialScene = null;
+            }
+            startGameProper();
+        });
+    }
+
+    private void startGameProper() {
+        stopTitleMusic();
+        createUI();
+        initSystems();
+        handleGameStart();
+        flowState = FlowState.GAME;
     }
 
     private void initEngine() {
@@ -106,6 +158,55 @@ public class Main extends ApplicationAdapter {
         enemyRegion = new TextureRegion(enemyTexture);
     }
 
+    private void loadTitleMusic() {
+        if (!Gdx.files.internal("music/TSMusic.wav").exists())
+            return;
+        try {
+            titleMusic = Gdx.audio.newMusic(Gdx.files.internal("music/TSMusic.wav"));
+            titleMusic.setLooping(true);
+            titleMusic.setVolume(0.6f);
+        } catch (com.badlogic.gdx.utils.GdxRuntimeException e) {
+            Gdx.app.log("Main", "Could not load TSMusic.wav: " + e.getMessage());
+        }
+    }
+
+    private void updateTitleMusic(float delta) {
+        if (titleMusic == null || titleMusicStarted)
+            return;
+        titleMusicDelayTimer += delta;
+        if (titleMusicDelayTimer >= 2f) {
+            titleMusic.play();
+            titleMusicStarted = true;
+        }
+    }
+
+    private void stopTitleMusic() {
+        if (titleMusic != null) {
+            titleMusic.stop();
+        }
+    }
+
+    private void playTutorialMusic() {
+        if (!Gdx.files.internal("music/secBG.wav").exists())
+            return;
+        try {
+            tutorialMusic = Gdx.audio.newMusic(Gdx.files.internal("music/secBG.wav"));
+            tutorialMusic.setLooping(true);
+            tutorialMusic.setVolume(0.65f);
+            tutorialMusic.play();
+        } catch (com.badlogic.gdx.utils.GdxRuntimeException e) {
+            Gdx.app.log("Main", "Could not load secBG.wav: " + e.getMessage());
+        }
+    }
+
+    private void stopTutorialMusic() {
+        if (tutorialMusic != null) {
+            tutorialMusic.stop();
+            tutorialMusic.dispose();
+            tutorialMusic = null;
+        }
+    }
+
     private void initSystems() {
         // --- MOVEMENT SYSTEM LINKING ---
         MovementSystem moveSystem = new MovementSystem();
@@ -131,7 +232,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem(new InteractionSystem(doorOpenRegion, batch));
+        engine.addSystem(new InteractionSystem(doorOpenRegion));
 
         lightingSystem = new LightingSystem(camera);
         if (menuScreen != null) {
@@ -208,13 +309,6 @@ public class Main extends ApplicationAdapter {
             TransformComponent t = enemy.getComponent(TransformComponent.class);
             t.pos.set(5 * 32f, 40 * 32f);
             t.updateBounds();
-
-            // Clear stale BFS path after teleporting enemy back to spawn
-            EnemyComponent ec = enemy.getComponent(EnemyComponent.class);
-            if (ec != null) {
-                ec.path.clear();
-                ec.pathTimer = 0f;
-            }
         }
 
         // Reset EnemySystem triggered flag so it can fire again
@@ -232,15 +326,32 @@ public class Main extends ApplicationAdapter {
         float delta = Gdx.graphics.getDeltaTime();
         ScreenUtils.clear(0f, 0f, 0f, 1);
 
-        if (showingTitleScreen && titleScreen != null) {
-            titleScreen.render(delta);
+        if (flowState == FlowState.OPENING) {
+            updateTitleMusic(delta);
+            if (openingScene != null)
+                openingScene.render(delta);
+            drawCursor();
+            return;
+        }
+
+        if (flowState == FlowState.TITLE) {
+            updateTitleMusic(delta);
+            if (titleScreen != null)
+                titleScreen.render(delta);
+            drawCursor();
+            return;
+        }
+
+        if (flowState == FlowState.TUTORIAL) {
+            if (tutorialScene != null)
+                tutorialScene.render(delta);
             drawCursor();
             return;
         }
 
         // --- MAP LAYER (behind sprites) ---
         if (mapManager != null) {
-            mapManager.renderMap(camera);
+            mapManager.render(camera);
         }
 
         // 2. Draw the Game World (ECS entities)
@@ -259,14 +370,6 @@ public class Main extends ApplicationAdapter {
         }
         batch.end();
 
-        // Removed: PASS 2 WALLS LAYER
-
-        // 2.5. Debug BFS path lines (between sprites and lighting)
-        EnemySystem enemySystem = engine.getSystem(EnemySystem.class);
-        if (enemySystem != null) {
-            enemySystem.renderDebug(camera);
-        }
-
         // 3. Lighting overlay (outside SpriteBatch, after sprites)
         if (lightingSystem != null) {
             lightingSystem.render();
@@ -275,7 +378,6 @@ public class Main extends ApplicationAdapter {
         // --- DEBUG POLLING ---
         if (debugManager != null) {
             debugManager.update(lightingSystem);
-            debugManager.renderHitboxes(engine, camera);
         }
 
         // Draw UI on top
@@ -312,8 +414,12 @@ public class Main extends ApplicationAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, false);
+        if (openingScene != null)
+            openingScene.resize(width, height);
         if (titleScreen != null)
             titleScreen.resize(width, height);
+        if (tutorialScene != null)
+            tutorialScene.resize(width, height);
         if (menuScreen != null)
             menuScreen.resize(width, height);
     }
@@ -321,34 +427,23 @@ public class Main extends ApplicationAdapter {
     @Override
     public void dispose() {
         // Clean up resources to prevent memory leaks
-        InteractionSystem interactionSystem = engine.getSystem(InteractionSystem.class);
-        if (interactionSystem != null)
-            interactionSystem.dispose();
         batch.dispose();
-        if (mapManager != null)
-            mapManager.dispose();
-        if (lightingSystem != null)
-            lightingSystem.dispose();
-        if (debugManager != null)
-            debugManager.dispose();
-        if (titleScreen != null)
-            titleScreen.dispose();
-        if (menuScreen != null)
-            menuScreen.dispose();
-        if (playerSpriteSheet != null)
-            playerSpriteSheet.dispose();
-        if (cursorTexture != null)
-            cursorTexture.dispose();
-        if (beepTexture != null)
-            beepTexture.dispose();
-        if (doorOpenTexture != null)
-            doorOpenTexture.dispose();
-        if (doorClosedTexture != null)
-            doorClosedTexture.dispose();
-        if (enemyTexture != null)
-            enemyTexture.dispose();
-        if (flashlightTexture != null)
-            flashlightTexture.dispose();
+        if (mapManager != null) mapManager.dispose();
+        if (lightingSystem != null) lightingSystem.dispose();
+        debugManager = null;
+        if (openingScene != null) openingScene.dispose();
+        if (titleScreen != null) titleScreen.dispose();
+        if (tutorialScene != null) tutorialScene.dispose();
+        if (menuScreen != null) menuScreen.dispose();
+        if (titleMusic != null) titleMusic.dispose();
+        stopTutorialMusic();
+        if (playerSpriteSheet != null) playerSpriteSheet.dispose();
+        if (cursorTexture != null) cursorTexture.dispose();
+        if (beepTexture != null) beepTexture.dispose();
+        if (doorOpenTexture != null) doorOpenTexture.dispose();
+        if (doorClosedTexture != null) doorClosedTexture.dispose();
+        if (enemyTexture != null) enemyTexture.dispose();
+        if (flashlightTexture != null) flashlightTexture.dispose();
     }
 
     public TextureRegion getBeepRegion() {
