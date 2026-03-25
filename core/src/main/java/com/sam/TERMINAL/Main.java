@@ -122,7 +122,11 @@ public class Main extends ApplicationAdapter {
             });
         }));
 
-        engine.addSystem(new WinLossSystem(this));
+        WinLossSystem winLossSystem = new WinLossSystem(this);
+        if (menuScreen != null) {
+            winLossSystem.setMenuScreen(menuScreen);
+        }
+        engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
         engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
@@ -277,12 +281,16 @@ public class Main extends ApplicationAdapter {
         // Draw UI on top
         menuScreen.render(delta);
 
-        // Check win/loss — guarded so jumpscare isn't interrupted
+        // Check win/loss — guarded so jumpscare isn't interrupted.
+        // During a jumpscare, showGameOver() is called by the jumpscare's own
+        // fade-out action — do NOT call it here or it races the animation.
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
-        if (wls.win && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
-            menuScreen.showGameOver(true);
-        } else if (wls.gameOver && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
-            menuScreen.showGameOver(false);
+        if (!menuScreen.isJumpscaring()) {
+            if (wls.win && !menuScreen.isGameOver()) {
+                menuScreen.showGameOver(true);
+            } else if (wls.gameOver && !menuScreen.isGameOver()) {
+                menuScreen.showGameOver(false);
+            }
         }
 
         drawCursor();

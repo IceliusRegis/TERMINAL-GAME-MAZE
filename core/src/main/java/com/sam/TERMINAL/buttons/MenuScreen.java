@@ -418,6 +418,9 @@ public class MenuScreen {
                     jumpscareTexture.dispose();
                     jumpscareTexture = null;
                 }
+                // Reset the guard so showGameOver() rebuilds the UI even if
+                // WinLossSystem set gameOver = true in an earlier frame.
+                isGameOver = false;
                 showGameOver(false);         // Trigger the death screen
             })
         ));

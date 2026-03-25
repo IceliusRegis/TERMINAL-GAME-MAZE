@@ -7,6 +7,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.ashley.core.EntitySystem;
 import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.Main;
+import com.sam.TERMINAL.buttons.MenuScreen;
 
 /**
  * WinLossSystem — Checks win and lose conditions each frame.
@@ -18,12 +19,18 @@ import com.sam.TERMINAL.Main;
 public class WinLossSystem extends EntitySystem {
 
     private Main mainGame;
+    private MenuScreen menuScreen;
     public boolean gameOver = false;
     public boolean win = false;
 
     public WinLossSystem(Main main) {
         // Priority 0 — runs in default order
         this.mainGame = main;
+    }
+
+    /** Allows Main to inject MenuScreen after construction. */
+    public void setMenuScreen(MenuScreen menuScreen) {
+        this.menuScreen = menuScreen;
     }
 
     @Override
@@ -42,6 +49,11 @@ public class WinLossSystem extends EntitySystem {
             for (Entity e : enemies) {
                 TransformComponent eT = e.getComponent(TransformComponent.class);
                 if (eT != null && eT.bounds.overlaps(pT.bounds)) {
+                    // If a jumpscare is already playing, let it finish and
+                    // call showGameOver() at the end of its animation.
+                    if (menuScreen != null && menuScreen.isJumpscaring()) {
+                        return;
+                    }
                     Gdx.app.log("TERMINAL", "YOU DIED - GAME OVER");
                     gameOver = true;
                     return;

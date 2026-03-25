@@ -35,6 +35,9 @@ public class EnemySystem extends IteratingSystem {
     /** Pixels — "close enough" to a waypoint to snap and advance. */
     private static final float ARRIVAL_THRESHOLD = 4f;
 
+    /** Pixels — distance at which the enemy "catches" the player and triggers the callback. */
+    private static final float CATCH_THRESHOLD = 16f;
+
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
             .getFor(TransformComponent.class);
     private final ComponentMapper<EnemyComponent> enemyMapper = ComponentMapper.getFor(EnemyComponent.class);
@@ -45,8 +48,34 @@ public class EnemySystem extends IteratingSystem {
     /** ShapeRenderer for drawing debug BFS path lines. */
     private ShapeRenderer debugRenderer;
 
+    /** Callback fired when the enemy catches the player (e.g. jumpscare). */
+    private final Runnable onCatchCallback;
+
+    /** Guard flag — true once the callback has fired, preventing repeat triggers. */
+    private boolean triggered;
+
+    /** No-arg constructor — no catch callback. */
     public EnemySystem() {
+        this(null);
+    }
+
+    /**
+     * Constructor that accepts a catch callback (e.g. a jumpscare trigger).
+     *
+     * @param onCatchCallback Runnable invoked once when the enemy reaches the player.
+     */
+    public EnemySystem(Runnable onCatchCallback) {
         super(Family.all(EnemyComponent.class, TransformComponent.class).get());
+        this.onCatchCallback = onCatchCallback;
+    }
+
+    /**
+     * Resets the triggered flag so the catch callback can fire again
+     * (e.g. after a game reset).
+     */
+    public void reset() {
+        triggered = false;
+        cachedPlayer = null;
     }
 
     // -----------------------------------------------------------------------
@@ -127,6 +156,12 @@ public class EnemySystem extends IteratingSystem {
 
             // CRITICAL: Always update bounds after moving
             enemyT.updateBounds();
+        }
+
+        // 6. Check if enemy caught the player — fire callback once
+        if (!triggered && onCatchCallback != null && enemyT.bounds.overlaps(playerT.bounds)) {
+            triggered = true;
+            onCatchCallback.run();
         }
     }
 
