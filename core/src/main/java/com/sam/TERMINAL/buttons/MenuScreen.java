@@ -350,7 +350,7 @@ public class MenuScreen {
 
         // Dark background
         Image dimmer = new Image(whitePixel);
-        dimmer.setColor(0, 0, 0, 0.8f);
+        dimmer.setColor(0, 0, 0, 1f);
         dimmer.setFillParent(true);
         uiStage.addActor(dimmer);
 
