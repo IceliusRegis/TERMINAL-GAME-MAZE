@@ -46,6 +46,11 @@ public class Main extends ApplicationAdapter {
     private Music tutorialMusic;
     private float titleMusicDelayTimer;
     private boolean titleMusicStarted;
+    private static final float CURSOR_HIDE_DELAY_SECONDS = 5f;
+    private float cursorIdleTimer = CURSOR_HIDE_DELAY_SECONDS;
+    private int lastPointerX = Integer.MIN_VALUE;
+    private int lastPointerY = Integer.MIN_VALUE;
+    private boolean cursorVisible;
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
@@ -66,6 +71,9 @@ public class Main extends ApplicationAdapter {
         loadTitleMusic();
         openingScene = new OpeningScene(batch, this::onOpeningComplete);
         flowState = FlowState.OPENING;
+        lastPointerX = Gdx.input.getX();
+        lastPointerY = Gdx.input.getY();
+        cursorVisible = false;
     }
 
     private void onOpeningComplete() {
@@ -325,6 +333,7 @@ public class Main extends ApplicationAdapter {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
         ScreenUtils.clear(0f, 0f, 0f, 1);
+        updateCursorVisibility(delta);
 
         if (flowState == FlowState.OPENING) {
             updateTitleMusic(delta);
@@ -408,6 +417,7 @@ public class Main extends ApplicationAdapter {
     }
 
     private void drawCursor() {
+        if (!cursorVisible) return;
         batch.getProjectionMatrix().setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         float scale = Gdx.graphics.getWidth() / 800f;
         float cursorSize = 48 * scale;
@@ -418,6 +428,23 @@ public class Main extends ApplicationAdapter {
             batch.draw(cursorTexture, mouseX, mouseY - cursorSize, cursorSize, cursorSize);
         }
         batch.end();
+    }
+
+    private void updateCursorVisibility(float delta) {
+        int currentX = Gdx.input.getX();
+        int currentY = Gdx.input.getY();
+        boolean pointerMoved = currentX != lastPointerX || currentY != lastPointerY;
+        if (pointerMoved) {
+            cursorVisible = true; // show cursor immediately when mouse moves
+            cursorIdleTimer = 0f;
+        } else if (cursorVisible) {
+            cursorIdleTimer += delta;
+            if (cursorIdleTimer >= CURSOR_HIDE_DELAY_SECONDS) {
+                cursorVisible = false; // hide cursor after 5 seconds without movement
+            }
+        }
+        lastPointerX = currentX;
+        lastPointerY = currentY;
     }
 
     @Override
