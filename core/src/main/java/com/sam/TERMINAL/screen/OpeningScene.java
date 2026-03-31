@@ -22,6 +22,8 @@ public class OpeningScene {
     private final BitmapFont terminalFont;
     private final OpeningCompleteListener listener;
     private final GlyphLayout layout = new GlyphLayout();
+    private static final float[] TEXT_START_TIMES = {2f, 8f, 14f};
+    private static final float OPENING_END_TIME = 21f;
 
     private float elapsed;
     private boolean completed;
@@ -42,7 +44,8 @@ public class OpeningScene {
 
     public void render(float delta) {
         elapsed += delta;
-        if (!completed && elapsed >= 21f) {
+        handleSkipInput();
+        if (!completed && elapsed >= OPENING_END_TIME) {
             completed = true;
             listener.onComplete();
             return;
@@ -55,6 +58,24 @@ public class OpeningScene {
         drawCenteredText("Gateway presents", bodyFont, 8f, 5f);
         drawCenteredText("TERMINAL", terminalFont, 14f, 5f);
         batch.end();
+    }
+
+    private void handleSkipInput() {
+        boolean skipPressed = Gdx.input.isKeyJustPressed(com.badlogic.gdx.Input.Keys.X)
+            || Gdx.input.isKeyJustPressed(com.badlogic.gdx.Input.Keys.SPACE)
+            || Gdx.input.justTouched();
+        if (!skipPressed || completed) return;
+        skipToNextText();
+    }
+
+    private void skipToNextText() {
+        for (float startTime : TEXT_START_TIMES) {
+            if (elapsed < startTime) {
+                elapsed = startTime;
+                return;
+            }
+        }
+        elapsed = OPENING_END_TIME;
     }
 
     private void drawCenteredText(String text, BitmapFont font, float start, float duration) {

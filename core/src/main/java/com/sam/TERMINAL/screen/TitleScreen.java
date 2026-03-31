@@ -42,6 +42,8 @@ public class TitleScreen {
     private static final int SHADOW_OFFSET_Y = -2;
     private static final float SUBMENU_PANEL_WIDTH = 400f;
     private static final float SCROLL_AMOUNT = 40f;
+    private static final float BASE_WIDTH = 1600f;
+    private static final float BASE_HEIGHT = 900f;
 
     private final Stage stage;
     private final Texture backgroundTexture;
@@ -63,6 +65,7 @@ public class TitleScreen {
     private Sound soundReturn;
 
     private float stateTime;
+    private float uiScale = 1f;
 
     public TitleScreen(SpriteBatch batch, boolean hasSaveFile, TitleScreenListener listener) {
         this.hasSaveFile = hasSaveFile;
@@ -74,9 +77,10 @@ public class TitleScreen {
 
         backgroundTexture = new Texture(Gdx.files.internal("ui/title_background.jpg"));
 
-        titleFont = loadFont("fonts/BIOSfontII.ttf", 72);
+        titleFont = loadFont("fonts/BIOSfontII.ttf", 80);
         menuFont = loadFont("fonts/BIOSfontII.ttf", 32);
         bodyFont = loadFont("fonts/Abaddon Light.ttf", 22);
+        updateFontScale(w, h);
 
         loadSounds();
         rootTable = new Table();
@@ -209,6 +213,15 @@ public class TitleScreen {
             case ABOUT: showAbout(); break;
             case CREDITS: showCredits(); break;
         }
+    }
+
+    private void updateFontScale(float width, float height) {
+        float widthScale = width / BASE_WIDTH;
+        float heightScale = height / BASE_HEIGHT;
+        uiScale = MathUtils.clamp(Math.min(widthScale, heightScale), 0.65f, 1.85f);
+        titleFont.getData().setScale(uiScale);
+        menuFont.getData().setScale(uiScale);
+        bodyFont.getData().setScale(uiScale);
     }
 
     private void addHoverAndClickListeners(Group g, int idx, Runnable onRefresh) {
@@ -443,6 +456,8 @@ public class TitleScreen {
 
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
+        updateFontScale(width, height);
+        refreshScreen();
     }
 
     public void dispose() {
