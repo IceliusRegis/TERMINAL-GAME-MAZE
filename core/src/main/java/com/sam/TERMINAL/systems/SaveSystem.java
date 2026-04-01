@@ -225,17 +225,44 @@ public class SaveSystem extends IteratingSystem {
                             //If item was not picked, restore its sprite
                             else {
                                 if (spriteMapper.get(entity) == null) {
+                                    // createComponent() returns a pooled instance that may carry
+                                    // stale field values from a previous lifecycle. Explicitly
+                                    // reset every field we care about to match EntityFactory's
+                                    // canonical dimensions so the item renders at the correct size.
                                     SpriteComponent restoredSprite = getEngine().createComponent(SpriteComponent.class);
                                     restoredSprite.isStatic = true;
+                                    restoredSprite.staticSprite = null;
+                                    restoredSprite.drawWidth = 0;
+                                    restoredSprite.drawHeight = 0;
 
                                     if (interactLoad.type.equals("beep")) {
+                                        // Canonical beep card dimensions from EntityFactory.createKey()
                                         restoredSprite.staticSprite = keySprite;
-                                        restoredSprite.drawWidth = 16;
-                                        restoredSprite.drawHeight = 16;
+                                        restoredSprite.drawWidth  = 40;
+                                        restoredSprite.drawHeight = 30;
+
+                                        // Also reset the TransformComponent so collision bounds
+                                        // reflect the correct world-unit size, not pooled leftovers.
+                                        TransformComponent beepTransform = transformMapper.get(entity);
+                                        if (beepTransform != null) {
+                                            beepTransform.width  = 40;
+                                            beepTransform.height = 30;
+                                            beepTransform.updateBounds();
+                                        }
+
                                     } else if (interactLoad.type.equals("flashlight")) {
+                                        // Canonical flashlight dimensions from EntityFactory.createFlashlight()
                                         restoredSprite.staticSprite = flashlightSprite;
-                                        restoredSprite.drawWidth = 20;
-                                        restoredSprite.drawHeight = 20;
+                                        restoredSprite.drawWidth  = 50;
+                                        restoredSprite.drawHeight = 50;
+
+                                        // Same guard on the TransformComponent.
+                                        TransformComponent flTransform = transformMapper.get(entity);
+                                        if (flTransform != null) {
+                                            flTransform.width  = 50;
+                                            flTransform.height = 50;
+                                            flTransform.updateBounds();
+                                        }
                                     }
 
                                     // Only add the component if we assigned a valid sprite
