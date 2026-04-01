@@ -83,6 +83,11 @@ public class MenuScreen {
     private Table itemTable;
     private Table bottomTable;
 
+    // --- Dynamic HUD Elements ---
+    private Label beepCardLabel;
+    private Label batteryLabel;
+    private Label lowBatteryWarningLabel;
+
     // ── ECS / Game references ─────────────────────────────────────────────────
     private final PooledEngine engine;
     private final Main mainGame;
@@ -290,6 +295,7 @@ public class MenuScreen {
     // =========================================================================
 
     public void render(float delta) {
+        updateDynamicHUD();
         // Always act and draw uiStage — keeps the jumpscare timer ticking
         uiStage.act(delta);
         uiStage.draw();
@@ -442,6 +448,36 @@ public class MenuScreen {
         stage.getBatch().end();
     }
 
+    private void updateDynamicHUD() {
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+        com.sam.TERMINAL.components.BatteryComponent bat = player.getComponent(com.sam.TERMINAL.components.BatteryComponent.class);
+
+        int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+        int heldCards = 0;
+        if (inv != null) {
+            heldCards = java.util.Collections.frequency(inv.items, "beep_card");
+        }
+
+        if (beepCardLabel != null) {
+            beepCardLabel.setText("Beep Cards: " + heldCards + " / " + totalExpected);
+        }
+
+        if (bat != null && inv != null && inv.hasItem("flashlight")) {
+            if (batteryLabel != null) {
+                batteryLabel.setText(String.format("Battery: %.0f%%", bat.battery));
+                batteryLabel.getStyle().fontColor = (bat.battery <= 20f) ? Color.RED : Color.GREEN;
+            }
+            if (lowBatteryWarningLabel != null) {
+                lowBatteryWarningLabel.setVisible(bat.battery <= 20f && bat.battery > 0f);
+            }
+        } else {
+            if (batteryLabel != null) batteryLabel.setText("");
+            if (lowBatteryWarningLabel != null) lowBatteryWarningLabel.setVisible(false);
+        }
+    }
+
     // =========================================================================
     // Resize / Dispose / Accessors
     // =========================================================================
@@ -488,6 +524,22 @@ public class MenuScreen {
 
         localBottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
         uiStage.addActor(localBottomTable);
+
+        // Top-right: Dynamic tracker
+        Table topRightTable = new Table();
+        topRightTable.setFillParent(true);
+        topRightTable.top().right();
+
+        beepCardLabel = new Label("Beep Cards: 0 / 0", new Label.LabelStyle(font, Color.WHITE));
+        batteryLabel = new Label("", new Label.LabelStyle(font, Color.GREEN));
+        lowBatteryWarningLabel = new Label("Battery Low!", new Label.LabelStyle(font, Color.RED));
+        lowBatteryWarningLabel.setVisible(false);
+
+        topRightTable.add(beepCardLabel).padRight(20).padTop(10).row();
+        topRightTable.add(batteryLabel).padRight(20).padTop(10).row();
+        topRightTable.add(lowBatteryWarningLabel).padRight(20).padTop(5).row();
+
+        uiStage.addActor(topRightTable);
     }
 
     // =========================================================================

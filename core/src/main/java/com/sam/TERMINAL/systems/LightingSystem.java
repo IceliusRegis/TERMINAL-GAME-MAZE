@@ -9,10 +9,14 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Gdx;
 import com.sam.TERMINAL.components.LightComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.BatteryComponent;
+import com.sam.TERMINAL.components.InventoryComponent;
 
 /**
  * LightingSystem — Manages Box2DLights for the player's FOV cone.
@@ -167,6 +171,34 @@ public class LightingSystem extends IteratingSystem {
 
         if (light.pointLight != null) {
             light.pointLight.setPosition(centerX, centerY);
+        }
+
+        // --- FLASH LIGHT BATTERY LOGIC ---
+        BatteryComponent batteryState = entity.getComponent(BatteryComponent.class);
+        InventoryComponent inv = entity.getComponent(InventoryComponent.class);
+        boolean hasFlashlight = (inv != null && inv.hasItem("flashlight"));
+
+        if (batteryState != null) {
+            // Toggle
+            if (hasFlashlight && Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+                if (batteryState.battery > 0) {
+                    batteryState.flashlightOn = !batteryState.flashlightOn;
+                }
+            }
+
+            // Drain
+            if (batteryState.flashlightOn) {
+                batteryState.battery -= 5f * deltaTime; // Adjust this scale as needed 
+                if (batteryState.battery <= 0) {
+                    batteryState.battery = 0;
+                    batteryState.flashlightOn = false;
+                }
+            }
+
+            // Sync cone
+            if (light.cone != null && hasFlashlight) {
+                light.cone.setActive(batteryState.flashlightOn);
+            }
         }
     }
 

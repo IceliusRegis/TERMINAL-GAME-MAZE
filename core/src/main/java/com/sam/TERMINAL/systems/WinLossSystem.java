@@ -31,7 +31,7 @@ import com.sam.TERMINAL.buttons.MenuScreen;
 public class WinLossSystem extends EntitySystem {
 
     private static final String BEEP_CARD_ITEM_ID = "beep_card";
-    private static final String MISSING_CARD_MESSAGE = "Find the Beep Card first!";
+    private String currentMissingMessage = "Find all Beep Cards!";
 
     private Main mainGame;
     private MenuScreen menuScreen;
@@ -170,8 +170,16 @@ public class WinLossSystem extends EntitySystem {
         promptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
 
         // --- Beep Card prerequisite check ---
+        int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+        int heldCards = 0;
         InventoryComponent inventory = player.getComponent(InventoryComponent.class);
-        playerHasBeepCard = (inventory != null) && inventory.hasItem(BEEP_CARD_ITEM_ID);
+        if (inventory != null) {
+            heldCards = java.util.Collections.frequency(inventory.items, BEEP_CARD_ITEM_ID);
+        }
+        playerHasBeepCard = (heldCards >= totalExpected && totalExpected > 0);
+
+        // Update dynamic missing message
+        currentMissingMessage = "Find all Beep Cards! (" + heldCards + "/" + totalExpected + ")";
 
         // The 'E' prompt is always shown from here on (nearWinTile == true).
         // If E is pressed, attempt the win or start the warning timer.
@@ -245,11 +253,11 @@ public class WinLossSystem extends EntitySystem {
                 : 1f;
         notificationFont.setColor(1f, 1f, 0f, alpha); // yellow with fade
 
-        glyphLayout.setText(notificationFont, MISSING_CARD_MESSAGE);
+        glyphLayout.setText(notificationFont, currentMissingMessage);
         float screenX = (Gdx.graphics.getWidth() - glyphLayout.width) / 2f;
         float screenY = Gdx.graphics.getHeight() * 0.72f; // upper portion of screen
 
-        notificationFont.draw(batch, MISSING_CARD_MESSAGE, screenX, screenY);
+        notificationFont.draw(batch, currentMissingMessage, screenX, screenY);
 
         // Reset alpha to fully opaque so future draws with this font are unaffected.
         notificationFont.setColor(1f, 1f, 0f, 1f);

@@ -163,6 +163,14 @@ public class SaveSystem extends IteratingSystem {
                     pendingSaveData.playerX = pTrans.pos.x;
                     pendingSaveData.playerY = pTrans.pos.y;
 
+                    BatteryComponent pBat = entity.getComponent(BatteryComponent.class);
+                    if (pBat != null) {
+                        pendingSaveData.playerBattery = pBat.battery;
+                    }
+
+                    // Save total beep cards spawned from global context
+                    pendingSaveData.totalBeepCardsSpawned = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+
                         InventoryComponent pInventory = inventoryMapper.get(entity);
                         if (pInventory !=null) {
                             pendingSaveData.inventoryItems.clear();
@@ -193,6 +201,13 @@ public class SaveSystem extends IteratingSystem {
                     pTrans.pos.x = loadedData.playerX;
                     pTrans.pos.y = loadedData.playerY;
                     pTrans.updateBounds();
+
+                    BatteryComponent pBatLoad = entity.getComponent(BatteryComponent.class);
+                    if (pBatLoad != null) {
+                        pBatLoad.battery = loadedData.playerBattery;
+                    }
+
+                    com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned = loadedData.totalBeepCardsSpawned;
 
 
                     InventoryComponent pInventoryLoad = inventoryMapper.get(entity);

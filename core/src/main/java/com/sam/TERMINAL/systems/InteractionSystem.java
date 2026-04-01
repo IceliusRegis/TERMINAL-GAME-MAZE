@@ -218,6 +218,16 @@ public class InteractionSystem extends EntitySystem {
                 typeData.isActive = false;
                 break;
 
+            case "battery":
+                System.out.println("Picked up a BATTERY!");
+                BatteryComponent pBat = player.getComponent(BatteryComponent.class);
+                if (pBat != null) {
+                    pBat.battery = pBat.maxBattery;
+                }
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
+                break;
+
             default:
                 System.out.println("Interacted with " + typeData.type);
         }

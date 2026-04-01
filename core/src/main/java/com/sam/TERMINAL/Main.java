@@ -54,10 +54,10 @@ public class Main extends ApplicationAdapter {
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, flashlightTexture;
+    private Texture beepTexture, flashlightTexture, batteryTexture;
 
     // Regions and Animation
-    private TextureRegion beepRegion, enemyRegion, flashlightRegion;
+    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -145,6 +145,9 @@ public class Main extends ApplicationAdapter {
 
         flashlightTexture = new Texture(Gdx.files.internal("sprites/flash_off.png"));
         flashlightRegion = new TextureRegion(flashlightTexture);
+
+        batteryTexture = new Texture(Gdx.files.internal("sprites/battery.png"));
+        batteryRegion = new TextureRegion(batteryTexture);
 
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
@@ -269,7 +272,7 @@ public class Main extends ApplicationAdapter {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion);
+                    enemyRegion, flashlightRegion, batteryRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -281,7 +284,7 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
             EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion);
+                    enemyRegion, flashlightRegion, batteryRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
@@ -320,42 +323,55 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        // 4. Load the temp save — this restores player position, inventory, and
-        //    all interactable isActive flags (including flashlight).
+        // 4. First, physically remove the old items so we can re-generate a new random count
+        ImmutableArray<Entity> currentItems = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : currentItems) toRemove.add(e);
+        for (Entity e : toRemove) engine.removeEntity(e);
+
+        // 5. Load the temp save — this restores player position, inventory, and resets battery component context
+        //    (It won't affect items because we just removed them!)
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
-        // 4.1. Randomize item spawn locations so they change every reset
-        ImmutableArray<Entity> items = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
-        ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
-        TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
-        
-        if (world != null) {
-            com.badlogic.gdx.math.GridPoint2 usedPoint = null;
-            for (Entity item : items) {
-                InteractableComponent interactable = item.getComponent(InteractableComponent.class);
-                if (interactable != null && (interactable.type.equals("beep") || interactable.type.equals("flashlight"))) {
-                    TransformComponent t = item.getComponent(TransformComponent.class);
-                    if (t != null) {
-                        com.badlogic.gdx.math.GridPoint2 newPos = world.getRandomSpawnPoint(usedPoint);
-                        if (newPos != null) {
-                            t.pos.set(newPos.x * 32f, newPos.y * 32f);
-                            t.updateBounds();
-                            usedPoint = newPos;
-                        }
-                    }
-                }
+        // 6. Provide a clean slate for the player's runtime components (sometimes items could erroneously persist in load state if not checked)
+        ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
+        if (players.size() > 0) {
+            Entity p = players.first();
+            InventoryComponent inv = p.getComponent(InventoryComponent.class);
+            if (inv != null) inv.items.clear();
+            
+            BatteryComponent bat = p.getComponent(BatteryComponent.class);
+            if (bat != null) {
+                bat.battery = bat.maxBattery;
+                bat.flashlightOn = false;
             }
         }
 
-        // 5. Revert the player's lighting back to the no-flashlight state.
-        //    This must happen AFTER the load so the player entity still exists.
-        ImmutableArray<Entity> players = engine
-                .getEntitiesFor(Family.all(PlayerComponent.class).get());
+        // 7. Spawn fresh completely randomized items (Beep Cards, Battery, Flashlight)
+        ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
+        TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
+        if (world != null) {
+            int pTileX = 5;
+            int pTileY = 5;
+            if (players.size() > 0) {
+                TransformComponent t = players.first().getComponent(TransformComponent.class);
+                if (t != null) {
+                    pTileX = (int)(t.pos.x / 32f);
+                    pTileY = (int)(t.pos.y / 32f);
+                }
+            }
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
+            
+            // Re-save temp snapshot to cement these new random locations and the new random count
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+        }
+
+        // 8. Revert the player's lighting back to the no-flashlight state.
         if (players.size() > 0 && lightingSystem != null) {
             lightingSystem.createPlayerLight(players.first(), false);
         }
 
-        // 6. Restore the HUD to its normal in-game state.
+        // 9. Restore the HUD to its normal in-game state.
         menuScreen.resetUI();
     }
 
@@ -543,6 +559,7 @@ public class Main extends ApplicationAdapter {
         if (beepTexture != null) beepTexture.dispose();
         if (enemyTexture != null) enemyTexture.dispose();
         if (flashlightTexture != null) flashlightTexture.dispose();
+        if (batteryTexture != null) batteryTexture.dispose();
         WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
         if (wlsDispose != null) wlsDispose.dispose();
     }

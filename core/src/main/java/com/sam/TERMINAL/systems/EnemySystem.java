@@ -216,6 +216,19 @@ public class EnemySystem extends IteratingSystem {
                 enemyT.pos.set(targetX, targetY);
                 enemy.path.poll();
             } else {
+                // Determine speed scaled by currently held beep cards
+                float baseSpeed = 80f;
+                float maxSpeed = 125f;
+                int heldCards = 0;
+                
+                InventoryComponent playerInv = cachedPlayer.getComponent(InventoryComponent.class);
+                if (playerInv != null) {
+                    heldCards = java.util.Collections.frequency(playerInv.items, "beep_card");
+                }
+                
+                float calculatedSpeed = baseSpeed + (heldCards * 15f);
+                enemy.speed = Math.min(calculatedSpeed, maxSpeed);
+
                 // Move toward waypoint at configured speed
                 float step = enemy.speed * deltaTime;
                 enemyT.pos.x += (dx / dist) * step;

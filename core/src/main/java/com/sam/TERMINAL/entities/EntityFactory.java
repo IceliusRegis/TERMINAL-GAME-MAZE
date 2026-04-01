@@ -52,6 +52,7 @@ public class EntityFactory {
         // Persistence Data this is where player position is saved
         player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
         player.add(engine.createComponent(InventoryComponent.class));
+        player.add(new BatteryComponent(100f));
         engine.addEntity(player);
     }
 
@@ -125,6 +126,29 @@ public class EntityFactory {
         flashlight.add(new PersistenceComponent("INTERACTABLE", saveId));
 
         engine.addEntity(flashlight);
+    }
+
+    public static void createBattery(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
+        Entity battery = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 30;
+        transform.height = 30;
+        transform.updateBounds();
+        battery.add(transform);
+
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = texture;
+        sprite.isStatic = true;
+        sprite.drawWidth = 30;
+        sprite.drawHeight = 30;
+        battery.add(sprite);
+
+        battery.add(new InteractableComponent("battery", 40f));
+        battery.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(battery);
     }
 
     /**
