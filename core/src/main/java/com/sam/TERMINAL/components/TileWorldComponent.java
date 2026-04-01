@@ -19,6 +19,8 @@ public class TileWorldComponent implements Component {
     public TiledMapTileLayer collisionLayer;
     public TiledMapTileLayer wallsLayer;
     public TiledMapTileLayer winningLayer;
+    public TiledMapTileLayer groundLayer;
+    public java.util.List<com.badlogic.gdx.math.GridPoint2> validSpawnPoints = new java.util.ArrayList<>();
 
     // Size of map in tiles
     public int mapWidthTiles;
@@ -46,6 +48,58 @@ public class TileWorldComponent implements Component {
 
         Object winningRaw = tiledMap.getLayers().get("Winning");
         this.winningLayer = (winningRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) winningRaw : null;
+        
+        for (com.badlogic.gdx.maps.MapLayer layer : tiledMap.getLayers()) {
+            if (layer instanceof TiledMapTileLayer) {
+                String name = layer.getName().toLowerCase();
+                if (name.contains("ground") || name.contains("floor")) {
+                    this.groundLayer = (TiledMapTileLayer) layer;
+                    break;
+                }
+            }
+        }
+        
+        cacheValidSpawnPoints();
+    }
+
+    private void cacheValidSpawnPoints() {
+        if (groundLayer == null) return;
+        
+        for (int x = 0; x < mapWidthTiles; x++) {
+            for (int y = 0; y < mapHeightTiles; y++) {
+                // Must have a tile on the ground/floor layer
+                if (groundLayer.getCell(x, y) != null) {
+                    // Must not be a wall or collision tile
+                    if (!isSolidForSpawning(x, y)) {
+                        validSpawnPoints.add(new com.badlogic.gdx.math.GridPoint2(x, y));
+                    }
+                }
+            }
+        }
+    }
+
+    public com.badlogic.gdx.math.GridPoint2 getRandomSpawnPoint(com.badlogic.gdx.math.GridPoint2... avoidPoints) {
+        if (validSpawnPoints.isEmpty()) return null;
+        
+        com.badlogic.gdx.math.GridPoint2 pt;
+        int maxAttempts = 50;
+        int attempts = 0;
+        do {
+            int index = com.badlogic.gdx.math.MathUtils.random(validSpawnPoints.size() - 1);
+            pt = validSpawnPoints.get(index);
+            
+            boolean conflict = false;
+            for (com.badlogic.gdx.math.GridPoint2 avoid : avoidPoints) {
+                if (avoid != null && avoid.x == pt.x && avoid.y == pt.y) {
+                    conflict = true;
+                    break;
+                }
+            }
+            if (!conflict) return pt;
+            attempts++;
+        } while (attempts < maxAttempts);
+        
+        return pt;
     }
 
     /**

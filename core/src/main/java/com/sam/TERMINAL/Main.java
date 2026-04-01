@@ -324,6 +324,29 @@ public class Main extends ApplicationAdapter {
         //    all interactable isActive flags (including flashlight).
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
+        // 4.1. Randomize item spawn locations so they change every reset
+        ImmutableArray<Entity> items = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
+        TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
+        
+        if (world != null) {
+            com.badlogic.gdx.math.GridPoint2 usedPoint = null;
+            for (Entity item : items) {
+                InteractableComponent interactable = item.getComponent(InteractableComponent.class);
+                if (interactable != null && (interactable.type.equals("beep") || interactable.type.equals("flashlight"))) {
+                    TransformComponent t = item.getComponent(TransformComponent.class);
+                    if (t != null) {
+                        com.badlogic.gdx.math.GridPoint2 newPos = world.getRandomSpawnPoint(usedPoint);
+                        if (newPos != null) {
+                            t.pos.set(newPos.x * 32f, newPos.y * 32f);
+                            t.updateBounds();
+                            usedPoint = newPos;
+                        }
+                    }
+                }
+            }
+        }
+
         // 5. Revert the player's lighting back to the no-flashlight state.
         //    This must happen AFTER the load so the player entity still exists.
         ImmutableArray<Entity> players = engine

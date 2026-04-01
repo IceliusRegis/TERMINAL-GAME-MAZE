@@ -54,27 +54,32 @@ public class EntitySpawner {
         // --- SAFE BEEP CARD POSITION ---
         int keyTileX = KEY_TILE_X;
         int keyTileY = KEY_TILE_Y;
-        if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
+        com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint() : null;
+        if (randomCardSpawn != null) {
+            keyTileX = randomCardSpawn.x;
+            keyTileY = randomCardSpawn.y;
+            Gdx.app.log("SPAWNER", "Beep card relocated to safe random tile (" + keyTileX + ", " + keyTileY + ")");
+        } else if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
             int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, pTileX, pTileY, 0);
             keyTileX = safe[0];
             keyTileY = safe[1];
-            Gdx.app.log("SPAWNER", "Beep card relocated to safe tile (" + keyTileX + ", " + keyTileY + ")");
         }
 
         // --- SAFE FLASHLIGHT POSITION ---
-        int minFlDist = 4;
-        int maxFlRadius = 12;
-        int flTileX;
-        int flTileY;
+        int flTileX = pTileX + 6;
+        int flTileY = pTileY + 6;
 
-        if (world != null) {
+        com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(randomCardSpawn) : null;
+        if (randomFlSpawn != null) {
+            flTileX = randomFlSpawn.x;
+            flTileY = randomFlSpawn.y;
+            Gdx.app.log("SPAWNER", "Flashlight relocated to safe random tile (" + flTileX + ", " + flTileY + ")");
+        } else if (world != null) {
+            int maxFlRadius = 12;
+            int minFlDist = 4;
             int[] flSafe = findSafeTileRandom(world, pTileX, pTileY, maxFlRadius, minFlDist, mapWidth, mapHeight);
             flTileX = flSafe[0];
             flTileY = flSafe[1];
-        } else {
-            // Fallback: no world data — pick random tile without wall check
-            flTileX = pTileX + 6;
-            flTileY = pTileY + 6;
         }
 
         float flPixelX = flTileX * TILE_SIZE;
@@ -85,9 +90,6 @@ public class EntitySpawner {
         EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID);
         EntityFactory.createFlashlight(engine, flPixelX, flPixelY, flashlightRegion, FLASHLIGHT_SAVE_ID);
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
-
-        Gdx.app.log("SPAWNER", "Beep card at tile (" + keyTileX + ", " + keyTileY + ")");
-        Gdx.app.log("SPAWNER", "Flashlight at tile (" + flTileX + ", " + flTileY + ")");
     }
 
     /**
@@ -107,7 +109,11 @@ public class EntitySpawner {
         // --- SAFE BEEP CARD POSITION ---
         int keyTileX = KEY_TILE_X;
         int keyTileY = KEY_TILE_Y;
-        if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
+        com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint() : null;
+        if (randomCardSpawn != null) {
+            keyTileX = randomCardSpawn.x;
+            keyTileY = randomCardSpawn.y;
+        } else if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
             int playerTX = (int) (saveData.playerX / TILE_SIZE);
             int playerTY = (int) (saveData.playerY / TILE_SIZE);
             int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, playerTX, playerTY, 0);
@@ -119,7 +125,11 @@ public class EntitySpawner {
         // --- SAFE FLASHLIGHT POSITION (load path) ---
         int flTileX = KEY_TILE_X + 1;
         int flTileY = KEY_TILE_Y;
-        if (world != null && world.isSolidForSpawning(flTileX, flTileY)) {
+        com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(randomCardSpawn) : null;
+        if (randomFlSpawn != null) {
+            flTileX = randomFlSpawn.x;
+            flTileY = randomFlSpawn.y;
+        } else if (world != null && world.isSolidForSpawning(flTileX, flTileY)) {
             int playerTX = (int) (saveData.playerX / TILE_SIZE);
             int playerTY = (int) (saveData.playerY / TILE_SIZE);
             int[] safe = findSafeTile(world, flTileX, flTileY, 8, playerTX, playerTY, 0);
