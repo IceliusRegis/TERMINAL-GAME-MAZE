@@ -3,6 +3,8 @@ package com.sam.TERMINAL.systems;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.graphics.Camera;
@@ -54,10 +56,14 @@ public class EnemySystem extends IteratingSystem {
     /** Callback fired when the enemy catches the player (e.g. jumpscare). */
     private final Runnable onCatchCallback;
 
-    /**
-     * Guard flag — true once the callback has fired, preventing repeat triggers.
-     */
+    /** Guard flag — true once the callback has fired, preventing repeat triggers. */
     private boolean triggered;
+
+    // --- Audio Fields ---
+    private Sound heartbeatSound;
+    private long heartbeatSoundId = -1;
+    private static final float MAX_AUDIO_DISTANCE = 320f;
+    private float minDistanceThisFrame;
 
     /** No-arg constructor — no catch callback. */
     public EnemySystem() {
@@ -67,21 +73,61 @@ public class EnemySystem extends IteratingSystem {
     /**
      * Constructor that accepts a catch callback (e.g. a jumpscare trigger).
      *
-     * @param onCatchCallback Runnable invoked once when the enemy reaches the
-     *                        player.
+     * @param onCatchCallback Runnable invoked once when the enemy reaches the player.
      */
     public EnemySystem(Runnable onCatchCallback) {
         super(Family.all(EnemyComponent.class, TransformComponent.class).get());
         this.onCatchCallback = onCatchCallback;
+        // Load heartbeat audio file dynamically
+        this.heartbeatSound = Gdx.audio.newSound(Gdx.files.internal("sfx/heart_beat_monster_a_fast.ogg"));
     }
 
     /**
      * Resets the triggered flag so the catch callback can fire again
-     * (e.g. after a game reset).
+     * (e.g. after a game reset). Also halts audio manually.
      */
     public void reset() {
         triggered = false;
         cachedPlayer = null;
+        if (heartbeatSound != null && heartbeatSoundId != -1) {
+            heartbeatSound.stop(heartbeatSoundId);
+            heartbeatSoundId = -1;
+        }
+    }
+
+    @Override
+    public void update(float deltaTime) {
+        minDistanceThisFrame = Float.MAX_VALUE;
+        super.update(deltaTime);
+
+        if (heartbeatSound == null) return;
+
+        // Audio Lifecycle & Proximity Update
+        if (cachedPlayer == null || triggered || deltaTime == 0f) {
+            // Stop sound entirely if game is over, resetting, or frozen
+            if (heartbeatSoundId != -1) {
+                heartbeatSound.stop(heartbeatSoundId);
+                heartbeatSoundId = -1;
+            }
+        } else {
+            // Scale linearly initially, then apply exponential falloff for impact
+            float volume = 1.0f - (minDistanceThisFrame / MAX_AUDIO_DISTANCE);
+            if (volume <= 0f) {
+                if (heartbeatSoundId != -1) {
+                    heartbeatSound.stop(heartbeatSoundId);
+                    heartbeatSoundId = -1;
+                }
+            } else {
+                // Aggressive volume padding: Start heavily boosted (~40%) as soon as range triggers
+                float boostedVolume = Math.min(1.0f, 0.40f + (volume * 0.60f));
+                
+                if (heartbeatSoundId == -1) {
+                    heartbeatSoundId = heartbeatSound.loop(0f);
+                }
+                heartbeatSound.setVolume(heartbeatSoundId, boostedVolume);
+                Gdx.app.log("AudioDebug", "Min Distance: " + minDistanceThisFrame + " | Volume: " + boostedVolume);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -104,6 +150,22 @@ public class EnemySystem extends IteratingSystem {
         EnemyComponent enemy = enemyMapper.get(entity);
         TransformComponent enemyT = transformMapper.get(entity);
         TransformComponent playerT = transformMapper.get(cachedPlayer);
+
+        // 2b. Calculate Euclidean distance for proximity audio (only per-frame, not frozen)
+        if (deltaTime > 0f) {
+            float eCenterX = enemyT.pos.x + enemyT.width / 2f;
+            float eCenterY = enemyT.pos.y + enemyT.height / 2f;
+            float pCenterX = playerT.pos.x + playerT.width / 2f;
+            float pCenterY = playerT.pos.y + playerT.height / 2f;
+
+            float diffX = pCenterX - eCenterX;
+            float diffY = pCenterY - eCenterY;
+            float distToPlayer = (float) Math.sqrt(diffX * diffX + diffY * diffY);
+
+            if (distToPlayer < minDistanceThisFrame) {
+                minDistanceThisFrame = distToPlayer;
+            }
+        }
 
         // 3. Get world component (needed for BFS)
         TileWorldComponent world = getWorldComponent();
@@ -333,6 +395,14 @@ public class EnemySystem extends IteratingSystem {
         if (debugRenderer != null) {
             debugRenderer.dispose();
             debugRenderer = null;
+        }
+        if (heartbeatSound != null) {
+            if (heartbeatSoundId != -1) {
+                heartbeatSound.stop(heartbeatSoundId);
+                heartbeatSoundId = -1;
+            }
+            heartbeatSound.dispose();
+            heartbeatSound = null;
         }
     }
 }
