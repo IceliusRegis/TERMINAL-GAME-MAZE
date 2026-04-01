@@ -36,6 +36,11 @@ public class WinLossSystem extends EntitySystem {
     private static final float PROMPT_HEIGHT = 24f;
     private static final float PROMPT_OFFSET_Y = 8f;
 
+    // Set each frame in update(); read by renderPrompt() in Main after lighting.
+    private boolean nearWinTile = false;
+    private float promptWorldX = 0f;
+    private float promptWorldY = 0f;
+
     public WinLossSystem(Main main, SpriteBatch batch) {
         this.mainGame = main;
         this.batch = batch;
@@ -54,6 +59,9 @@ public class WinLossSystem extends EntitySystem {
 
     @Override
     public void update(float deltaTime) {
+        // Reset the win-tile indicator at the top of every frame.
+        nearWinTile = false;
+
         if (gameOver || win)
             return;
 
@@ -99,25 +107,34 @@ public class WinLossSystem extends EntitySystem {
         int playerTileY = (int) (playerCenterY / TILE_SIZE);
 
         // Check the player's tile and 4 adjacent tiles for a Winning cell
-        boolean nearWinTile = isWinningTile(world, playerTileX, playerTileY)
+        nearWinTile = isWinningTile(world, playerTileX, playerTileY)
                 || isWinningTile(world, playerTileX + 1, playerTileY)
                 || isWinningTile(world, playerTileX - 1, playerTileY)
                 || isWinningTile(world, playerTileX, playerTileY + 1)
                 || isWinningTile(world, playerTileX, playerTileY - 1);
 
         if (nearWinTile) {
-            // Draw the "Press E" prompt above the player
-            if (promptRegion != null) {
-                float promptX = playerCenterX - PROMPT_WIDTH / 2f;
-                float promptY = playerTransform.pos.y + playerTransform.height + PROMPT_OFFSET_Y + 20f;
-                batch.draw(promptRegion, promptX, promptY, PROMPT_WIDTH, PROMPT_HEIGHT);
-            }
+            // Compute and cache the prompt world position for renderPrompt().
+            promptWorldX = playerCenterX - PROMPT_WIDTH / 2f;
+            promptWorldY = playerTransform.pos.y + playerTransform.height + PROMPT_OFFSET_Y + 20f;
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
                 Gdx.app.log("TERMINAL", "YOU WIN - ESCAPED!");
                 win = true;
             }
         }
+    }
+
+    /**
+     * Draws the "Press E" prompt above the player when they are adjacent to a
+     * Winning layer tile. Called by Main.renderInteractionPrompts() AFTER the
+     * lighting pass so it is always visible above the darkness overlay.
+     */
+    public void renderPrompt() {
+        if (promptRegion == null || !nearWinTile) {
+            return;
+        }
+        batch.draw(promptRegion, promptWorldX, promptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
     }
 
     /**

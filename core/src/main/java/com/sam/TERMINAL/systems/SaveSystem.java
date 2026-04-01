@@ -53,12 +53,14 @@ public class SaveSystem extends IteratingSystem {
 
     //Sprites
     private final TextureRegion keySprite;
+    private final TextureRegion flashlightSprite;
 
-    public SaveSystem(TextureRegion keySprite) {
+    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
         this.keySprite = keySprite;
+        this.flashlightSprite = flashlightSprite;
 
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
@@ -220,16 +222,24 @@ public class SaveSystem extends IteratingSystem {
                                 }
                             }
 
-                            //If item was not picked, restore it
+                            //If item was not picked, restore its sprite
                             else {
-                                if (interactLoad.type.equals("beep")) {
-                                    if (spriteMapper.get(entity) == null) {
-                                        SpriteComponent restoredSprite = getEngine().createComponent(SpriteComponent.class);
+                                if (spriteMapper.get(entity) == null) {
+                                    SpriteComponent restoredSprite = getEngine().createComponent(SpriteComponent.class);
+                                    restoredSprite.isStatic = true;
+
+                                    if (interactLoad.type.equals("beep")) {
                                         restoredSprite.staticSprite = keySprite;
-                                        restoredSprite.isStatic = true;
                                         restoredSprite.drawWidth = 16;
                                         restoredSprite.drawHeight = 16;
+                                    } else if (interactLoad.type.equals("flashlight")) {
+                                        restoredSprite.staticSprite = flashlightSprite;
+                                        restoredSprite.drawWidth = 20;
+                                        restoredSprite.drawHeight = 20;
+                                    }
 
+                                    // Only add the component if we assigned a valid sprite
+                                    if (restoredSprite.staticSprite != null) {
                                         entity.add(restoredSprite);
                                     }
                                 }

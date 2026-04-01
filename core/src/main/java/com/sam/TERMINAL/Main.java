@@ -232,7 +232,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(beepRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(batch));
 
@@ -295,31 +295,44 @@ public class Main extends ApplicationAdapter {
     }
 
     public void resetGame() {
-        Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+        Gdx.app.log("TERMINAL", "Resetting game to initial state...");
 
-        com.badlogic.ashley.utils.ImmutableArray<Entity> interactables = engine
-                .getEntitiesFor(Family.all(InteractableComponent.class).get());
-        for (Entity item : interactables) {
-            item.getComponent(InteractableComponent.class).isActive = true;
+        // 1. Reset the WinLossSystem flags first so update() runs normally again.
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        if (wls != null) {
+            wls.reset();
         }
 
-        engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
+        // 2. Reset the EnemySystem triggered flag so the jumpscare can fire again.
+        EnemySystem enemySys = engine.getSystem(EnemySystem.class);
+        if (enemySys != null) {
+            enemySys.reset();
+        }
 
-        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine
+        // 3. Reposition all enemies to their original spawn point.
+        ImmutableArray<Entity> enemies = engine
                 .getEntitiesFor(Family.all(EnemyComponent.class).get());
         for (Entity enemy : enemies) {
             TransformComponent t = enemy.getComponent(TransformComponent.class);
-            t.pos.set(5 * 32f, 40 * 32f);
-            t.updateBounds();
+            if (t != null) {
+                t.pos.set(5 * 32f, 40 * 32f);
+                t.updateBounds();
+            }
         }
 
-        // Reset EnemySystem triggered flag so it can fire again
-        engine.getSystem(EnemySystem.class).reset();
+        // 4. Load the temp save — this restores player position, inventory, and
+        //    all interactable isActive flags (including flashlight).
+        engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
-        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
-        wls.gameOver = false;
-        wls.win = false;
+        // 5. Revert the player's lighting back to the no-flashlight state.
+        //    This must happen AFTER the load so the player entity still exists.
+        ImmutableArray<Entity> players = engine
+                .getEntitiesFor(Family.all(PlayerComponent.class).get());
+        if (players.size() > 0 && lightingSystem != null) {
+            lightingSystem.createPlayerLight(players.first(), false);
+        }
 
+        // 6. Restore the HUD to its normal in-game state.
         menuScreen.resetUI();
     }
 
@@ -378,6 +391,10 @@ public class Main extends ApplicationAdapter {
             lightingSystem.render();
         }
 
+        // 4. Draw interaction prompts on top of the lighting layer so they
+        //    are never blacked out by the Box2DLights ambient darkness.
+        renderInteractionPrompts();
+
         // --- DEBUG POLLING & HITBOX RENDERING ---
         if (debugManager != null) {
             debugManager.update(lightingSystem);
@@ -408,6 +425,37 @@ public class Main extends ApplicationAdapter {
         }
 
         drawCursor();
+    }
+
+    /**
+     * Draws the "Press E" interaction prompts in world-space AFTER the lighting
+     * layer finishes. This guarantees they are always visible on top of the
+     * Box2DLights ambient-darkness overlay.
+     *
+     * InteractionSystem and WinLossSystem expose delegated render methods so
+     * that all prompt drawing is consolidated here rather than inside update().
+     */
+    private void renderInteractionPrompts() {
+        // Only draw during active gameplay — not during menus or end-screens.
+        if (menuScreen == null || menuScreen.isGameOver()) {
+            return;
+        }
+
+        // Re-apply world-space projection so prompts sit on the map correctly.
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+
+        InteractionSystem interactSys = engine.getSystem(InteractionSystem.class);
+        if (interactSys != null) {
+            interactSys.renderPrompts();
+        }
+
+        WinLossSystem winLossSys = engine.getSystem(WinLossSystem.class);
+        if (winLossSys != null) {
+            winLossSys.renderPrompt();
+        }
+
+        batch.end();
     }
 
     private void drawCursor() {

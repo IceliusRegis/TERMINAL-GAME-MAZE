@@ -38,6 +38,10 @@ public class InteractionSystem extends EntitySystem {
     private Texture promptTexture;
     private TextureRegion promptRegion;
 
+    // Tracks the most recent entity that is in range and has clear LoS,
+    // so renderPrompts() can draw the indicator after the lighting pass.
+    private TransformComponent nearestTargetTransform = null;
+
     private static final float PROMPT_WIDTH = 24f;
     private static final float PROMPT_HEIGHT = 24f;
     private static final float PROMPT_OFFSET_Y = 8f; // pixels above the entity top
@@ -60,6 +64,9 @@ public class InteractionSystem extends EntitySystem {
 
     @Override
     public void update(float deltaTime) {
+        // Clear the tracked target at the top of every frame.
+        nearestTargetTransform = null;
+
         // 1.) Find the player tag and their position first
         ImmutableArray<Entity> players = getEngine()
                 .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
@@ -118,12 +125,8 @@ public class InteractionSystem extends EntitySystem {
                 if (hasLineOfSight) {
                     interact.nearPlayer = true;
 
-                    // Draw the "Press E" prompt above the entity center
-                    if (promptRegion != null) {
-                        float promptX = targetCenterX - PROMPT_WIDTH / 2f;
-                        float promptY = targetPos.pos.y + targetPos.height + PROMPT_OFFSET_Y;
-                        batch.draw(promptRegion, promptX, promptY, PROMPT_WIDTH, PROMPT_HEIGHT);
-                    }
+                    // Record this transform so renderPrompts() can draw above it.
+                    nearestTargetTransform = targetPos;
 
                     // Receive interact input
                     if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
@@ -132,6 +135,21 @@ public class InteractionSystem extends EntitySystem {
                 }
             }
         }
+    }
+
+    /**
+     * Draws the "Press E" prompt above the nearest in-range interactable.
+     * Called by Main.renderInteractionPrompts() AFTER the lighting pass so the
+     * indicator is never blacked out by the ambient darkness overlay.
+     */
+    public void renderPrompts() {
+        if (promptRegion == null || nearestTargetTransform == null) {
+            return;
+        }
+        float targetCenterX = nearestTargetTransform.pos.x + (nearestTargetTransform.width / 2f);
+        float promptX = targetCenterX - PROMPT_WIDTH / 2f;
+        float promptY = nearestTargetTransform.pos.y + nearestTargetTransform.height + PROMPT_OFFSET_Y;
+        batch.draw(promptRegion, promptX, promptY, PROMPT_WIDTH, PROMPT_HEIGHT);
     }
 
     /**
