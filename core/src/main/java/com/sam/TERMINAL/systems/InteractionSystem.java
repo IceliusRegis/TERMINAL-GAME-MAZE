@@ -220,9 +220,8 @@ public class InteractionSystem extends EntitySystem {
 
             case "battery":
                 System.out.println("Picked up a BATTERY!");
-                BatteryComponent pBat = player.getComponent(BatteryComponent.class);
-                if (pBat != null) {
-                    pBat.battery = pBat.maxBattery;
+                if (inventory != null) {
+                    inventory.addItem("battery");
                 }
                 target.remove(SpriteComponent.class);
                 typeData.isActive = false;

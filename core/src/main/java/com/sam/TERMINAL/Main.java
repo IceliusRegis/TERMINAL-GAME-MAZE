@@ -312,16 +312,11 @@ public class Main extends ApplicationAdapter {
             enemySys.reset();
         }
 
-        // 3. Reposition all enemies to their original spawn point.
-        ImmutableArray<Entity> enemies = engine
-                .getEntitiesFor(Family.all(EnemyComponent.class).get());
-        for (Entity enemy : enemies) {
-            TransformComponent t = enemy.getComponent(TransformComponent.class);
-            if (t != null) {
-                t.pos.set(5 * 32f, 40 * 32f);
-                t.updateBounds();
-            }
-        }
+        // 3. Remove all enemies from the old run
+        ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
+        com.badlogic.gdx.utils.Array<Entity> toRemoveEnemies = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : enemies) toRemoveEnemies.add(e);
+        for (Entity e : toRemoveEnemies) engine.removeEntity(e);
 
         // 4. First, physically remove the old items so we can re-generate a new random count
         ImmutableArray<Entity> currentItems = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
@@ -348,6 +343,7 @@ public class Main extends ApplicationAdapter {
         }
 
         // 7. Spawn fresh completely randomized items (Beep Cards, Battery, Flashlight)
+        //    AND spawn a fresh enemy.
         ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
         TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
         if (world != null) {
@@ -362,6 +358,9 @@ public class Main extends ApplicationAdapter {
             }
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
             
+            // Re-spawn the enemy cleanly
+            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 40 * 32f, enemyRegion);
+
             // Re-save temp snapshot to cement these new random locations and the new random count
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }

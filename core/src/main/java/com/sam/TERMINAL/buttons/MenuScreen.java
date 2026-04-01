@@ -126,20 +126,7 @@ public class MenuScreen {
         createDimmerTexture();
 
         // --- HUD SETUP ---
-        Table mainRoot = new Table();
-        mainRoot.setFillParent(true);
-        mainRoot.top().left();
-
-        Image settingsBtn = new Image(settingsTexture);
-        settingsBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                isSettingsVisible = true;
-                updateInputProcessor();
-            }
-        });
-        mainRoot.add(settingsBtn).size(40, 40).pad(10);
-        uiStage.addActor(mainRoot);
+        setupHUD();
 
         // --- SETTINGS WINDOW SETUP ---
         Table settingsRoot = new Table();
@@ -163,21 +150,6 @@ public class MenuScreen {
                 });
 
         // --- INVENTORY SETUP ---
-        ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
-        bottomTable = new Table();
-        bottomTable.setFillParent(true);
-        bottomTable.bottom();
-        bottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
-        uiStage.addActor(bottomTable);
-
-        inventoryBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                isInventoryVisible = true;
-                updateInputProcessor();
-            }
-        });
-
         Table inventoryRoot = new Table();
         inventoryRoot.setFillParent(true);
         inventoryStage.addActor(inventoryRoot);

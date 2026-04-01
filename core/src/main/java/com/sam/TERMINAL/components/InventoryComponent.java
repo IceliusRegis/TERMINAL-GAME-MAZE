@@ -25,6 +25,10 @@ public class InventoryComponent implements Component {
         return items.contains(item);
     }
 
+    public void removeItem(String item) {
+        items.remove(item);
+    }
+
 
 
 }
