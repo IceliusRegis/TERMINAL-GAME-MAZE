@@ -52,16 +52,12 @@ public class SaveSystem extends IteratingSystem {
     private String currentRunId = "";
 
     //Sprites
-    private final  TextureRegion openDoorSprite;
-    private final  TextureRegion closedDoorSprite;
     private final TextureRegion keySprite;
 
-    public SaveSystem(TextureRegion openDoorSprite, TextureRegion closedDoorSprite, TextureRegion keySprite) {
+    public SaveSystem(TextureRegion keySprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
-        this.openDoorSprite = openDoorSprite;
-        this.closedDoorSprite = closedDoorSprite;
         this.keySprite = keySprite;
 
         //Initialize Mappers
@@ -215,18 +211,16 @@ public class SaveSystem extends IteratingSystem {
                         if (interactLoad !=null) {
                             interactLoad.isActive = shouldBeActive;
 
-                            //If Item was taken / Door was opened
+                            //If Item was taken
                             if (!shouldBeActive) {
                                 if (interactLoad.type.equals("beep")) {
                                     entity.remove((SpriteComponent.class));
-                                } else if (interactLoad.type.equals("door")) {
-                                    entity.remove(CollisionComponent.class);
-                                    SpriteComponent doorSprite = spriteMapper.get(entity);
-                                    if (doorSprite != null) doorSprite.staticSprite = openDoorSprite;
+                                } else if (interactLoad.type.equals("flashlight")) {
+                                    entity.remove((SpriteComponent.class));
                                 }
                             }
 
-                            //If item/door are not picked or opened restore it
+                            //If item was not picked, restore it
                             else {
                                 if (interactLoad.type.equals("beep")) {
                                     if (spriteMapper.get(entity) == null) {
@@ -239,18 +233,6 @@ public class SaveSystem extends IteratingSystem {
                                         entity.add(restoredSprite);
                                     }
                                 }
-                                if (interactLoad.type.equals("door")) {
-                                    if (!collisionMapper.has(entity)) {
-                                        entity.add(getEngine().createComponent(CollisionComponent.class));
-                                    }
-
-                                    SpriteComponent doorSprite = spriteMapper.get(entity);
-                                    if (doorSprite !=null) {
-                                        doorSprite.staticSprite = closedDoorSprite;
-                                    }
-
-                                }
-
                             }
                         }
                     }

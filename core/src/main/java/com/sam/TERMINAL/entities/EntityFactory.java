@@ -55,29 +55,6 @@ public class EntityFactory {
         engine.addEntity(player);
     }
 
-    public static void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
-        Entity door = engine.createEntity();
-
-        TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(x, y);
-        transform.width = 32;
-        transform.height = 32;
-        transform.updateBounds();
-        door.add(transform);
-
-        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
-        sprite.staticSprite = closedSprite;
-        sprite.isStatic = true;
-        door.add(sprite);
-
-        door.add(engine.createComponent(CollisionComponent.class));
-        door.add(new InteractableComponent("door", 40f));
-
-        door.add(new PersistenceComponent("INTERACTABLE", saveId));
-
-        engine.addEntity(door);
-    }
-
     public static void createKey(PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
         Entity beep = engine.createEntity();
 

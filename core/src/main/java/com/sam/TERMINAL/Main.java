@@ -54,10 +54,10 @@ public class Main extends ApplicationAdapter {
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, doorOpenTexture, doorClosedTexture, flashlightTexture;
+    private Texture beepTexture, flashlightTexture;
 
     // Regions and Animation
-    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion, flashlightRegion;
+    private TextureRegion beepRegion, enemyRegion, flashlightRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -143,12 +143,6 @@ public class Main extends ApplicationAdapter {
         beepTexture = new Texture(Gdx.files.internal("sprites/beep.png"));
         beepRegion = new TextureRegion(beepTexture);
 
-        doorOpenTexture = new Texture(Gdx.files.internal("environments/opendoor.png"));
-        doorOpenRegion = new TextureRegion(doorOpenTexture);
-
-        doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
-        doorCloseRegion = new TextureRegion(doorClosedTexture);
-
         flashlightTexture = new Texture(Gdx.files.internal("sprites/flash_off.png"));
         flashlightRegion = new TextureRegion(flashlightTexture);
 
@@ -231,16 +225,16 @@ public class Main extends ApplicationAdapter {
             });
         }));
 
-        WinLossSystem winLossSystem = new WinLossSystem(this);
+        WinLossSystem winLossSystem = new WinLossSystem(this, batch);
         if (menuScreen != null) {
             winLossSystem.setMenuScreen(menuScreen);
         }
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
+        engine.addSystem(new SaveSystem(beepRegion));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem(new InteractionSystem(doorOpenRegion, batch));
+        engine.addSystem(new InteractionSystem(batch));
 
         lightingSystem = new LightingSystem(camera);
         if (menuScreen != null) {
@@ -274,7 +268,7 @@ public class Main extends ApplicationAdapter {
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
                     enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
@@ -286,7 +280,7 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
-            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
                     enemyRegion, flashlightRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
@@ -303,10 +297,10 @@ public class Main extends ApplicationAdapter {
     public void resetGame() {
         Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
 
-        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine
+        com.badlogic.ashley.utils.ImmutableArray<Entity> interactables = engine
                 .getEntitiesFor(Family.all(InteractableComponent.class).get());
-        for (Entity door : doors) {
-            door.getComponent(InteractableComponent.class).isActive = true;
+        for (Entity item : interactables) {
+            item.getComponent(InteractableComponent.class).isActive = true;
         }
 
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
@@ -476,10 +470,10 @@ public class Main extends ApplicationAdapter {
         if (playerSpriteSheet != null) playerSpriteSheet.dispose();
         if (cursorTexture != null) cursorTexture.dispose();
         if (beepTexture != null) beepTexture.dispose();
-        if (doorOpenTexture != null) doorOpenTexture.dispose();
-        if (doorClosedTexture != null) doorClosedTexture.dispose();
         if (enemyTexture != null) enemyTexture.dispose();
         if (flashlightTexture != null) flashlightTexture.dispose();
+        WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
+        if (wlsDispose != null) wlsDispose.dispose();
     }
 
     public TextureRegion getBeepRegion() {
