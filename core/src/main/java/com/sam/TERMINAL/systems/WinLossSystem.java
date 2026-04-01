@@ -17,13 +17,14 @@ import com.sam.TERMINAL.buttons.MenuScreen;
 /**
  * WinLossSystem — Checks win and lose conditions each frame.
  *
- * Win condition (UPDATED): Player must:
+ * Win condition: Player must:
  *   1. Be adjacent to a non-zero tile on the "Winning" map layer, AND
  *   2. Have "beep_card" in their InventoryComponent.
  *   Then pressing E triggers the win.
  *
- * If the player is near the win tile but lacks the card, a
- * "Find the Beep Card first!" notification is shown instead of the prompt.
+ * The 'E' prompt is shown whenever the player is near the win tile, regardless
+ * of whether they hold the Beep Card. If E is pressed without the card, a
+ * timed "Find the Beep Card first!" warning appears for a few seconds.
  *
  * Lose condition: Enemy entity overlaps the player.
  */
@@ -48,13 +49,24 @@ public class WinLossSystem extends EntitySystem {
     private static final float TILE_SIZE = 32f;
     private static final float PROMPT_WIDTH = 24f;
     private static final float PROMPT_HEIGHT = 24f;
-    private static final float PROMPT_OFFSET_Y = 8f;
+
+    /**
+     * How long (in seconds) the "Find the Beep Card first!" warning remains
+     * visible after the player presses E without having the card.
+     */
+    private static final float MISSING_CARD_DISPLAY_DURATION = 2.5f;
 
     // Set each frame in update(); read by renderPrompt() in Main after lighting.
     private boolean nearWinTile = false;
     private boolean playerHasBeepCard = false;
     private float promptWorldX = 0f;
     private float promptWorldY = 0f;
+
+    /**
+     * Counts down from MISSING_CARD_DISPLAY_DURATION to 0.
+     * While > 0 the warning message is rendered on screen.
+     */
+    private float missingCardWarningTimer = 0f;
 
     public WinLossSystem(Main main, SpriteBatch batch) {
         this.mainGame = main;
@@ -83,6 +95,15 @@ public class WinLossSystem extends EntitySystem {
         // Reset per-frame state flags at the top of every frame.
         nearWinTile = false;
         playerHasBeepCard = false;
+
+        // Tick down the warning timer independently of the win/loss state so
+        // the message can finish displaying even mid-frame transitions.
+        if (missingCardWarningTimer > 0f) {
+            missingCardWarningTimer -= deltaTime;
+            if (missingCardWarningTimer < 0f) {
+                missingCardWarningTimer = 0f;
+            }
+        }
 
         if (gameOver || win)
             return;
@@ -129,7 +150,7 @@ public class WinLossSystem extends EntitySystem {
         int playerTileX = (int) (playerCenterX / TILE_SIZE);
         int playerTileY = (int) (playerCenterY / TILE_SIZE);
 
-        // Check the player's tile and 4 adjacent tiles for a Winning cell
+        // Check the player's tile and 4 adjacent tiles for a Winning cell.
         nearWinTile = isWinningTile(world, playerTileX, playerTileY)
                 || isWinningTile(world, playerTileX + 1, playerTileY)
                 || isWinningTile(world, playerTileX - 1, playerTileY)
@@ -139,24 +160,30 @@ public class WinLossSystem extends EntitySystem {
         if (!nearWinTile)
             return;
 
-        // Cache prompt world position for renderPrompt().
-        promptWorldX = playerCenterX - PROMPT_WIDTH / 2f;
-        promptWorldY = playerTransform.pos.y + playerTransform.height + PROMPT_OFFSET_Y + 20f;
+        // --- Dynamic prompt position ---
+        // Place the icon to the right of the player bounding box so it never
+        // overlaps the sprite itself. A small horizontal gap of 4 pixels is
+        // added between the right edge and the icon's left edge.
+        float promptGap = 4f;
+        promptWorldX = playerTransform.pos.x + playerTransform.width + promptGap;
+        // Vertically centered on the player bounding box.
+        promptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
 
-        // --- BEEP CARD prerequisite check ---
+        // --- Beep Card prerequisite check ---
         InventoryComponent inventory = player.getComponent(InventoryComponent.class);
         playerHasBeepCard = (inventory != null) && inventory.hasItem(BEEP_CARD_ITEM_ID);
 
-        if (!playerHasBeepCard) {
-            // Player is at the exit but missing the card — do nothing further this frame.
-            // renderPrompt() will draw the warning message instead of the Press-E icon.
-            return;
-        }
-
-        // Player has the card: listen for the E key to complete the win.
+        // The 'E' prompt is always shown from here on (nearWinTile == true).
+        // If E is pressed, attempt the win or start the warning timer.
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            Gdx.app.log("TERMINAL", "YOU WIN - ESCAPED!");
-            win = true;
+            if (playerHasBeepCard) {
+                Gdx.app.log("TERMINAL", "YOU WIN - ESCAPED!");
+                win = true;
+            } else {
+                // Restart (or extend) the warning display timer.
+                missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;
+                Gdx.app.log("TERMINAL", "Win attempt blocked — Beep Card not found.");
+            }
         }
     }
 
@@ -165,21 +192,24 @@ public class WinLossSystem extends EntitySystem {
      * indicators are always visible above the darkness overlay.
      *
      * Behavior:
-     *   - Player near win tile WITHOUT beep_card → yellow "Find the Beep Card first!" text.
-     *   - Player near win tile WITH beep_card    → standard "Press E" sprite prompt.
+     *   - Player near win tile → always draws the Press-E icon to the side of
+     *     the player bounding box.
+     *   - E pressed without Beep Card → also draws the timed warning text until
+     *     missingCardWarningTimer reaches zero.
      */
     public void renderPrompt() {
+        // Draw the warning message whenever its timer is still active,
+        // independently of the nearWinTile flag so the text persists even if
+        // the player briefly steps away.
+        if (missingCardWarningTimer > 0f) {
+            renderMissingCardWarning();
+        }
+
         if (!nearWinTile) {
             return;
         }
 
-        if (!playerHasBeepCard) {
-            // Draw the warning message in screen-space so it is always legible.
-            renderMissingCardWarning();
-            return;
-        }
-
-        // Player has the card: draw the standard Press-E icon in world-space.
+        // Always draw the Press-E icon when the player is adjacent to the win tile.
         if (promptRegion != null) {
             batch.draw(promptRegion, promptWorldX, promptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
         }
@@ -193,6 +223,8 @@ public class WinLossSystem extends EntitySystem {
      * is called from Main. We temporarily switch to a screen-space ortho matrix,
      * draw the text, then restore the world matrix so subsequent draws are not
      * disrupted.
+     *
+     * Fades the text out over the last 0.5 s of the timer to give a smooth end.
      */
     private void renderMissingCardWarning() {
         // Snapshot the current world-space projection so we can restore it later.
@@ -206,11 +238,21 @@ public class WinLossSystem extends EntitySystem {
         screenMatrix.setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         batch.setProjectionMatrix(screenMatrix);
 
+        // Fade out the text smoothly over the final 0.5 s of the timer.
+        float fadeWindow = 0.5f;
+        float alpha = (missingCardWarningTimer < fadeWindow)
+                ? missingCardWarningTimer / fadeWindow
+                : 1f;
+        notificationFont.setColor(1f, 1f, 0f, alpha); // yellow with fade
+
         glyphLayout.setText(notificationFont, MISSING_CARD_MESSAGE);
         float screenX = (Gdx.graphics.getWidth() - glyphLayout.width) / 2f;
         float screenY = Gdx.graphics.getHeight() * 0.72f; // upper portion of screen
 
         notificationFont.draw(batch, MISSING_CARD_MESSAGE, screenX, screenY);
+
+        // Reset alpha to fully opaque so future draws with this font are unaffected.
+        notificationFont.setColor(1f, 1f, 0f, 1f);
 
         // Restore the world-space matrix so subsequent world-space draws are correct.
         batch.setProjectionMatrix(worldMatrix);
@@ -229,6 +271,7 @@ public class WinLossSystem extends EntitySystem {
     public void reset() {
         gameOver = false;
         win = false;
+        missingCardWarningTimer = 0f;
     }
 
     public void dispose() {
