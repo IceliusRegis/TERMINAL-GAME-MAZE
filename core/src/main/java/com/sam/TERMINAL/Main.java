@@ -235,7 +235,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(batch));
 
@@ -326,7 +326,7 @@ public class Main extends ApplicationAdapter {
 
         // 5. Load the temp save — this restores player position, inventory, and resets battery component context
         //    (It won't affect items because we just removed them!)
-        engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
+        engine.getSystem(SaveSystem.class).forceImmediateLoad(TEMP_SAVE_FILE);
 
         // 6. Provide a clean slate for the player's runtime components (sometimes items could erroneously persist in load state if not checked)
         ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());

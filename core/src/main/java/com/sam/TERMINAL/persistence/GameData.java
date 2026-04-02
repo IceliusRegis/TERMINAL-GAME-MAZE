@@ -27,9 +27,44 @@ public class GameData {
 
     public Map<String, Boolean> interactableStates = new HashMap<>();
 
+    public static class EnemySaveData {
+        public float x;
+        public float y;
+
+        public EnemySaveData() {}
+        
+        public EnemySaveData(float x, float y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    public static class ItemSaveData {
+        public float x;
+        public float y;
+        public String type;
+        public String saveId;
+        public boolean isActive;
+
+        public ItemSaveData() {}
+        
+        public ItemSaveData(float x, float y, String type, String saveId, boolean isActive) {
+            this.x = x;
+            this.y = y;
+            this.type = type;
+            this.saveId = saveId;
+            this.isActive = isActive;
+        }
+    }
+
+    public List<EnemySaveData> enemies;
+    public List<ItemSaveData> items;
+
     // 2. Required for JSON serialization
     public GameData() {
         // Initialize lists here to avoid NullPointerExceptions later
         this.inventoryItems = new ArrayList<>();
+        this.enemies = new ArrayList<>();
+        this.items = new ArrayList<>();
     }
 }

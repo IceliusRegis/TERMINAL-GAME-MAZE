@@ -96,6 +96,7 @@ public class EntityFactory {
         enemy.add(s);
 
         enemy.add(new EnemyComponent());
+        enemy.add(new PersistenceComponent("ENEMY", "ENEMY_" + java.util.UUID.randomUUID().toString()));
         engine.addEntity(enemy);
     }
 

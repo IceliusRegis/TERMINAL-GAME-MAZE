@@ -54,13 +54,17 @@ public class SaveSystem extends IteratingSystem {
     //Sprites
     private final TextureRegion keySprite;
     private final TextureRegion flashlightSprite;
+    private final TextureRegion enemySprite;
+    private final TextureRegion batterySprite;
 
-    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite) {
+    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite, TextureRegion batterySprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
         this.keySprite = keySprite;
         this.flashlightSprite = flashlightSprite;
+        this.enemySprite = enemySprite;
+        this.batterySprite = batterySprite;
 
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
@@ -109,6 +113,39 @@ public class SaveSystem extends IteratingSystem {
             }
 
             if (loading) {
+                // Clear existing dynamic entities completely to prevent duplication
+                com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
+                for (Entity e : getEngine().getEntitiesFor(Family.all(EnemyComponent.class).get())) {
+                    toRemove.add(e);
+                }
+                for (Entity e : getEngine().getEntitiesFor(Family.all(InteractableComponent.class).get())) {
+                    toRemove.add(e);
+                }
+                for (Entity e : toRemove) {
+                    getEngine().removeEntity(e);
+                }
+
+                // Dynamically spawn the entities based on the saved coordinates
+                if (loadedData != null) {
+                    if (loadedData.enemies != null && !loadedData.enemies.isEmpty()) {
+                        for (GameData.EnemySaveData eData : loadedData.enemies) {
+                            com.sam.TERMINAL.entities.EntityFactory.createEnemy((com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
+                        }
+                    }
+
+                    if (loadedData.items != null && !loadedData.items.isEmpty()) {
+                        for (GameData.ItemSaveData iData : loadedData.items) {
+                            if (iData.type.equals("beep")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createKey((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, keySprite, iData.saveId);
+                            } else if (iData.type.equals("flashlight")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createFlashlight((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite, iData.saveId);
+                            } else if (iData.type.equals("battery")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createBattery((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite, iData.saveId);
+                            }
+                        }
+                    }
+                }
+
                 System.out.println("Loaded from: " + currentSaveFile);
                 loading = false;
                 loadedData = null;
@@ -141,6 +178,16 @@ public class SaveSystem extends IteratingSystem {
             } else {
                 System.out.println("Cannot load: " + fileName + " does not exist");
             }
+        }
+    }
+
+    public void forceImmediateLoad(String fileName) {
+        triggerManualLoad(fileName);
+        if (loading) {
+            super.update(0f); // Processes entities synchronously right now
+            System.out.println("Force loaded from: " + currentSaveFile);
+            loading = false;
+            loadedData = null;
         }
     }
 
@@ -180,8 +227,17 @@ public class SaveSystem extends IteratingSystem {
 
                 case "INTERACTABLE":
                     InteractableComponent interact = interactMapper.get(entity);
-                    if (interact !=null) {
+                    TransformComponent iTrans = transformMapper.get(entity);
+                    if (interact !=null && iTrans != null) {
                         pendingSaveData.interactableStates.put(persistence.saveId, interact.isActive);
+                        pendingSaveData.items.add(new GameData.ItemSaveData(iTrans.pos.x, iTrans.pos.y, interact.type, persistence.saveId, interact.isActive));
+                    }
+                    break;
+                    
+                case "ENEMY":
+                    TransformComponent eTrans = transformMapper.get(entity);
+                    if (eTrans != null) {
+                        pendingSaveData.enemies.add(new GameData.EnemySaveData(eTrans.pos.x, eTrans.pos.y));
                     }
                     break;
             }
