@@ -22,7 +22,7 @@ public class EntityFactory {
      * @param idleAnimation
      */
     public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight,
-            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
+                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
@@ -133,16 +133,16 @@ public class EntityFactory {
 
         TransformComponent transform = engine.createComponent(TransformComponent.class);
         transform.pos.set(x, y);
-        transform.width = 30;
-        transform.height = 30;
+        transform.width = 70;
+        transform.height = 70;
         transform.updateBounds();
         battery.add(transform);
 
         SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
         sprite.staticSprite = texture;
         sprite.isStatic = true;
-        sprite.drawWidth = 30;
-        sprite.drawHeight = 30;
+        sprite.drawWidth = 70;
+        sprite.drawHeight = 70;
         battery.add(sprite);
 
         battery.add(new InteractableComponent("battery", 40f));

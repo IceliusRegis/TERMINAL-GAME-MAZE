@@ -212,6 +212,10 @@ public class MenuScreen {
                     updateInputProcessor();
                     return true;
                 }
+                if (keycode == Input.Keys.U) {
+                    useBatteryFromInventory();
+                    return true;
+                }
                 return false;
             }
         };
@@ -224,6 +228,25 @@ public class MenuScreen {
     // =========================================================================
     // Helper Methods
     // =========================================================================
+    private void useBatteryFromInventory() {
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
+
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+        com.sam.TERMINAL.components.BatteryComponent bat = player.getComponent(com.sam.TERMINAL.components.BatteryComponent.class);
+
+        // Only use if the player actually has a battery AND needs it (or has a flashlight)
+        if (inv != null && inv.hasItem("battery") && bat != null) {
+            // 1. Refill battery to max
+            bat.battery = bat.maxBattery;
+
+            // 2. Remove the battery string from the inventory list
+            inv.items.remove("battery");
+
+            // Note: refreshInventory() is called automatically in render()
+            // if the inventory is open, so the icon will disappear instantly.
+        }
+    }
 
     private void saveMapLogic() {
         if (engine != null) {
@@ -438,11 +461,11 @@ public class MenuScreen {
 
         if (bat != null && inv != null && inv.hasItem("flashlight")) {
             if (batteryLabel != null) {
-                batteryLabel.setText(String.format("Battery: %.0f%%", bat.battery));
-                batteryLabel.getStyle().fontColor = (bat.battery <= 20f) ? Color.RED : Color.GREEN;
+                batteryLabel.setText(String.format("Flashlight Battery: %.0f%%", bat.battery));
+                batteryLabel.getStyle().fontColor = (bat.battery <= 15f) ? Color.RED : Color.GREEN;
             }
             if (lowBatteryWarningLabel != null) {
-                lowBatteryWarningLabel.setVisible(bat.battery <= 20f && bat.battery > 0f);
+                lowBatteryWarningLabel.setVisible(bat.battery <= 15f && bat.battery > 0f);
             }
         } else {
             if (batteryLabel != null) batteryLabel.setText("");
@@ -485,7 +508,7 @@ public class MenuScreen {
         localBottomTable.bottom();
 
         ImageButton inventoryBtn = new ImageButton(
-                new TextureRegionDrawable(new TextureRegion(invTexture)));
+            new TextureRegionDrawable(new TextureRegion(invTexture)));
         inventoryBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -497,7 +520,7 @@ public class MenuScreen {
         localBottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
         uiStage.addActor(localBottomTable);
 
-        // Top-right: Dynamic tracker
+        // --- UPDATED: Top-right Dynamic tracker (Right Aligned) ---
         Table topRightTable = new Table();
         topRightTable.setFillParent(true);
         topRightTable.top().right();
@@ -507,9 +530,10 @@ public class MenuScreen {
         lowBatteryWarningLabel = new Label("Battery Low!", new Label.LabelStyle(font, Color.RED));
         lowBatteryWarningLabel.setVisible(false);
 
-        topRightTable.add(beepCardLabel).padRight(20).padTop(10).row();
-        topRightTable.add(batteryLabel).padRight(20).padTop(10).row();
-        topRightTable.add(lowBatteryWarningLabel).padRight(20).padTop(5).row();
+        // Adding .right() to the cell makes the text hug the right side of the table
+        topRightTable.add(beepCardLabel).right().padRight(20).padTop(10).row();
+        topRightTable.add(batteryLabel).right().padRight(20).padTop(10).row();
+        topRightTable.add(lowBatteryWarningLabel).right().padRight(20).padTop(5).row();
 
         uiStage.addActor(topRightTable);
     }
@@ -545,6 +569,19 @@ public class MenuScreen {
                             new BitmapFont(),
                             Color.WHITE)))
                     .padRight(20);
+        }
+        if (inv != null && inv.hasItem("battery")) {
+            // Create an Image using the battery textur  e region from Main
+            Image icon = new Image(mainGame.getBatteryRegion());
+
+            // Add to the table with the same styling as the others
+            itemTable.add(icon).size(64, 64).pad(10);
+            itemTable.add(new Label(
+                    "Battery",
+                    new Label.LabelStyle(
+                        new BitmapFont(),
+                        Color.WHITE)))
+                .padRight(20);
         }
         itemTable.invalidateHierarchy();
     }

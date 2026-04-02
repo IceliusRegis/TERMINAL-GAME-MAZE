@@ -44,7 +44,7 @@ public class EnemySystem extends IteratingSystem {
     private static final float CATCH_THRESHOLD = 16f;
 
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
-            .getFor(TransformComponent.class);
+        .getFor(TransformComponent.class);
     private final ComponentMapper<EnemyComponent> enemyMapper = ComponentMapper.getFor(EnemyComponent.class);
 
     /** Cached player entity — looked up once and reused until engine reset. */
@@ -120,7 +120,7 @@ public class EnemySystem extends IteratingSystem {
             } else {
                 // Aggressive volume padding: Start heavily boosted (~40%) as soon as range triggers
                 float boostedVolume = Math.min(1.0f, 0.40f + (volume * 0.60f));
-                
+
                 if (heartbeatSoundId == -1) {
                     heartbeatSoundId = heartbeatSound.loop(0f);
                 }
@@ -140,7 +140,7 @@ public class EnemySystem extends IteratingSystem {
         // 1. Find player entity (cached after first frame)
         if (cachedPlayer == null) {
             ImmutableArray<Entity> players = getEngine()
-                    .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
+                .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
             if (players.size() == 0)
                 return;
             cachedPlayer = players.first();
@@ -175,7 +175,7 @@ public class EnemySystem extends IteratingSystem {
         // 4. Accumulate timer; recalculate path when interval fires or path exhausted
         enemy.pathTimer += deltaTime;
         boolean shouldRepath = enemy.pathTimer >= enemy.pathRecalcInterval
-                || enemy.path.isEmpty();
+            || enemy.path.isEmpty();
 
         if (shouldRepath) {
             enemy.pathTimer = 0f;
@@ -188,7 +188,7 @@ public class EnemySystem extends IteratingSystem {
 
             // Run BFS and cache the result
             Queue<GridPoint2> newPath = findPath(
-                    world, startTileX, startTileY, goalTileX, goalTileY);
+                world, startTileX, startTileY, goalTileX, goalTileY);
             enemy.path.clear();
             if (newPath != null) {
                 enemy.path.addAll(newPath);
@@ -201,11 +201,11 @@ public class EnemySystem extends IteratingSystem {
 
             // Target pixel: center of the next tile, offset by half entity size
             float targetX = nextTile.x * world.tileWidth
-                    + world.tileWidth / 2f
-                    - enemyT.width / 2f;
+                + world.tileWidth / 2f
+                - enemyT.width / 2f;
             float targetY = nextTile.y * world.tileHeight
-                    + world.tileHeight / 2f
-                    - enemyT.height / 2f;
+                + world.tileHeight / 2f
+                - enemyT.height / 2f;
 
             float dx = targetX - enemyT.pos.x;
             float dy = targetY - enemyT.pos.y;
@@ -216,20 +216,25 @@ public class EnemySystem extends IteratingSystem {
                 enemyT.pos.set(targetX, targetY);
                 enemy.path.poll();
             } else {
-                // Determine speed scaled by currently held beep cards
-                float baseSpeed = 80f;
-                float maxSpeed = 125f;
+                // --- INCREASE ENEMY SPEED PER BEEP CARD ---
+                float baseSpeed = 80f;      // Starting speed with 0 cards
+                float maxEnemySpeed = 160f; // Speed cap so it doesn't become impossible
                 int heldCards = 0;
-                
+
                 InventoryComponent playerInv = cachedPlayer.getComponent(InventoryComponent.class);
                 if (playerInv != null) {
+                    // Count how many "beep_card" items are currently in the player's inventory
                     heldCards = java.util.Collections.frequency(playerInv.items, "beep_card");
                 }
-                
-                float calculatedSpeed = baseSpeed + (heldCards * 15f);
-                enemy.speed = Math.min(calculatedSpeed, maxSpeed);
 
-                // Move toward waypoint at configured speed
+                // Add 10 speed for every card held
+                // 0 cards = 80, 5 cards = 130, etc.
+                float calculatedSpeed = baseSpeed + (heldCards * 10f);
+
+                // Ensure the enemy doesn't exceed the max speed cap
+                enemy.speed = Math.min(calculatedSpeed, maxEnemySpeed);
+
+                // Move toward the current BFS waypoint at the adjusted speed
                 float step = enemy.speed * deltaTime;
                 enemyT.pos.x += (dx / dist) * step;
                 enemyT.pos.y += (dy / dist) * step;
@@ -263,8 +268,8 @@ public class EnemySystem extends IteratingSystem {
      *         goal (inclusive), or null if no path exists.
      */
     private Queue<GridPoint2> findPath(TileWorldComponent world,
-            int startX, int startY,
-            int goalX, int goalY) {
+                                       int startX, int startY,
+                                       int goalX, int goalY) {
 
         // Edge case: already at goal
         if (startX == goalX && startY == goalY) {
@@ -355,7 +360,7 @@ public class EnemySystem extends IteratingSystem {
         debugRenderer.setColor(Color.YELLOW);
 
         ImmutableArray<Entity> enemies = getEngine()
-                .getEntitiesFor(Family.all(EnemyComponent.class, TransformComponent.class).get());
+            .getEntitiesFor(Family.all(EnemyComponent.class, TransformComponent.class).get());
 
         for (Entity entity : enemies) {
             EnemyComponent enemy = enemyMapper.get(entity);
@@ -392,7 +397,7 @@ public class EnemySystem extends IteratingSystem {
      */
     private TileWorldComponent getWorldComponent() {
         ImmutableArray<Entity> worldEntities = getEngine()
-                .getEntitiesFor(Family.all(TileWorldComponent.class).get());
+            .getEntitiesFor(Family.all(TileWorldComponent.class).get());
         if (worldEntities.size() == 0)
             return null;
         return worldEntities.first().getComponent(TileWorldComponent.class);

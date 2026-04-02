@@ -272,7 +272,7 @@ public class Main extends ApplicationAdapter {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion);
+                enemyRegion, flashlightRegion, batteryRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -284,14 +284,14 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
             EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion);
+                enemyRegion, flashlightRegion, batteryRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
 
         // Attach the player's ConeLight after all entities have been spawned
         ImmutableArray<Entity> players = engine.getEntitiesFor(
-                Family.all(PlayerComponent.class).get());
+            Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             lightingSystem.createPlayerLight(players.first(), false);
         }
@@ -334,7 +334,7 @@ public class Main extends ApplicationAdapter {
             Entity p = players.first();
             InventoryComponent inv = p.getComponent(InventoryComponent.class);
             if (inv != null) inv.items.clear();
-            
+
             BatteryComponent bat = p.getComponent(BatteryComponent.class);
             if (bat != null) {
                 bat.battery = bat.maxBattery;
@@ -357,7 +357,7 @@ public class Main extends ApplicationAdapter {
                 }
             }
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
-            
+
             // Re-spawn the enemy cleanly
             com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 40 * 32f, enemyRegion);
 
@@ -570,4 +570,6 @@ public class Main extends ApplicationAdapter {
     public TextureRegion getFlashlightRegion() {
         return flashlightRegion;
     }
+
+    public TextureRegion getBatteryRegion() { return batteryRegion; }
 }
