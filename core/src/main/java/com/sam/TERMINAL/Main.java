@@ -54,10 +54,10 @@ public class Main extends ApplicationAdapter {
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, flashlightTexture, batteryTexture;
+    private Texture beepTexture, flashlightTexture, batteryTexture, potionTexture; // ADDED potionTexture
 
     // Regions and Animation
-    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion;
+    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion, potionRegion; // ADDED potionRegion
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -148,6 +148,9 @@ public class Main extends ApplicationAdapter {
 
         batteryTexture = new Texture(Gdx.files.internal("sprites/battery.png"));
         batteryRegion = new TextureRegion(batteryTexture);
+
+        potionTexture = new Texture(Gdx.files.internal("sprites/sting.png")); // Ensure this file exists!
+        potionRegion = new TextureRegion(potionTexture);
 
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
@@ -272,7 +275,7 @@ public class Main extends ApplicationAdapter {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion);
+                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -284,7 +287,7 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
             EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion);
+                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
@@ -364,8 +367,8 @@ public class Main extends ApplicationAdapter {
                     pTileY = (int) (t.pos.y / 32f);
                 }
             }
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY,
-                    world.mapWidthTiles, world.mapHeightTiles);
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
+                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
             // Re-spawn the enemy cleanly
             com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 40 * 32f, enemyRegion);
@@ -584,6 +587,8 @@ public class Main extends ApplicationAdapter {
             flashlightTexture.dispose();
         if (batteryTexture != null)
             batteryTexture.dispose();
+        if (potionTexture != null)
+            potionTexture.dispose();
         WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
         if (wlsDispose != null)
             wlsDispose.dispose();
@@ -599,5 +604,9 @@ public class Main extends ApplicationAdapter {
 
     public TextureRegion getBatteryRegion() {
         return batteryRegion;
+    }
+
+    public TextureRegion getPotionRegion() {
+        return potionRegion;
     }
 }

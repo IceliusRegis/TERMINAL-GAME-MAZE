@@ -38,4 +38,6 @@ public class SpriteComponent implements Component {
 
     public boolean flipX = false;
     public boolean flipY = false;
+
+    public String name = "";
 }

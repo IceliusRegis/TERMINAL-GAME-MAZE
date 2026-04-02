@@ -226,6 +226,18 @@ public class InteractionSystem extends EntitySystem {
                 target.remove(SpriteComponent.class);
                 typeData.isActive = false;
                 break;
+            case "potion": // ADD THIS CASE
+                System.out.println("Picked up a SPEED POTION!");
+                if (inventory != null) {
+                    // This adds the string "potion" to your InventoryComponent's list
+                    inventory.addItem("potion");
+                }
+                // Hide the potion from the world
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
+
+                // Optional: You can play a small sound effect here if you have one
+                break;
 
             default:
                 System.out.println("Interacted with " + typeData.type);

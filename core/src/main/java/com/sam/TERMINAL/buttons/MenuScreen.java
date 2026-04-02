@@ -24,6 +24,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.sam.TERMINAL.components.BatteryComponent;
 import com.sam.TERMINAL.components.InventoryComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.systems.LightingSystem;
@@ -101,6 +102,16 @@ public class MenuScreen {
 
     // ── BUG 3 FIX: store the SettingsButton so dispose() can be called on it.
     private SettingsButton settingsButtonWidget;
+
+    // --- HUD Elements & Timers ---
+    private Label stingTimerLabel;
+    private Label noFlashlightWarningLabel;
+
+    private float stingEffectTimer = 0f;
+    private float warningDisplayTimer = 0f;
+
+    private final float STING_DURATION = 10f;
+    private final float WARNING_DURATION = 3f;
 
     // =========================================================================
     // Constructor
@@ -216,6 +227,10 @@ public class MenuScreen {
                     useBatteryFromInventory();
                     return true;
                 }
+                if (keycode == Input.Keys.P) { // 'P' for Potion
+                    usePotionFromInventory();
+                    return true;
+                }
                 return false;
             }
         };
@@ -228,24 +243,75 @@ public class MenuScreen {
     // =========================================================================
     // Helper Methods
     // =========================================================================
-    private void useBatteryFromInventory() {
+    private void usePotionFromInventory() {
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
 
         Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
         InventoryComponent inv = player.getComponent(InventoryComponent.class);
-        com.sam.TERMINAL.components.BatteryComponent bat = player.getComponent(com.sam.TERMINAL.components.BatteryComponent.class);
+        final PlayerComponent pc = player.getComponent(PlayerComponent.class);
 
-        // Only use if the player actually has a battery AND needs it (or has a flashlight)
-        if (inv != null && inv.hasItem("battery") && bat != null) {
-            // 1. Refill battery to max
-            bat.battery = bat.maxBattery;
+        if (inv != null && inv.hasItem("potion") && pc != null) {
+            inv.items.remove("potion");
 
-            // 2. Remove the battery string from the inventory list
-            inv.items.remove("battery");
+            // 1. Set the speed directly (e.g., Normal + 70)
+            pc.speed = pc.baseSpeed + 70f;
 
-            // Note: refreshInventory() is called automatically in render()
-            // if the inventory is open, so the icon will disappear instantly.
+            stingEffectTimer = STING_DURATION;
+
+            // 2. Schedule the reset
+            com.badlogic.gdx.utils.Timer.schedule(new com.badlogic.gdx.utils.Timer.Task() {
+                @Override
+                public void run() {
+                    // 3. Reset directly to the base speed (Guaranteed to be 170f)
+                    pc.speed = pc.baseSpeed;
+                    stingEffectTimer = 0;
+                    Gdx.app.log("GAME", "Sting wore off. Speed reset to: " + pc.speed);
+                }
+            }, STING_DURATION);
         }
+    }
+    public void useBatteryFromInventory() {
+        Entity player = getPlayerEntity();
+        if (player == null) return;
+
+        BatteryComponent bc = player.getComponent(BatteryComponent.class);
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+
+        // 1. Check if player has the Flashlight item first
+        if (inv == null || !inv.hasItem("flashlight")) {
+            showWarningLabel("NEED FLASHLIGHT TO RELOAD!");
+            return;
+        }
+
+        // 2. Check if player has a battery in inventory
+        if (!inv.hasItem("battery")) {
+            showWarningLabel("NO BATTERIES IN INVENTORY!");
+            return;
+        }
+
+        // 3. Check if battery is already full
+        if (bc != null && bc.battery >= bc.maxBattery) {
+            showWarningLabel("FLASHLIGHT IS ALREADY FULL!");
+            return;
+        }
+
+        // 4. Success: Use battery
+        inv.removeItem("battery");
+        if (bc != null) bc.battery = bc.maxBattery;
+        showWarningLabel("FLASHLIGHT RECHARGED!");
+    }
+
+    /** Helper to trigger the warning label for a few seconds */
+    public void showWarningLabel(String text) {
+        if (noFlashlightWarningLabel != null) {
+            noFlashlightWarningLabel.setText(text);
+            warningDisplayTimer = WARNING_DURATION; // Uses your existing timer field
+        }
+    }
+
+    private Entity getPlayerEntity() {
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return null;
+        return engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
     }
 
     private void saveMapLogic() {
@@ -447,7 +513,7 @@ public class MenuScreen {
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
         Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
         InventoryComponent inv = player.getComponent(InventoryComponent.class);
-        com.sam.TERMINAL.components.BatteryComponent bat = player.getComponent(com.sam.TERMINAL.components.BatteryComponent.class);
+        BatteryComponent bat = player.getComponent(BatteryComponent.class);
 
         int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
         int heldCards = 0;
@@ -464,12 +530,36 @@ public class MenuScreen {
                 batteryLabel.setText(String.format("Flashlight Battery: %.0f%%", bat.battery));
                 batteryLabel.getStyle().fontColor = (bat.battery <= 15f) ? Color.RED : Color.GREEN;
             }
+            // NULL CHECK: lowBatteryWarningLabel
             if (lowBatteryWarningLabel != null) {
                 lowBatteryWarningLabel.setVisible(bat.battery <= 15f && bat.battery > 0f);
             }
         } else {
             if (batteryLabel != null) batteryLabel.setText("");
             if (lowBatteryWarningLabel != null) lowBatteryWarningLabel.setVisible(false);
+        }
+
+        float delta = Gdx.graphics.getDeltaTime();
+
+        // NULL CHECK: Warning Label Logic
+        if (noFlashlightWarningLabel != null) {
+            if (warningDisplayTimer > 0) {
+                warningDisplayTimer -= delta;
+                noFlashlightWarningLabel.setVisible(true);
+            } else {
+                noFlashlightWarningLabel.setVisible(false);
+            }
+        }
+
+        // NULL CHECK: Sting Timer Logic
+        if (stingTimerLabel != null) {
+            if (stingEffectTimer > 0) {
+                stingEffectTimer -= delta;
+                stingTimerLabel.setText(String.format("Sting Boost: %.1fs", stingEffectTimer));
+                stingTimerLabel.setVisible(true);
+            } else {
+                stingTimerLabel.setVisible(false);
+            }
         }
     }
 
@@ -486,10 +576,11 @@ public class MenuScreen {
     private void setupHUD() {
         uiStage.clear();
 
-        // Top-left: Settings gear
-        Table mainRoot = new Table();
-        mainRoot.setFillParent(true);
-        mainRoot.top().left();
+        // --- 1. TOP LEFT: Settings ---
+        Table topLeftTable = new Table();
+        topLeftTable.setFillParent(true);
+        topLeftTable.top().left();
+        uiStage.addActor(topLeftTable);
 
         Image settingsBtn = new Image(settingsTexture);
         settingsBtn.addListener(new ClickListener() {
@@ -499,16 +590,15 @@ public class MenuScreen {
                 updateInputProcessor();
             }
         });
-        mainRoot.add(settingsBtn).size(40, 40).pad(10);
-        uiStage.addActor(mainRoot);
+        topLeftTable.add(settingsBtn).size(40, 40).pad(10);
 
-        // Bottom-center: Inventory button
-        Table localBottomTable = new Table();
-        localBottomTable.setFillParent(true);
-        localBottomTable.bottom();
+        // --- 2. BOTTOM CENTER: Inventory ---
+        Table bottomCenterTable = new Table();
+        bottomCenterTable.setFillParent(true);
+        bottomCenterTable.bottom();
+        uiStage.addActor(bottomCenterTable);
 
-        ImageButton inventoryBtn = new ImageButton(
-            new TextureRegionDrawable(new TextureRegion(invTexture)));
+        ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
         inventoryBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -516,26 +606,38 @@ public class MenuScreen {
                 updateInputProcessor();
             }
         });
+        bottomCenterTable.add(inventoryBtn).size(55, 55).padBottom(5);
 
-        localBottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
-        uiStage.addActor(localBottomTable);
-
-        // --- UPDATED: Top-right Dynamic tracker (Right Aligned) ---
+        // --- 3. TOP RIGHT: Stats & Warnings ---
         Table topRightTable = new Table();
         topRightTable.setFillParent(true);
         topRightTable.top().right();
+        uiStage.addActor(topRightTable);
 
         beepCardLabel = new Label("Beep Cards: 0 / 0", new Label.LabelStyle(font, Color.WHITE));
         batteryLabel = new Label("", new Label.LabelStyle(font, Color.GREEN));
-        lowBatteryWarningLabel = new Label("Battery Low!", new Label.LabelStyle(font, Color.RED));
+
+        // RE-ADDED MISSING LABELS:
+        lowBatteryWarningLabel = new Label("LOW BATTERY", new Label.LabelStyle(font, Color.RED));
         lowBatteryWarningLabel.setVisible(false);
 
-        // Adding .right() to the cell makes the text hug the right side of the table
+        noFlashlightWarningLabel = new Label("", new Label.LabelStyle(font, Color.ORANGE));
+        noFlashlightWarningLabel.setVisible(false);
+
         topRightTable.add(beepCardLabel).right().padRight(20).padTop(10).row();
         topRightTable.add(batteryLabel).right().padRight(20).padTop(10).row();
-        topRightTable.add(lowBatteryWarningLabel).right().padRight(20).padTop(5).row();
+        topRightTable.add(lowBatteryWarningLabel).right().padRight(20).row();
+        topRightTable.add(noFlashlightWarningLabel).right().padRight(20).padTop(5).row();
 
-        uiStage.addActor(topRightTable);
+        // --- 4. BOTTOM RIGHT: Boost Timers ---
+        Table bottomRightTable = new Table();
+        bottomRightTable.setFillParent(true);
+        bottomRightTable.bottom().right();
+        uiStage.addActor(bottomRightTable);
+
+        stingTimerLabel = new Label("", new Label.LabelStyle(font, Color.CYAN));
+        stingTimerLabel.setVisible(false);
+        bottomRightTable.add(stingTimerLabel).right().padRight(20).padBottom(20);
     }
 
     // =========================================================================
@@ -583,8 +685,21 @@ public class MenuScreen {
                         Color.WHITE)))
                 .padRight(20);
         }
+        if (inv != null && inv.hasItem("potion")) {
+            // Create the icon using the region from Main
+            Image icon = new Image(mainGame.getPotionRegion());
+
+            itemTable.add(icon).size(64, 64).pad(10);
+            itemTable.add(new Label(
+                    "Sting",
+                    new Label.LabelStyle(
+                        new BitmapFont(),
+                        Color.WHITE)))
+                .padRight(20);
+        } // <--- Added this closing brace for the IF statement
+
         itemTable.invalidateHierarchy();
-    }
+    } // <--- Added this closing brace for the METHOD
 
     public void dispose() {
         uiStage.dispose();

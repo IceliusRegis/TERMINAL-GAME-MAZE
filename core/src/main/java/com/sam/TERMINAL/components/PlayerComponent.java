@@ -9,5 +9,6 @@ import com.badlogic.ashley.core.Component;
  * Systems use this to filter and find the player entity specifically.
  */
 public class PlayerComponent implements Component {
-    // Empty marker component - just used for identification
+    public float speed = 170f;     // The current speed (changes)
+    public float baseSpeed = 170f;
 }
