@@ -20,15 +20,16 @@ public class EntitySpawner {
 
     private static final float TILE_SIZE = 32f;
 
-    // Default hardcoded tile positions
-    private static final float PLAYER_X = 5 * TILE_SIZE;
-    private static final float PLAYER_Y = 5 * TILE_SIZE;
+    // Default hardcoded tile positions (calculated from LibGDX bottom-left origin)
+    // Tiled coordinates (15, 7) on a 50x50 map equal LibGDX coordinates (15, 42)
+    private static final float PLAYER_X = 15 * TILE_SIZE;
+    private static final float PLAYER_Y = 42 * TILE_SIZE;
     private static final int KEY_TILE_X = 20;
     private static final int KEY_TILE_Y = 10;
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
-    public static final String KEY_SAVE_ID  = "KEY_BEEP_MAIN";
+    public static final String KEY_SAVE_ID = "KEY_BEEP_MAIN";
     public static final String FLASHLIGHT_SAVE_ID = "ITEM_FLASHLIGHT";
     public static final String BATTERY_SAVE_ID = "ITEM_BATTERY";
 
@@ -42,9 +43,9 @@ public class EntitySpawner {
     // =========================================================================
 
     public static void spawnInitialEntities(PooledEngine engine,
-                                            TextureRegion beepRegion,
-                                            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
-                                            TextureRegion enemyRegion, TextureRegion flashlightRegion, TextureRegion batteryRegion) {
+            TextureRegion beepRegion,
+            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
+            TextureRegion enemyRegion, TextureRegion flashlightRegion, TextureRegion batteryRegion) {
 
         TileWorldComponent world = getWorldComponent(engine);
 
@@ -62,22 +63,23 @@ public class EntitySpawner {
     }
 
     public static void spawnItems(PooledEngine engine,
-                                  TextureRegion beepRegion,
-                                  TextureRegion flashlightRegion,
-                                  TextureRegion batteryRegion,
-                                  TileWorldComponent world,
-                                  int pTileX, int pTileY,
-                                  int mapWidth, int mapHeight) {
-        
+            TextureRegion beepRegion,
+            TextureRegion flashlightRegion,
+            TextureRegion batteryRegion,
+            TileWorldComponent world,
+            int pTileX, int pTileY,
+            int mapWidth, int mapHeight) {
+
         // --- SAFE BEEP CARDS POSITION ---
         // Spawn 3 to 5 beep cards
-        totalBeepCardsSpawned = 3 + (int)(Math.random() * 3);
+        totalBeepCardsSpawned = 3 + (int) (Math.random() * 3);
         com.badlogic.gdx.math.GridPoint2 usedPoint = null;
         for (int i = 0; i < totalBeepCardsSpawned; i++) {
-            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint)
+                    : null;
             int keyTileX = KEY_TILE_X;
             int keyTileY = KEY_TILE_Y;
-            
+
             if (randomCardSpawn != null) {
                 keyTileX = randomCardSpawn.x;
                 keyTileY = randomCardSpawn.y;
@@ -87,7 +89,8 @@ public class EntitySpawner {
                 keyTileX = safe[0];
                 keyTileY = safe[1];
             }
-            EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID + "_" + i);
+            EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion,
+                    KEY_SAVE_ID + "_" + i);
         }
 
         // --- SAFE FLASHLIGHT POSITION ---
@@ -133,9 +136,9 @@ public class EntitySpawner {
      * against the collision layer before placement.
      */
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
-                                    TextureRegion beepRegion,
-                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
-                                    TextureRegion enemyRegion, TextureRegion flashlightRegion, TextureRegion batteryRegion) {
+            TextureRegion beepRegion,
+            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
+            TextureRegion enemyRegion, TextureRegion flashlightRegion, TextureRegion batteryRegion) {
 
         TileWorldComponent world = getWorldComponent(engine);
 
@@ -148,7 +151,8 @@ public class EntitySpawner {
         for (int i = 0; i < totalBeepCardsSpawned; i++) {
             int keyTileX = KEY_TILE_X;
             int keyTileY = KEY_TILE_Y;
-            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint)
+                    : null;
             if (randomCardSpawn != null) {
                 keyTileX = randomCardSpawn.x;
                 keyTileY = randomCardSpawn.y;
@@ -160,7 +164,8 @@ public class EntitySpawner {
                 keyTileX = safe[0];
                 keyTileY = safe[1];
             }
-            EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID + "_" + i);
+            EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion,
+                    KEY_SAVE_ID + "_" + i);
         }
 
         // --- SAFE FLASHLIGHT POSITION (load path) ---
@@ -224,9 +229,9 @@ public class EntitySpawner {
      * Used for randomized item spawns (e.g. flashlight).
      */
     private static int[] findSafeTileRandom(TileWorldComponent world,
-                                            int centerX, int centerY,
-                                            int radius, int minDistFromCenter,
-                                            int mapWidth, int mapHeight) {
+            int centerX, int centerY,
+            int radius, int minDistFromCenter,
+            int mapWidth, int mapHeight) {
         for (int attempt = 0; attempt < MAX_RANDOM_ATTEMPTS; attempt++) {
             int offX = (int) (Math.random() * (radius * 2 + 1)) - radius;
             int offY = (int) (Math.random() * (radius * 2 + 1)) - radius;
@@ -268,8 +273,8 @@ public class EntitySpawner {
      *         nothing was found (should not happen on a valid map).
      */
     private static int[] findSafeTile(TileWorldComponent world,
-                                      int originX, int originY, int searchRadius,
-                                      int avoidX, int avoidY, int minAvoidDist) {
+            int originX, int originY, int searchRadius,
+            int avoidX, int avoidY, int minAvoidDist) {
         // Try the origin first
         if (!world.isSolidForSpawning(originX, originY)) {
             int dist = Math.abs(originX - avoidX) + Math.abs(originY - avoidY);
