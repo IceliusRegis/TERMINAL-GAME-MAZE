@@ -47,6 +47,25 @@ public class MovementSystem extends IteratingSystem {
         float xInput = 0;
         float yInput = 0;
 
+        // --- NEW: Manual Battery Consumption ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.U)) {
+            InventoryComponent inventory = entity.getComponent(InventoryComponent.class);
+            BatteryComponent battery = entity.getComponent(BatteryComponent.class);
+            if (inventory != null && battery != null) {
+                if (inventory.hasItem("battery")) {
+                    if (battery.battery < battery.maxBattery) {
+                        inventory.removeItem("battery");
+                        battery.battery = battery.maxBattery;
+                        System.out.println("Reloaded flashlight battery.");
+                    } else {
+                        System.out.println("Flashlight battery is already full.");
+                    }
+                } else {
+                    System.out.println("No battery to use.");
+                }
+            }
+        }
+
         // Handle WASD input
         if (Gdx.input.isKeyPressed(Input.Keys.W)) yInput += 1;
         if (Gdx.input.isKeyPressed(Input.Keys.S)) yInput -= 1;

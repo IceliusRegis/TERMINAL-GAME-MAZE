@@ -54,10 +54,10 @@ public class Main extends ApplicationAdapter {
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, doorOpenTexture, doorClosedTexture, flashlightTexture;
+    private Texture beepTexture, flashlightTexture, batteryTexture;
 
     // Regions and Animation
-    private TextureRegion beepRegion, doorOpenRegion, doorCloseRegion, enemyRegion, flashlightRegion;
+    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -143,14 +143,11 @@ public class Main extends ApplicationAdapter {
         beepTexture = new Texture(Gdx.files.internal("sprites/beep.png"));
         beepRegion = new TextureRegion(beepTexture);
 
-        doorOpenTexture = new Texture(Gdx.files.internal("environments/opendoor.png"));
-        doorOpenRegion = new TextureRegion(doorOpenTexture);
-
-        doorClosedTexture = new Texture(Gdx.files.internal("environments/closedoor.png"));
-        doorCloseRegion = new TextureRegion(doorClosedTexture);
-
         flashlightTexture = new Texture(Gdx.files.internal("sprites/flash_off.png"));
         flashlightRegion = new TextureRegion(flashlightTexture);
+
+        batteryTexture = new Texture(Gdx.files.internal("sprites/battery.png"));
+        batteryRegion = new TextureRegion(batteryTexture);
 
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
@@ -231,16 +228,16 @@ public class Main extends ApplicationAdapter {
             });
         }));
 
-        WinLossSystem winLossSystem = new WinLossSystem(this);
+        WinLossSystem winLossSystem = new WinLossSystem(this, batch);
         if (menuScreen != null) {
             winLossSystem.setMenuScreen(menuScreen);
         }
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(doorOpenRegion, doorCloseRegion, beepRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion));
         engine.addSystem(new RenderSystem(batch, camera));
-        engine.addSystem(new InteractionSystem(doorOpenRegion, batch));
+        engine.addSystem(new InteractionSystem(batch));
 
         lightingSystem = new LightingSystem(camera);
         if (menuScreen != null) {
@@ -274,8 +271,8 @@ public class Main extends ApplicationAdapter {
             if (mainSave.runId != null) {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
-            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion);
+            EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
+                enemyRegion, flashlightRegion, batteryRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -286,46 +283,94 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
-            EntitySpawner.spawnInitialEntities(engine, beepRegion, doorCloseRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion);
+            EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
+                enemyRegion, flashlightRegion, batteryRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
 
         // Attach the player's ConeLight after all entities have been spawned
         ImmutableArray<Entity> players = engine.getEntitiesFor(
-                Family.all(PlayerComponent.class).get());
+            Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             lightingSystem.createPlayerLight(players.first(), false);
         }
     }
 
     public void resetGame() {
-        Gdx.app.log("TERMINAL", "Resetting Game to Initial Save...");
+        Gdx.app.log("TERMINAL", "Resetting game to initial state...");
 
-        com.badlogic.ashley.utils.ImmutableArray<Entity> doors = engine
-                .getEntitiesFor(Family.all(InteractableComponent.class).get());
-        for (Entity door : doors) {
-            door.getComponent(InteractableComponent.class).isActive = true;
+        // 1. Reset the WinLossSystem flags first so update() runs normally again.
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        if (wls != null) {
+            wls.reset();
         }
 
+        // 2. Reset the EnemySystem triggered flag so the jumpscare can fire again.
+        EnemySystem enemySys = engine.getSystem(EnemySystem.class);
+        if (enemySys != null) {
+            enemySys.reset();
+        }
+
+        // 3. Remove all enemies from the old run
+        ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
+        com.badlogic.gdx.utils.Array<Entity> toRemoveEnemies = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : enemies) toRemoveEnemies.add(e);
+        for (Entity e : toRemoveEnemies) engine.removeEntity(e);
+
+        // 4. First, physically remove the old items so we can re-generate a new random count
+        ImmutableArray<Entity> currentItems = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : currentItems) toRemove.add(e);
+        for (Entity e : toRemove) engine.removeEntity(e);
+
+        // 5. Load the temp save — this restores player position, inventory, and resets battery component context
+        //    (It won't affect items because we just removed them!)
         engine.getSystem(SaveSystem.class).triggerManualLoad(TEMP_SAVE_FILE);
 
-        com.badlogic.ashley.utils.ImmutableArray<Entity> enemies = engine
-                .getEntitiesFor(Family.all(EnemyComponent.class).get());
-        for (Entity enemy : enemies) {
-            TransformComponent t = enemy.getComponent(TransformComponent.class);
-            t.pos.set(5 * 32f, 40 * 32f);
-            t.updateBounds();
+        // 6. Provide a clean slate for the player's runtime components (sometimes items could erroneously persist in load state if not checked)
+        ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
+        if (players.size() > 0) {
+            Entity p = players.first();
+            InventoryComponent inv = p.getComponent(InventoryComponent.class);
+            if (inv != null) inv.items.clear();
+
+            BatteryComponent bat = p.getComponent(BatteryComponent.class);
+            if (bat != null) {
+                bat.battery = bat.maxBattery;
+                bat.flashlightOn = false;
+            }
         }
 
-        // Reset EnemySystem triggered flag so it can fire again
-        engine.getSystem(EnemySystem.class).reset();
+        // 7. Spawn fresh completely randomized items (Beep Cards, Battery, Flashlight)
+        //    AND spawn a fresh enemy.
+        ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
+        TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
+        if (world != null) {
+            int pTileX = 5;
+            int pTileY = 5;
+            if (players.size() > 0) {
+                TransformComponent t = players.first().getComponent(TransformComponent.class);
+                if (t != null) {
+                    pTileX = (int)(t.pos.x / 32f);
+                    pTileY = (int)(t.pos.y / 32f);
+                }
+            }
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
-        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
-        wls.gameOver = false;
-        wls.win = false;
+            // Re-spawn the enemy cleanly
+            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 40 * 32f, enemyRegion);
 
+            // Re-save temp snapshot to cement these new random locations and the new random count
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+        }
+
+        // 8. Revert the player's lighting back to the no-flashlight state.
+        if (players.size() > 0 && lightingSystem != null) {
+            lightingSystem.createPlayerLight(players.first(), false);
+        }
+
+        // 9. Restore the HUD to its normal in-game state.
         menuScreen.resetUI();
     }
 
@@ -384,6 +429,10 @@ public class Main extends ApplicationAdapter {
             lightingSystem.render();
         }
 
+        // 4. Draw interaction prompts on top of the lighting layer so they
+        //    are never blacked out by the Box2DLights ambient darkness.
+        renderInteractionPrompts();
+
         // --- DEBUG POLLING & HITBOX RENDERING ---
         if (debugManager != null) {
             debugManager.update(lightingSystem);
@@ -414,6 +463,37 @@ public class Main extends ApplicationAdapter {
         }
 
         drawCursor();
+    }
+
+    /**
+     * Draws the "Press E" interaction prompts in world-space AFTER the lighting
+     * layer finishes. This guarantees they are always visible on top of the
+     * Box2DLights ambient-darkness overlay.
+     *
+     * InteractionSystem and WinLossSystem expose delegated render methods so
+     * that all prompt drawing is consolidated here rather than inside update().
+     */
+    private void renderInteractionPrompts() {
+        // Only draw during active gameplay — not during menus or end-screens.
+        if (menuScreen == null || menuScreen.isGameOver()) {
+            return;
+        }
+
+        // Re-apply world-space projection so prompts sit on the map correctly.
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+
+        InteractionSystem interactSys = engine.getSystem(InteractionSystem.class);
+        if (interactSys != null) {
+            interactSys.renderPrompts();
+        }
+
+        WinLossSystem winLossSys = engine.getSystem(WinLossSystem.class);
+        if (winLossSys != null) {
+            winLossSys.renderPrompt();
+        }
+
+        batch.end();
     }
 
     private void drawCursor() {
@@ -476,10 +556,11 @@ public class Main extends ApplicationAdapter {
         if (playerSpriteSheet != null) playerSpriteSheet.dispose();
         if (cursorTexture != null) cursorTexture.dispose();
         if (beepTexture != null) beepTexture.dispose();
-        if (doorOpenTexture != null) doorOpenTexture.dispose();
-        if (doorClosedTexture != null) doorClosedTexture.dispose();
         if (enemyTexture != null) enemyTexture.dispose();
         if (flashlightTexture != null) flashlightTexture.dispose();
+        if (batteryTexture != null) batteryTexture.dispose();
+        WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
+        if (wlsDispose != null) wlsDispose.dispose();
     }
 
     public TextureRegion getBeepRegion() {
@@ -489,4 +570,6 @@ public class Main extends ApplicationAdapter {
     public TextureRegion getFlashlightRegion() {
         return flashlightRegion;
     }
+
+    public TextureRegion getBatteryRegion() { return batteryRegion; }
 }

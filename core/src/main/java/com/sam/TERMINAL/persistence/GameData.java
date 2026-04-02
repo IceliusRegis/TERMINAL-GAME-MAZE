@@ -19,6 +19,8 @@ public class GameData {
     // 1. Data we want to save
     public String runId = "";
     public float playerX, playerY;
+    public float playerBattery = 100f;
+    public int totalBeepCardsSpawned = 0;
 
     // We'll use a simple list of Strings for item IDs (e.g., "key_card_blue")
     public List<String> inventoryItems;

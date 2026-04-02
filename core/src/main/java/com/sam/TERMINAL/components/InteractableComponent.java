@@ -16,6 +16,7 @@ public class InteractableComponent implements Component {
     public float radius = 50f; // How close you need to be in pixels to the certain items
     public String type = "unknown";
     public boolean isActive = true; //This what determines if you can interact with it
+    public boolean nearPlayer = false; // True when player is in range AND has clear line-of-sight
 
     //public InteractableComponent() {}
 

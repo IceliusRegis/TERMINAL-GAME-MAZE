@@ -13,7 +13,7 @@ import com.sam.TERMINAL.persistence.GameData;
 /**
  * EntitySpawner — Calculates spawn positions and creates entities.
  *
- * All item spawns are validated against TileWorldComponent.isSolid()
+ * All item spawns are validated against TileWorldComponent.isSolidForSpawning()
  * to guarantee items never appear inside walls.
  */
 public class EntitySpawner {
@@ -25,14 +25,14 @@ public class EntitySpawner {
     private static final float PLAYER_Y = 5 * TILE_SIZE;
     private static final int KEY_TILE_X = 20;
     private static final int KEY_TILE_Y = 10;
-    private static final float DOOR_X = 40 * TILE_SIZE;
-    private static final float DOOR_Y = 40 * TILE_SIZE;
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
     public static final String KEY_SAVE_ID  = "KEY_BEEP_MAIN";
-    public static final String DOOR_SAVE_ID = "DOOR_EXIT_MAIN";
     public static final String FLASHLIGHT_SAVE_ID = "ITEM_FLASHLIGHT";
+    public static final String BATTERY_SAVE_ID = "ITEM_BATTERY";
+
+    public static int totalBeepCardsSpawned = 0;
 
     /** Maximum random attempts before falling back to spiral scan. */
     private static final int MAX_RANDOM_ATTEMPTS = 100;
@@ -42,9 +42,9 @@ public class EntitySpawner {
     // =========================================================================
 
     public static void spawnInitialEntities(PooledEngine engine,
-                                            TextureRegion beepRegion, TextureRegion doorRegion,
+                                            TextureRegion beepRegion,
                                             Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
-                                            TextureRegion enemyRegion, TextureRegion flashlightRegion) {
+                                            TextureRegion enemyRegion, TextureRegion flashlightRegion, TextureRegion batteryRegion) {
 
         TileWorldComponent world = getWorldComponent(engine);
 
@@ -54,44 +54,78 @@ public class EntitySpawner {
         int pTileX = (int) (PLAYER_X / TILE_SIZE);
         int pTileY = (int) (PLAYER_Y / TILE_SIZE);
 
-        // --- SAFE BEEP CARD POSITION ---
-        int keyTileX = KEY_TILE_X;
-        int keyTileY = KEY_TILE_Y;
-        if (world != null && world.isSolid(keyTileX, keyTileY)) {
-            int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, pTileX, pTileY, 0);
-            keyTileX = safe[0];
-            keyTileY = safe[1];
-            Gdx.app.log("SPAWNER", "Beep card relocated to safe tile (" + keyTileX + ", " + keyTileY + ")");
+        // --- ACTUAL CREATION ---
+        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
+        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
+
+        spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY, mapWidth, mapHeight);
+    }
+
+    public static void spawnItems(PooledEngine engine,
+                                  TextureRegion beepRegion,
+                                  TextureRegion flashlightRegion,
+                                  TextureRegion batteryRegion,
+                                  TileWorldComponent world,
+                                  int pTileX, int pTileY,
+                                  int mapWidth, int mapHeight) {
+        
+        // --- SAFE BEEP CARDS POSITION ---
+        // Spawn 3 to 5 beep cards
+        totalBeepCardsSpawned = 3 + (int)(Math.random() * 3);
+        com.badlogic.gdx.math.GridPoint2 usedPoint = null;
+        for (int i = 0; i < totalBeepCardsSpawned; i++) {
+            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+            int keyTileX = KEY_TILE_X;
+            int keyTileY = KEY_TILE_Y;
+            
+            if (randomCardSpawn != null) {
+                keyTileX = randomCardSpawn.x;
+                keyTileY = randomCardSpawn.y;
+                usedPoint = randomCardSpawn;
+            } else if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
+                int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, pTileX, pTileY, 0);
+                keyTileX = safe[0];
+                keyTileY = safe[1];
+            }
+            EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID + "_" + i);
         }
 
         // --- SAFE FLASHLIGHT POSITION ---
-        int minFlDist = 4;
-        int maxFlRadius = 12;
-        int flTileX;
-        int flTileY;
+        int flTileX = pTileX + 6;
+        int flTileY = pTileY + 6;
 
-        if (world != null) {
+        com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+        if (randomFlSpawn != null) {
+            flTileX = randomFlSpawn.x;
+            flTileY = randomFlSpawn.y;
+            usedPoint = randomFlSpawn;
+            Gdx.app.log("SPAWNER", "Flashlight relocated to safe random tile (" + flTileX + ", " + flTileY + ")");
+        } else if (world != null) {
+            int maxFlRadius = 12;
+            int minFlDist = 4;
             int[] flSafe = findSafeTileRandom(world, pTileX, pTileY, maxFlRadius, minFlDist, mapWidth, mapHeight);
             flTileX = flSafe[0];
             flTileY = flSafe[1];
-        } else {
-            // Fallback: no world data — pick random tile without wall check
-            flTileX = pTileX + 6;
-            flTileY = pTileY + 6;
         }
 
         float flPixelX = flTileX * TILE_SIZE;
         float flPixelY = flTileY * TILE_SIZE;
 
-        // --- ACTUAL CREATION ---
-        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
-        EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID);
-        EntityFactory.createFlashlight(engine, flPixelX, flPixelY, flashlightRegion, FLASHLIGHT_SAVE_ID);
-        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion, DOOR_SAVE_ID);
-        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
+        // --- SAFE BATTERY POSITION ---
+        int batTileX = pTileX + 8;
+        int batTileY = pTileY + 8;
+        com.badlogic.gdx.math.GridPoint2 randomBatSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+        if (randomBatSpawn != null) {
+            batTileX = randomBatSpawn.x;
+            batTileY = randomBatSpawn.y;
+        } else if (world != null) {
+            int[] batSafe = findSafeTileRandom(world, pTileX, pTileY, 15, 6, mapWidth, mapHeight);
+            batTileX = batSafe[0];
+            batTileY = batSafe[1];
+        }
 
-        Gdx.app.log("SPAWNER", "Beep card at tile (" + keyTileX + ", " + keyTileY + ")");
-        Gdx.app.log("SPAWNER", "Flashlight at tile (" + flTileX + ", " + flTileY + ")");
+        EntityFactory.createFlashlight(engine, flPixelX, flPixelY, flashlightRegion, FLASHLIGHT_SAVE_ID);
+        EntityFactory.createBattery(engine, batTileX * TILE_SIZE, batTileY * TILE_SIZE, batteryRegion, BATTERY_SAVE_ID);
     }
 
     /**
@@ -99,31 +133,45 @@ public class EntitySpawner {
      * against the collision layer before placement.
      */
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
-                                    TextureRegion beepRegion, TextureRegion doorRegion,
+                                    TextureRegion beepRegion,
                                     Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
-                                    TextureRegion enemyRegion, TextureRegion flashlightRegion) {
+                                    TextureRegion enemyRegion, TextureRegion flashlightRegion, TextureRegion batteryRegion) {
 
         TileWorldComponent world = getWorldComponent(engine);
 
         // Restore Player position from save
         EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 24f, 15f, walkAnimation, idleAnimation);
+        totalBeepCardsSpawned = saveData.totalBeepCardsSpawned > 0 ? saveData.totalBeepCardsSpawned : 3;
 
-        // --- SAFE BEEP CARD POSITION ---
-        int keyTileX = KEY_TILE_X;
-        int keyTileY = KEY_TILE_Y;
-        if (world != null && world.isSolid(keyTileX, keyTileY)) {
-            int playerTX = (int) (saveData.playerX / TILE_SIZE);
-            int playerTY = (int) (saveData.playerY / TILE_SIZE);
-            int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, playerTX, playerTY, 0);
-            keyTileX = safe[0];
-            keyTileY = safe[1];
+        // --- SAFE BEEP CARDS POSITION ---
+        com.badlogic.gdx.math.GridPoint2 usedPoint = null;
+        for (int i = 0; i < totalBeepCardsSpawned; i++) {
+            int keyTileX = KEY_TILE_X;
+            int keyTileY = KEY_TILE_Y;
+            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+            if (randomCardSpawn != null) {
+                keyTileX = randomCardSpawn.x;
+                keyTileY = randomCardSpawn.y;
+                usedPoint = randomCardSpawn;
+            } else if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
+                int playerTX = (int) (saveData.playerX / TILE_SIZE);
+                int playerTY = (int) (saveData.playerY / TILE_SIZE);
+                int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, playerTX, playerTY, 0);
+                keyTileX = safe[0];
+                keyTileY = safe[1];
+            }
+            EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID + "_" + i);
         }
-        EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion, KEY_SAVE_ID);
 
         // --- SAFE FLASHLIGHT POSITION (load path) ---
         int flTileX = KEY_TILE_X + 1;
         int flTileY = KEY_TILE_Y;
-        if (world != null && world.isSolid(flTileX, flTileY)) {
+        com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+        if (randomFlSpawn != null) {
+            flTileX = randomFlSpawn.x;
+            flTileY = randomFlSpawn.y;
+            usedPoint = randomFlSpawn;
+        } else if (world != null && world.isSolidForSpawning(flTileX, flTileY)) {
             int playerTX = (int) (saveData.playerX / TILE_SIZE);
             int playerTY = (int) (saveData.playerY / TILE_SIZE);
             int[] safe = findSafeTile(world, flTileX, flTileY, 8, playerTX, playerTY, 0);
@@ -133,7 +181,22 @@ public class EntitySpawner {
         EntityFactory.createFlashlight(engine, flTileX * TILE_SIZE, flTileY * TILE_SIZE,
                 flashlightRegion, FLASHLIGHT_SAVE_ID);
 
-        EntityFactory.createDoor(engine, DOOR_X, DOOR_Y, doorRegion, DOOR_SAVE_ID);
+        // --- SAFE BATTERY POSITION (load path) ---
+        int batTileX = KEY_TILE_X + 2;
+        int batTileY = KEY_TILE_Y;
+        com.badlogic.gdx.math.GridPoint2 randomBatSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+        if (randomBatSpawn != null) {
+            batTileX = randomBatSpawn.x;
+            batTileY = randomBatSpawn.y;
+        } else if (world != null && world.isSolidForSpawning(batTileX, batTileY)) {
+            int playerTX = (int) (saveData.playerX / TILE_SIZE);
+            int playerTY = (int) (saveData.playerY / TILE_SIZE);
+            int[] safe = findSafeTile(world, batTileX, batTileY, 8, playerTX, playerTY, 0);
+            batTileX = safe[0];
+            batTileY = safe[1];
+        }
+        EntityFactory.createBattery(engine, batTileX * TILE_SIZE, batTileY * TILE_SIZE, batteryRegion, BATTERY_SAVE_ID);
+
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
     }
 
@@ -181,7 +244,7 @@ public class EntitySpawner {
                 continue;
             }
             // Inside a wall
-            if (world.isSolid(candidateX, candidateY)) {
+            if (world.isSolidForSpawning(candidateX, candidateY)) {
                 continue;
             }
 
@@ -208,7 +271,7 @@ public class EntitySpawner {
                                       int originX, int originY, int searchRadius,
                                       int avoidX, int avoidY, int minAvoidDist) {
         // Try the origin first
-        if (!world.isSolid(originX, originY)) {
+        if (!world.isSolidForSpawning(originX, originY)) {
             int dist = Math.abs(originX - avoidX) + Math.abs(originY - avoidY);
             if (dist >= minAvoidDist) {
                 return new int[] { originX, originY };
@@ -226,7 +289,7 @@ public class EntitySpawner {
                     int candidateX = originX + dx;
                     int candidateY = originY + dy;
 
-                    if (world.isSolid(candidateX, candidateY)) {
+                    if (world.isSolidForSpawning(candidateX, candidateY)) {
                         continue;
                     }
 

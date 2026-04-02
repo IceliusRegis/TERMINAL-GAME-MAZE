@@ -83,6 +83,11 @@ public class MenuScreen {
     private Table itemTable;
     private Table bottomTable;
 
+    // --- Dynamic HUD Elements ---
+    private Label beepCardLabel;
+    private Label batteryLabel;
+    private Label lowBatteryWarningLabel;
+
     // ── ECS / Game references ─────────────────────────────────────────────────
     private final PooledEngine engine;
     private final Main mainGame;
@@ -121,20 +126,7 @@ public class MenuScreen {
         createDimmerTexture();
 
         // --- HUD SETUP ---
-        Table mainRoot = new Table();
-        mainRoot.setFillParent(true);
-        mainRoot.top().left();
-
-        Image settingsBtn = new Image(settingsTexture);
-        settingsBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                isSettingsVisible = true;
-                updateInputProcessor();
-            }
-        });
-        mainRoot.add(settingsBtn).size(40, 40).pad(10);
-        uiStage.addActor(mainRoot);
+        setupHUD();
 
         // --- SETTINGS WINDOW SETUP ---
         Table settingsRoot = new Table();
@@ -158,21 +150,6 @@ public class MenuScreen {
                 });
 
         // --- INVENTORY SETUP ---
-        ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
-        bottomTable = new Table();
-        bottomTable.setFillParent(true);
-        bottomTable.bottom();
-        bottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
-        uiStage.addActor(bottomTable);
-
-        inventoryBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                isInventoryVisible = true;
-                updateInputProcessor();
-            }
-        });
-
         Table inventoryRoot = new Table();
         inventoryRoot.setFillParent(true);
         inventoryStage.addActor(inventoryRoot);
@@ -235,6 +212,10 @@ public class MenuScreen {
                     updateInputProcessor();
                     return true;
                 }
+                if (keycode == Input.Keys.U) {
+                    useBatteryFromInventory();
+                    return true;
+                }
                 return false;
             }
         };
@@ -247,6 +228,25 @@ public class MenuScreen {
     // =========================================================================
     // Helper Methods
     // =========================================================================
+    private void useBatteryFromInventory() {
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
+
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+        com.sam.TERMINAL.components.BatteryComponent bat = player.getComponent(com.sam.TERMINAL.components.BatteryComponent.class);
+
+        // Only use if the player actually has a battery AND needs it (or has a flashlight)
+        if (inv != null && inv.hasItem("battery") && bat != null) {
+            // 1. Refill battery to max
+            bat.battery = bat.maxBattery;
+
+            // 2. Remove the battery string from the inventory list
+            inv.items.remove("battery");
+
+            // Note: refreshInventory() is called automatically in render()
+            // if the inventory is open, so the icon will disappear instantly.
+        }
+    }
 
     private void saveMapLogic() {
         if (engine != null) {
@@ -290,6 +290,7 @@ public class MenuScreen {
     // =========================================================================
 
     public void render(float delta) {
+        updateDynamicHUD();
         // Always act and draw uiStage — keeps the jumpscare timer ticking
         uiStage.act(delta);
         uiStage.draw();
@@ -442,6 +443,36 @@ public class MenuScreen {
         stage.getBatch().end();
     }
 
+    private void updateDynamicHUD() {
+        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
+        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        InventoryComponent inv = player.getComponent(InventoryComponent.class);
+        com.sam.TERMINAL.components.BatteryComponent bat = player.getComponent(com.sam.TERMINAL.components.BatteryComponent.class);
+
+        int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+        int heldCards = 0;
+        if (inv != null) {
+            heldCards = java.util.Collections.frequency(inv.items, "beep_card");
+        }
+
+        if (beepCardLabel != null) {
+            beepCardLabel.setText("Beep Cards: " + heldCards + " / " + totalExpected);
+        }
+
+        if (bat != null && inv != null && inv.hasItem("flashlight")) {
+            if (batteryLabel != null) {
+                batteryLabel.setText(String.format("Flashlight Battery: %.0f%%", bat.battery));
+                batteryLabel.getStyle().fontColor = (bat.battery <= 15f) ? Color.RED : Color.GREEN;
+            }
+            if (lowBatteryWarningLabel != null) {
+                lowBatteryWarningLabel.setVisible(bat.battery <= 15f && bat.battery > 0f);
+            }
+        } else {
+            if (batteryLabel != null) batteryLabel.setText("");
+            if (lowBatteryWarningLabel != null) lowBatteryWarningLabel.setVisible(false);
+        }
+    }
+
     // =========================================================================
     // Resize / Dispose / Accessors
     // =========================================================================
@@ -477,7 +508,7 @@ public class MenuScreen {
         localBottomTable.bottom();
 
         ImageButton inventoryBtn = new ImageButton(
-                new TextureRegionDrawable(new TextureRegion(invTexture)));
+            new TextureRegionDrawable(new TextureRegion(invTexture)));
         inventoryBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -488,6 +519,23 @@ public class MenuScreen {
 
         localBottomTable.add(inventoryBtn).size(55, 55).padBottom(5);
         uiStage.addActor(localBottomTable);
+
+        // --- UPDATED: Top-right Dynamic tracker (Right Aligned) ---
+        Table topRightTable = new Table();
+        topRightTable.setFillParent(true);
+        topRightTable.top().right();
+
+        beepCardLabel = new Label("Beep Cards: 0 / 0", new Label.LabelStyle(font, Color.WHITE));
+        batteryLabel = new Label("", new Label.LabelStyle(font, Color.GREEN));
+        lowBatteryWarningLabel = new Label("Battery Low!", new Label.LabelStyle(font, Color.RED));
+        lowBatteryWarningLabel.setVisible(false);
+
+        // Adding .right() to the cell makes the text hug the right side of the table
+        topRightTable.add(beepCardLabel).right().padRight(20).padTop(10).row();
+        topRightTable.add(batteryLabel).right().padRight(20).padTop(10).row();
+        topRightTable.add(lowBatteryWarningLabel).right().padRight(20).padTop(5).row();
+
+        uiStage.addActor(topRightTable);
     }
 
     // =========================================================================
@@ -521,6 +569,19 @@ public class MenuScreen {
                             new BitmapFont(),
                             Color.WHITE)))
                     .padRight(20);
+        }
+        if (inv != null && inv.hasItem("battery")) {
+            // Create an Image using the battery textur  e region from Main
+            Image icon = new Image(mainGame.getBatteryRegion());
+
+            // Add to the table with the same styling as the others
+            itemTable.add(icon).size(64, 64).pad(10);
+            itemTable.add(new Label(
+                    "Battery",
+                    new Label.LabelStyle(
+                        new BitmapFont(),
+                        Color.WHITE)))
+                .padRight(20);
         }
         itemTable.invalidateHierarchy();
     }

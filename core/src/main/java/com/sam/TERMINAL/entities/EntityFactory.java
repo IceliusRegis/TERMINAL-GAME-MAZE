@@ -22,7 +22,7 @@ public class EntityFactory {
      * @param idleAnimation
      */
     public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight,
-            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
+                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
@@ -52,30 +52,8 @@ public class EntityFactory {
         // Persistence Data this is where player position is saved
         player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
         player.add(engine.createComponent(InventoryComponent.class));
+        player.add(new BatteryComponent(100f));
         engine.addEntity(player);
-    }
-
-    public static void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
-        Entity door = engine.createEntity();
-
-        TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(x, y);
-        transform.width = 32;
-        transform.height = 32;
-        transform.updateBounds();
-        door.add(transform);
-
-        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
-        sprite.staticSprite = closedSprite;
-        sprite.isStatic = true;
-        door.add(sprite);
-
-        door.add(engine.createComponent(CollisionComponent.class));
-        door.add(new InteractableComponent("door", 40f));
-
-        door.add(new PersistenceComponent("INTERACTABLE", saveId));
-
-        engine.addEntity(door);
     }
 
     public static void createKey(PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
@@ -148,6 +126,29 @@ public class EntityFactory {
         flashlight.add(new PersistenceComponent("INTERACTABLE", saveId));
 
         engine.addEntity(flashlight);
+    }
+
+    public static void createBattery(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
+        Entity battery = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 70;
+        transform.height = 70;
+        transform.updateBounds();
+        battery.add(transform);
+
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = texture;
+        sprite.isStatic = true;
+        sprite.drawWidth = 70;
+        sprite.drawHeight = 70;
+        battery.add(sprite);
+
+        battery.add(new InteractableComponent("battery", 40f));
+        battery.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(battery);
     }
 
     /**

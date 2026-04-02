@@ -9,10 +9,14 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Gdx;
 import com.sam.TERMINAL.components.LightComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.BatteryComponent;
+import com.sam.TERMINAL.components.InventoryComponent;
 
 /**
  * LightingSystem — Manages Box2DLights for the player's FOV cone.
@@ -36,6 +40,7 @@ public class LightingSystem extends IteratingSystem {
     private static final float CONE_DEGREES = 90f; // Focused, narrow flashlight beam
     private static final Color CONE_COLOR = new Color(1f, 0.95f, 0.85f, 0.5f); // Dimmer warm white
     private static final Color AMBIENT_COLOR = new Color(0f, 0f, 0f, 1f); // Pitch black
+    private float drainTimer = 0; // Tracks elapsed time for battery drain
 
     // --- Box2DLights Core ---
     private final World box2dWorld; // Dummy physics world — never stepped
@@ -46,7 +51,7 @@ public class LightingSystem extends IteratingSystem {
 
     // --- Component Mappers ---
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
-            .getFor(TransformComponent.class);
+        .getFor(TransformComponent.class);
     private final ComponentMapper<SpriteComponent> spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     private final ComponentMapper<LightComponent> lightMapper = ComponentMapper.getFor(LightComponent.class);
 
@@ -55,10 +60,10 @@ public class LightingSystem extends IteratingSystem {
 
     public LightingSystem(OrthographicCamera camera) {
         super(Family.all(
-                PlayerComponent.class,
-                TransformComponent.class,
-                SpriteComponent.class,
-                LightComponent.class).get());
+            PlayerComponent.class,
+            TransformComponent.class,
+            SpriteComponent.class,
+            LightComponent.class).get());
 
         this.camera = camera;
 
@@ -87,12 +92,12 @@ public class LightingSystem extends IteratingSystem {
         // --- LIGHT CONFIGURATION ---
         // If no flashlight, the cone is tiny/invisible. If hasFlashlight, it's your 90+80 degree beam.
         float finalDistance = hasFlashlight ? (CONE_DISTANCE + 100f) : 0f;
-        float finalDegrees = hasFlashlight ? (CONE_DEGREES + 80f) : 0f;
+        float finalDegrees = hasFlashlight ? (CONE_DEGREES + 100f) : 0f;
 
         // The "Small Circle" around the player
         // We make it slightly larger if they don't have a flashlight so they can at least see their feet.
-        float finalPointRadius = hasFlashlight ? 150f : 300f;
-        float brightness = hasFlashlight ? 0.2f : 0.5f;
+        float finalPointRadius = hasFlashlight ? 150f : 180f;
+        float brightness = hasFlashlight ? 0.7f : 0.5f;
 
         // Cleanup old light
         if (lightMapper.has(playerEntity)) {
@@ -155,18 +160,55 @@ public class LightingSystem extends IteratingSystem {
         float centerY = transform.pos.y + transform.height / 2f;
         light.cone.setPosition(centerX, centerY);
 
-        // 3. --- ADD THE SMOOTH TURNING CODE HERE ---
-        float targetAngle = sprite.facingAngle; // The angle from MovementSystem
+        // 3. Smooth Turning
+        float targetAngle = sprite.facingAngle;
         float currentDir = light.cone.getDirection();
-
-        // 0.15f is the speed (1.0f is instant, 0.01f is very slow)
         float smoothAngle = com.badlogic.gdx.math.MathUtils.lerpAngleDeg(currentDir, targetAngle, 0.15f);
-
         light.cone.setDirection(smoothAngle);
-        // --------------------------------------------
 
         if (light.pointLight != null) {
             light.pointLight.setPosition(centerX, centerY);
+        }
+
+        // --- UPDATED FLASH LIGHT BATTERY LOGIC ---
+        BatteryComponent batteryState = entity.getComponent(BatteryComponent.class);
+        InventoryComponent inv = entity.getComponent(InventoryComponent.class);
+        boolean hasFlashlight = (inv != null && inv.hasItem("flashlight"));
+
+        if (batteryState != null) {
+            // Toggle Logic
+            if (hasFlashlight && Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+                // Only allow turning ON if there is battery left
+                if (!batteryState.flashlightOn) {
+                    if (batteryState.battery > 0) batteryState.flashlightOn = true;
+                } else {
+                    batteryState.flashlightOn = false;
+                }
+            }
+
+            // Timer-based Drain (Every 5 Seconds)
+            if (batteryState.flashlightOn && batteryState.battery > 0) {
+                drainTimer += deltaTime; // Count up the time
+
+                if (drainTimer >= 3.5f) {
+                    batteryState.battery -= 1.0f; // Drop 1% every 5 seconds
+                    drainTimer = 0; // Reset the clock
+
+                    if (batteryState.battery <= 0) {
+                        batteryState.battery = 0;
+                        batteryState.flashlightOn = false;
+                    }
+                }
+            } else {
+                // Reset timer when off so it starts fresh at 0 next time it's toggled
+                drainTimer = 0;
+            }
+
+            // Sync cone activity
+            if (light.cone != null) {
+                // Light is active only if you have the item AND it's toggled on
+                light.cone.setActive(hasFlashlight && batteryState.flashlightOn);
+            }
         }
     }
 
