@@ -212,15 +212,15 @@ public class EntitySpawner {
             int offY = (int) (Math.random() * (radius * 2 + 1)) - radius;
             int cX = centerX + offX;
             int cY = centerY + offY;
-            if (cX < 0 || cX >= mapW || cY < 0 || cY >= mapH)
+            if (cX < 0 || cX >= mapWidth || cY < 0 || cY >= mapHeight)
                 continue;
-            if (Math.abs(offX) + Math.abs(offY) < minDist)
+            if (Math.abs(offX) + Math.abs(offY) < minDistFromCenter)
                 continue;
             if (world.isSolidForSpawning(cX, cY))
                 continue;
             return new int[] { cX, cY };
         }
-        return findSafeTile(world, centerX, centerY, Math.max(radius, 20), centerX, centerY, minDist);
+        return findSafeTile(world, centerX, centerY, Math.max(radius, 20), centerX, centerY, minDistFromCenter);
     }
 
     /**

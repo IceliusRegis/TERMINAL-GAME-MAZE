@@ -85,9 +85,11 @@ public class MovementSystem extends IteratingSystem {
             if (menuScreen != null) menuScreen.useBatteryFromInventory();
         }
 
+        boolean playerHasFlashlight = (inv != null && inv.hasItem("flashlight"));
+
         // Toggle Flashlight with EMPTY warning
         if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
-            if (bc != null) {
+            if (playerHasFlashlight && bc != null) {
                 if (bc.battery <= 0) {
                     if (menuScreen != null) menuScreen.showWarningLabel("BATTERY EMPTY! NEED RECHARGE");
                     bc.flashlightOn = false;
