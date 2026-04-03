@@ -355,9 +355,31 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        // 8. Items are automatically restored from the temp save via forceImmediateLoad,
-        //    so we NO LONGER re-roll items here. This prevents duplicating items and properly
-        //    spawns the player with the exact map state they started the level with.
+        // 8. Randomize items upon reset (death, win, restart) by removing the items
+        //    restored from the temp save and spawning new ones dynamically.
+        ImmutableArray<Entity> loadedItems = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
+        com.badlogic.gdx.utils.Array<Entity> itemsToRemove = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : loadedItems) {
+            itemsToRemove.add(e);
+        }
+        for (Entity e : itemsToRemove) {
+            engine.removeEntity(e);
+        }
+
+        ImmutableArray<Entity> worldEntities = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
+        TileWorldComponent world = worldEntities.size() > 0 ? worldEntities.first().getComponent(TileWorldComponent.class) : null;
+        if (world != null && players.size() > 0) {
+            Entity p = players.first();
+            TransformComponent t = p.getComponent(TransformComponent.class);
+            int pTileX = 15;
+            int pTileY = 42;
+            if (t != null) {
+                pTileX = (int) (t.pos.x / 32f);
+                pTileY = (int) (t.pos.y / 32f);
+            }
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+        }
 
         // 9. Revert player's lighting
         if (players.size() > 0 && lightingSystem != null) {

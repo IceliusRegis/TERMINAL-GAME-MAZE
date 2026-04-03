@@ -115,40 +115,7 @@ public class SaveSystem extends IteratingSystem {
             }
 
             if (loading) {
-                // Clear existing dynamic entities completely to prevent duplication
-                com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
-                for (Entity e : getEngine().getEntitiesFor(Family.all(EnemyComponent.class).get())) {
-                    toRemove.add(e);
-                }
-                for (Entity e : getEngine().getEntitiesFor(Family.all(InteractableComponent.class).get())) {
-                    toRemove.add(e);
-                }
-                for (Entity e : toRemove) {
-                    getEngine().removeEntity(e);
-                }
-
-                // Dynamically spawn the entities based on the saved coordinates
-                if (loadedData != null) {
-                    if (loadedData.enemies != null && !loadedData.enemies.isEmpty()) {
-                        for (GameData.EnemySaveData eData : loadedData.enemies) {
-                            com.sam.TERMINAL.entities.EntityFactory.createEnemy((com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
-                        }
-                    }
-
-                    if (loadedData.items != null && !loadedData.items.isEmpty()) {
-                        for (GameData.ItemSaveData iData : loadedData.items) {
-                            if (iData.type.equals("beep")) {
-                                com.sam.TERMINAL.entities.EntityFactory.createKey((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, keySprite, iData.saveId);
-                            } else if (iData.type.equals("flashlight")) {
-                                com.sam.TERMINAL.entities.EntityFactory.createFlashlight((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite, iData.saveId);
-                            } else if (iData.type.equals("battery")) {
-                                com.sam.TERMINAL.entities.EntityFactory.createBattery((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite, iData.saveId);
-                            } else if (iData.type.equals("potion")) {
-                                com.sam.TERMINAL.entities.EntityFactory.createPotion((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite, iData.saveId);
-                            }
-                        }
-                    }
-                }
+                spawnLoadedEntities();
 
                 System.out.println("Loaded from: " + currentSaveFile);
                 loading = false;
@@ -156,6 +123,43 @@ public class SaveSystem extends IteratingSystem {
             }
 
 
+        }
+    }
+
+    private void spawnLoadedEntities() {
+        // Clear existing dynamic entities completely to prevent duplication
+        com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : getEngine().getEntitiesFor(Family.all(EnemyComponent.class).get())) {
+            toRemove.add(e);
+        }
+        for (Entity e : getEngine().getEntitiesFor(Family.all(InteractableComponent.class).get())) {
+            toRemove.add(e);
+        }
+        for (Entity e : toRemove) {
+            getEngine().removeEntity(e);
+        }
+
+        // Dynamically spawn the entities based on the saved coordinates
+        if (loadedData != null) {
+            if (loadedData.enemies != null && !loadedData.enemies.isEmpty()) {
+                for (GameData.EnemySaveData eData : loadedData.enemies) {
+                    com.sam.TERMINAL.entities.EntityFactory.createEnemy((com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
+                }
+            }
+
+            if (loadedData.items != null && !loadedData.items.isEmpty()) {
+                for (GameData.ItemSaveData iData : loadedData.items) {
+                    if (iData.type.equals("beep")) {
+                        com.sam.TERMINAL.entities.EntityFactory.createKey((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, keySprite, iData.saveId);
+                    } else if (iData.type.equals("flashlight")) {
+                        com.sam.TERMINAL.entities.EntityFactory.createFlashlight((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite, iData.saveId);
+                    } else if (iData.type.equals("battery")) {
+                        com.sam.TERMINAL.entities.EntityFactory.createBattery((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite, iData.saveId);
+                    } else if (iData.type.equals("potion")) {
+                        com.sam.TERMINAL.entities.EntityFactory.createPotion((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite, iData.saveId);
+                    }
+                }
+            }
         }
     }
 
@@ -189,6 +193,10 @@ public class SaveSystem extends IteratingSystem {
         triggerManualLoad(fileName);
         if (loading) {
             super.update(0f); // Processes entities synchronously right now
+            
+            // Execute the dynamic spawning logic immediately
+            spawnLoadedEntities();
+            
             System.out.println("Force loaded from: " + currentSaveFile);
             loading = false;
             loadedData = null;
