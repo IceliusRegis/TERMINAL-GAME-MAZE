@@ -355,29 +355,9 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        // 8. Spawn fresh randomized items
-        ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
-        TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
-        if (world != null) {
-            int pTileX = 15;
-            int pTileY = 42;
-            if (players.size() > 0) {
-                TransformComponent t = players.first().getComponent(TransformComponent.class);
-                if (t != null) {
-                    pTileX = (int) (t.pos.x / 32f);
-                    pTileY = (int) (t.pos.y / 32f);
-                }
-            }
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                pTileY, world.mapWidthTiles, world.mapHeightTiles);
-
-            // --- ENEMY SPAWN REMOVED FROM HERE ---
-            // We no longer call EntityFactory.createEnemy here.
-            // The MovementSystem will handle it once the 45s timer hits zero.
-
-            // Re-save temp snapshot
-            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
-        }
+        // 8. Items are automatically restored from the temp save via forceImmediateLoad,
+        //    so we NO LONGER re-roll items here. This prevents duplicating items and properly
+        //    spawns the player with the exact map state they started the level with.
 
         // 9. Revert player's lighting
         if (players.size() > 0 && lightingSystem != null) {
@@ -489,8 +469,11 @@ public class Main extends ApplicationAdapter {
                     pTileX, pTileY,
                     world.mapWidthTiles, world.mapHeightTiles);
 
-            // Spawn the enemy at a safe distance from the player
-            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyRegion);
+            // Reset the monster timer instead of hardcoding an immediate spawn
+            MovementSystem moveSystem = engine.getSystem(MovementSystem.class);
+            if (moveSystem != null) {
+                moveSystem.resetEnemyTimer();
+            }
         }
 
         // ------------------------------------------------------------------
@@ -501,7 +484,12 @@ public class Main extends ApplicationAdapter {
         }
 
         // ------------------------------------------------------------------
-        // 7. Reset HUD indicators
+        // 7. Update temp save snapshot so resetting in level 2 spawns you here
+        // ------------------------------------------------------------------
+        engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+
+        // ------------------------------------------------------------------
+        // 8. Reset HUD indicators
         // ------------------------------------------------------------------
         if (menuScreen != null) {
             menuScreen.resetUI();
