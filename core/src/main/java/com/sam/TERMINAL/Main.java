@@ -315,7 +315,13 @@ public class Main extends ApplicationAdapter {
             enemySys.reset();
         }
 
-        // 3. Remove all enemies from the old run
+        // 3. NEW: Reset the MovementSystem Enemy Timer (The 45s countdown)
+        MovementSystem moveSystem = engine.getSystem(MovementSystem.class);
+        if (moveSystem != null) {
+            moveSystem.resetEnemyTimer();
+        }
+
+        // 4. Remove all enemies from the old run
         ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
         com.badlogic.gdx.utils.Array<Entity> toRemoveEnemies = new com.badlogic.gdx.utils.Array<>();
         for (Entity e : enemies)
@@ -323,8 +329,7 @@ public class Main extends ApplicationAdapter {
         for (Entity e : toRemoveEnemies)
             engine.removeEntity(e);
 
-        // 4. First, physically remove the old items so we can re-generate a new random
-        // count
+        // 5. Physically remove the old items so we can re-generate a new random count
         ImmutableArray<Entity> currentItems = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
         com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
         for (Entity e : currentItems)
@@ -332,13 +337,10 @@ public class Main extends ApplicationAdapter {
         for (Entity e : toRemove)
             engine.removeEntity(e);
 
-        // 5. Load the temp save — this restores player position, inventory, and resets
-        // battery component context
-        // (It won't affect items because we just removed them!)
+        // 6. Load the temp save
         engine.getSystem(SaveSystem.class).forceImmediateLoad(TEMP_SAVE_FILE);
 
-        // 6. Provide a clean slate for the player's runtime components (sometimes items
-        // could erroneously persist in load state if not checked)
+        // 7. Clean slate for player components
         ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             Entity p = players.first();
@@ -353,8 +355,7 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        // 7. Spawn fresh completely randomized items (Beep Cards, Battery, Flashlight)
-        // AND spawn a fresh enemy.
+        // 8. Spawn fresh randomized items
         ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
         TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
         if (world != null) {
@@ -368,28 +369,22 @@ public class Main extends ApplicationAdapter {
                 }
             }
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
+                pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
-            // Re-spawn the enemy cleanly
-            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 40 * 32f, enemyRegion);
+            // --- ENEMY SPAWN REMOVED FROM HERE ---
+            // We no longer call EntityFactory.createEnemy here.
+            // The MovementSystem will handle it once the 45s timer hits zero.
 
-            // Re-save temp snapshot to cement these new random locations and the new random
-            // count
+            // Re-save temp snapshot
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
-        // 8. Revert the player's lighting back to the no-flashlight state.
+        // 9. Revert player's lighting
         if (players.size() > 0 && lightingSystem != null) {
             lightingSystem.createPlayerLight(players.first(), false);
         }
 
-        MovementSystem moveSystem = engine.getSystem(MovementSystem.class);
-        if (moveSystem != null) {
-            // You'll need to create a reset method in MovementSystem or make these public
-            moveSystem.resetEnemyTimer();
-        }
-
-        // 9. Restore the HUD to its normal in-game state.
+        // 10. Restore the HUD
         menuScreen.resetUI();
     }
 

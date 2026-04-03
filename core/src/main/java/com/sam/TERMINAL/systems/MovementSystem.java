@@ -240,5 +240,6 @@ public class MovementSystem extends IteratingSystem {
     public void resetEnemyTimer() {
         this.enemySpawnTimer = 0f;
         this.enemySpawned = false;
+        Gdx.app.log("MOVEMENT_SYSTEM", "Enemy timer reset to 45s");
     }
 }

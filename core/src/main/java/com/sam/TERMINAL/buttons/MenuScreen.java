@@ -103,6 +103,7 @@ public class MenuScreen {
 
     // ── BUG 3 FIX: store the SettingsButton so dispose() can be called on it.
     private SettingsButton settingsButtonWidget;
+    private InventoryButton inventoryButtonWidget;
 
     // --- HUD Elements & Timers ---
     private Label stingTimerLabel;
@@ -655,61 +656,63 @@ public class MenuScreen {
     // =========================================================================
 
     private void refreshInventory() {
-        itemTable.clearChildren(); // Only clears item rows; exit button is untouched.
+        itemTable.clearChildren();
 
-        if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0)
-            return;
-        Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
+        Entity player = getPlayerEntity();
+        if (player == null) return;
         InventoryComponent inv = player.getComponent(InventoryComponent.class);
+        if (inv == null) return;
 
-        if (inv != null && inv.hasItem("beep_card")) {
-            Image icon = new Image(mainGame.getBeepRegion());
-            itemTable.add(icon).size(64, 64).pad(20);
-            itemTable.add(new Label(
-                    "Beep Card",
-                    new Label.LabelStyle(
-                            new BitmapFont(),
-                            Color.WHITE)))
-                    .padRight(20);
-        }
-        if (inv != null && inv.hasItem("flashlight")) {
-            Image icon = new Image(mainGame.getFlashlightRegion());
-            itemTable.add(icon).size(64, 64).pad(10);
-            itemTable.add(new Label(
-                    "Flashlight",
-                    new Label.LabelStyle(
-                            new BitmapFont(),
-                            Color.WHITE)))
-                    .padRight(20);
-        }
-        if (inv != null && inv.hasItem("battery")) {
-            // Create an Image using the battery textur  e region from Main
-            Image icon = new Image(mainGame.getBatteryRegion());
+        // Define a consistent style for the labels
+        Label.LabelStyle itemLabelStyle = new Label.LabelStyle(new BitmapFont(), Color.WHITE);
+        itemLabelStyle.font.getData().setScale(1.2f);
 
-            // Add to the table with the same styling as the others
-            itemTable.add(icon).size(64, 64).pad(10);
-            itemTable.add(new Label(
-                    "Battery",
-                    new Label.LabelStyle(
-                        new BitmapFont(),
-                        Color.WHITE)))
-                .padRight(20);
-        }
-        if (inv != null && inv.hasItem("potion")) {
-            // Create the icon using the region from Main
-            Image icon = new Image(mainGame.getPotionRegion());
+        int itemsInRow = 0;
+        int maxColumns = 2; // Change this to 3 if your window is wide enough
 
-            itemTable.add(icon).size(64, 64).pad(10);
-            itemTable.add(new Label(
-                    "Sting",
-                    new Label.LabelStyle(
-                        new BitmapFont(),
-                        Color.WHITE)))
-                .padRight(20);
-        } // <--- Added this closing brace for the IF statement
+        // Check for each item type and add them
+        if (inv.hasItem("beep_card")) {
+            addItemToTable("Beep Card", mainGame.getBeepRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0) itemTable.row();
+        }
+
+        if (inv.hasItem("flashlight")) {
+            addItemToTable("Flashlight", mainGame.getFlashlightRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0) itemTable.row();
+        }
+
+        if (inv.hasItem("battery")) {
+            addItemToTable("Battery", mainGame.getBatteryRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0) itemTable.row();
+        }
+
+        if (inv.hasItem("potion")) {
+            addItemToTable("Sting", mainGame.getPotionRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0) itemTable.row();
+        }
 
         itemTable.invalidateHierarchy();
-    } // <--- Added this closing brace for the METHOD
+    }
+
+    /** * Helper method to create a consistent "Slot" for each item
+     */
+    private void addItemToTable(String name, TextureRegion region, Label.LabelStyle style) {
+        Table slot = new Table();
+
+        Image icon = new Image(region);
+        icon.setScaling(com.badlogic.gdx.utils.Scaling.fit); // Prevent stretching
+
+        slot.add(icon).size(64, 64).pad(5);
+        slot.add(new Label(name, style)).padLeft(10).padRight(20);
+
+        // Add the whole slot to the main itemTable
+        itemTable.add(slot).pad(10).left();
+    }
+
 
     public void updateMonsterTimer(int seconds) {
         if (monsterWarningLabel != null) {
@@ -743,6 +746,9 @@ public class MenuScreen {
             jumpscareTexture.dispose();
         if (jumpscareSound != null)
             jumpscareSound.dispose();
+        if (inventoryButtonWidget != null) {
+            inventoryButtonWidget.dispose();
+        }
     }
 
     // ── State accessors ───────────────────────────────────────────────────────
