@@ -393,6 +393,145 @@ public class Main extends ApplicationAdapter {
         menuScreen.resetUI();
     }
 
+    // =========================================================================
+    // LEVEL TRANSITION — Level 1 → Level 2
+    // =========================================================================
+
+    /**
+     * Purges all Level 1 entities from the engine, repositions the player,
+     * loads the Level 2 map, and spawns fresh items and an enemy.
+     *
+     * <p><b>Purge strategy:</b> We iterate each component family that belongs
+     * to the old level (walls, roofs, tile-world, enemies, interactables) and
+     * collect matching entities into a temporary buffer before removal.
+     * Removing directly from an {@code ImmutableArray} while iterating would
+     * throw a {@code ConcurrentModificationException}, so the two-pass
+     * collect-then-remove pattern is required.</p>
+     *
+     * <p>The {@link PlayerComponent} entity is explicitly <b>kept</b> — only
+     * its position is updated to a valid starting coordinate on Level 2.</p>
+     */
+    public void loadLevelTwo() {
+        Gdx.app.log("TERMINAL", "=== LOADING LEVEL 2 ===");
+
+        // ------------------------------------------------------------------
+        // 1. Reset system state flags so update() runs normally on the new map
+        // ------------------------------------------------------------------
+        WinLossSystem wls = engine.getSystem(WinLossSystem.class);
+        if (wls != null) {
+            wls.reset();
+        }
+
+        EnemySystem enemySys = engine.getSystem(EnemySystem.class);
+        if (enemySys != null) {
+            enemySys.reset();
+        }
+
+        // ------------------------------------------------------------------
+        // 2. Purge Level 1 entities (walls, roofs, enemies, interactables)
+        //    MapManager.loadMap() internally disposes the old TiledMap,
+        //    renderer, wall entities, and the TileWorldComponent entity.
+        //    We still need to clean up ECS-only entities it does NOT manage:
+        //    enemies and interactables.
+        // ------------------------------------------------------------------
+        purgeFamily(Family.all(EnemyComponent.class).get());
+        purgeFamily(Family.all(InteractableComponent.class).get());
+
+        // ------------------------------------------------------------------
+        // 3. Reposition the surviving player to a safe Level 2 starting tile
+        // ------------------------------------------------------------------
+        ImmutableArray<Entity> players = engine.getEntitiesFor(
+                Family.all(PlayerComponent.class).get());
+
+        if (players.size() > 0) {
+            Entity player = players.first();
+            TransformComponent playerTransform = player.getComponent(TransformComponent.class);
+            // 10,10 in tile coords → 320,320 px. Adjust if your Level 2 spawn differs.
+            playerTransform.pos.set(10 * 32f, 10 * 32f);
+            playerTransform.updateBounds();
+
+            // Clear inventory so the player starts Level 2 with a clean slate
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            if (inv != null) {
+                inv.items.clear();
+            }
+
+            // Reset battery to full, flashlight off
+            BatteryComponent bat = player.getComponent(BatteryComponent.class);
+            if (bat != null) {
+                bat.battery = bat.maxBattery;
+                bat.flashlightOn = false;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // 4. Load the new map — this creates fresh Wall/Roof/TileWorld entities
+        // ------------------------------------------------------------------
+        mapManager.loadMap("maps/Level2.tmx");
+
+        // ------------------------------------------------------------------
+        // 5. Spawn fresh items and a new enemy for Level 2
+        // ------------------------------------------------------------------
+        ImmutableArray<Entity> worldEntities = engine.getEntitiesFor(
+                Family.all(TileWorldComponent.class).get());
+        TileWorldComponent world = worldEntities.size() > 0
+                ? worldEntities.first().getComponent(TileWorldComponent.class)
+                : null;
+
+        if (world != null) {
+            int pTileX = 10;
+            int pTileY = 10;
+            if (players.size() > 0) {
+                TransformComponent t = players.first().getComponent(TransformComponent.class);
+                if (t != null) {
+                    pTileX = (int) (t.pos.x / 32f);
+                    pTileY = (int) (t.pos.y / 32f);
+                }
+            }
+
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion,
+                    batteryRegion, potionRegion, world,
+                    pTileX, pTileY,
+                    world.mapWidthTiles, world.mapHeightTiles);
+
+            // Spawn the enemy at a safe distance from the player
+            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyRegion);
+        }
+
+        // ------------------------------------------------------------------
+        // 6. Re-attach the player's lighting for the new level
+        // ------------------------------------------------------------------
+        if (players.size() > 0 && lightingSystem != null) {
+            lightingSystem.createPlayerLight(players.first(), false);
+        }
+
+        // ------------------------------------------------------------------
+        // 7. Reset HUD indicators
+        // ------------------------------------------------------------------
+        if (menuScreen != null) {
+            menuScreen.resetUI();
+        }
+
+        Gdx.app.log("TERMINAL", "=== LEVEL 2 LOADED SUCCESSFULLY ===");
+    }
+
+    /**
+     * Removes every entity matching the given {@link Family} from the engine.
+     *
+     * <p>Uses a two-pass collect-then-remove pattern to avoid concurrent
+     * modification of Ashley's internal entity arrays.</p>
+     */
+    private void purgeFamily(Family family) {
+        ImmutableArray<Entity> entities = engine.getEntitiesFor(family);
+        com.badlogic.gdx.utils.Array<Entity> buffer = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : entities) {
+            buffer.add(e);
+        }
+        for (Entity e : buffer) {
+            engine.removeEntity(e);
+        }
+    }
+
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
