@@ -13,6 +13,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -23,6 +24,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.sam.TERMINAL.components.BatteryComponent;
 import com.sam.TERMINAL.components.InventoryComponent;
@@ -30,6 +32,7 @@ import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.systems.LightingSystem;
 import com.sam.TERMINAL.systems.SaveSystem;
 import com.sam.TERMINAL.Main;
+import com.sam.TERMINAL.screen.SubmenuPanel;
 
 /**
  * MenuScreen — Owns all in-game UI stages: HUD, Settings overlay, Inventory
@@ -108,6 +111,9 @@ public class MenuScreen {
     // --- HUD Elements & Timers ---
     private Label stingTimerLabel;
     private Label noFlashlightWarningLabel;
+    private SubmenuPanel narrativePanel;
+    private Label narrativeLabel;
+    private float narrativeTimer = 0f;
 
     private float stingEffectTimer = 0f;
     private float warningDisplayTimer = 0f;
@@ -129,8 +135,7 @@ public class MenuScreen {
         settingsStage = new Stage(new ExtendViewport(w, h), batch);
         inventoryStage = new Stage(new ExtendViewport(w, h), batch);
 
-        font = new BitmapFont();
-        font.getData().setScale(2f);
+        font = loadUIFont("fonts/Abaddon Light.ttf", 28);
         restartTexture = new Texture(Gdx.files.internal("ui/Restart.png"));
         settingsTexture = new Texture(Gdx.files.internal("ui/settings.png"));
         invTexture = new Texture(Gdx.files.internal("ui/inventory.png"));
@@ -311,6 +316,24 @@ public class MenuScreen {
         }
     }
 
+    public void showNarrativeDialog(String text) {
+        showNarrativeDialog(text, 0f);
+    }
+
+    public void showNarrativeDialog(String text, float seconds) {
+        if (narrativePanel == null || narrativeLabel == null) return;
+        narrativeLabel.setText(text == null ? "" : text);
+        narrativePanel.setVisible(true);
+        narrativeTimer = Math.max(0f, seconds);
+    }
+
+    public void hideNarrativeDialog() {
+        if (narrativePanel != null) {
+            narrativePanel.setVisible(false);
+        }
+        narrativeTimer = 0f;
+    }
+
     private Entity getPlayerEntity() {
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return null;
         return engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
@@ -359,6 +382,12 @@ public class MenuScreen {
 
     public void render(float delta) {
         updateDynamicHUD();
+        if (narrativePanel != null && narrativePanel.isVisible() && narrativeTimer > 0f) {
+            narrativeTimer -= delta;
+            if (narrativeTimer <= 0f) {
+                hideNarrativeDialog();
+            }
+        }
         // Always act and draw uiStage — keeps the jumpscare timer ticking
         uiStage.act(delta);
         uiStage.draw();
@@ -573,6 +602,15 @@ public class MenuScreen {
         uiStage.getViewport().update(width, height, true);
         settingsStage.getViewport().update(width, height, true);
         inventoryStage.getViewport().update(width, height, true);
+        if (narrativePanel != null && narrativeLabel != null) {
+            float vw = uiStage.getViewport().getWorldWidth();
+            float vh = uiStage.getViewport().getWorldHeight();
+            float panelW = com.badlogic.gdx.math.MathUtils.clamp(vw * 0.82f, 320f, 760f);
+            float panelH = com.badlogic.gdx.math.MathUtils.clamp(vh * 0.22f, 130f, 210f);
+            narrativePanel.setSize(panelW, panelH);
+            narrativePanel.setPosition((vw - panelW) / 2f, 8f);
+            narrativePanel.getCell(narrativeLabel).width(panelW - 40f);
+        }
     }
 
     private void setupHUD() {
@@ -649,6 +687,31 @@ public class MenuScreen {
         stingTimerLabel.setFontScale(2f); // Ensuring size matches
         stingTimerLabel.setVisible(false);
         bottomRightTable.add(stingTimerLabel).right().padRight(20).padBottom(20);
+
+        // --- 5. Narrative Dialogue (SubmenuPanel-style, bottom center) ---
+        narrativePanel = new SubmenuPanel(18f);
+        narrativeLabel = new Label("", new Label.LabelStyle(font, Color.WHITE));
+        narrativeLabel.setWrap(true);
+        narrativeLabel.setAlignment(Align.topLeft);
+        narrativePanel.add(narrativeLabel).width(520f).left().top();
+        narrativePanel.setVisible(false);
+        narrativePanel.setSize(560f, 150f);
+        narrativePanel.setPosition((uiStage.getViewport().getWorldWidth() - 560f) / 2f, 8f);
+        uiStage.addActor(narrativePanel);
+    }
+
+    private BitmapFont loadUIFont(String path, int size) {
+        if (Gdx.files.internal(path).exists()) {
+            FreeTypeFontGenerator gen = new FreeTypeFontGenerator(Gdx.files.internal(path));
+            FreeTypeFontGenerator.FreeTypeFontParameter param = new FreeTypeFontGenerator.FreeTypeFontParameter();
+            param.size = size;
+            BitmapFont generated = gen.generateFont(param);
+            gen.dispose();
+            return generated;
+        }
+        BitmapFont fallback = new BitmapFont();
+        fallback.getData().setScale(size / 16f);
+        return fallback;
     }
 
     // =========================================================================
@@ -766,5 +829,10 @@ public class MenuScreen {
 
     public boolean isJumpscaring() {
         return isJumpscaring;
+    }
+
+    /** Restores the correct input processor based on current overlay state. */
+    public void reapplyInputProcessor() {
+        updateInputProcessor();
     }
 }

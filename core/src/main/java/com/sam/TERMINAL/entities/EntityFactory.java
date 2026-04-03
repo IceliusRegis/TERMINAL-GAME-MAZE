@@ -100,6 +100,31 @@ public class EntityFactory {
         engine.addEntity(enemy);
     }
 
+    /** Tutorial trigger object: Lily. */
+    public static void createLily(PooledEngine engine, float x, float y, TextureRegion lilyRegion, String saveId) {
+        Entity lily = engine.createEntity();
+
+        TransformComponent t = engine.createComponent(TransformComponent.class);
+        t.pos.set(x, y);
+        t.width = 48f;
+        t.height = 48f;
+        t.updateBounds();
+        lily.add(t);
+
+        SpriteComponent s = engine.createComponent(SpriteComponent.class);
+        s.staticSprite = lilyRegion;
+        s.isStatic = true;
+        s.drawWidth = 48f;
+        s.drawHeight = 48f;
+        s.name = "lily";
+        lily.add(s);
+
+        lily.add(new InteractableComponent("lily", 80f));
+        lily.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(lily);
+    }
+
     public static void createFlashlight(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
         Entity flashlight = engine.createEntity();
 

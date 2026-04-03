@@ -31,7 +31,6 @@ public class InteractionSystem extends EntitySystem {
     private ComponentMapper<TransformComponent> transformMapper;
     private ComponentMapper<InteractableComponent> interactMapper;
     private ComponentMapper<InventoryComponent> inventoryMapper;
-    private ComponentMapper<SpriteComponent> spriteMapper;
 
     // Rendering context for the "Press E" prompt
     private final SpriteBatch batch;
@@ -46,6 +45,7 @@ public class InteractionSystem extends EntitySystem {
     private static final float PROMPT_HEIGHT = 24f;
     private static final float PROMPT_OFFSET_Y = 8f; // pixels above the entity top
     private static final float TILE_SIZE = 32f;
+    private boolean lilyPromptShown = false;
 
     public InteractionSystem(SpriteBatch batch) {
         this.batch = batch;
@@ -59,7 +59,6 @@ public class InteractionSystem extends EntitySystem {
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
         interactMapper = ComponentMapper.getFor(InteractableComponent.class);
         inventoryMapper = ComponentMapper.getFor(InventoryComponent.class);
-        spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     }
 
     @Override
@@ -95,6 +94,7 @@ public class InteractionSystem extends EntitySystem {
         }
 
         // 3.) Check distance and line-of-sight for each item
+        boolean nearLilyThisFrame = false;
         for (Entity target : interactables) {
             InteractableComponent interact = interactMapper.get(target);
             if (!interact.isActive)
@@ -124,6 +124,16 @@ public class InteractionSystem extends EntitySystem {
 
                 if (hasLineOfSight) {
                     interact.nearPlayer = true;
+                    if ("lily".equals(interact.type)) {
+                        nearLilyThisFrame = true;
+                        if (!lilyPromptShown) {
+                            com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                            if (game != null && game.getMenuScreen() != null) {
+                                game.getMenuScreen().showNarrativeDialog("A lily..? What's it doing here?");
+                            }
+                            lilyPromptShown = true;
+                        }
+                    }
 
                     // Record this transform so renderPrompts() can draw above it.
                     nearestTargetTransform = targetPos;
@@ -134,6 +144,10 @@ public class InteractionSystem extends EntitySystem {
                     }
                 }
             }
+        }
+
+        if (!nearLilyThisFrame) {
+            lilyPromptShown = false;
         }
     }
 
@@ -237,6 +251,21 @@ public class InteractionSystem extends EntitySystem {
                 typeData.isActive = false;
 
                 // Optional: You can play a small sound effect here if you have one
+                break;
+
+            case "lily":
+                System.out.println("Interacted with LILY trigger!");
+                // Remove lily from world + trigger tutorial event
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
+                try {
+                    com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                    if (game != null && game.getMenuScreen() != null) {
+                        game.getMenuScreen().hideNarrativeDialog();
+                    }
+                    game.onLilyTriggered();
+                } catch (Exception ignored) {
+                }
                 break;
 
             default:

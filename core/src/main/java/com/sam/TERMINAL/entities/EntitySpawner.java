@@ -32,6 +32,7 @@ public class EntitySpawner {
     public static final String POTION_SAVE_ID = "ITEM_POTION";
 
     public static int totalBeepCardsSpawned = 0;
+    public static final int REQUIRED_BEEP_CARDS = 3;
 
     /** Maximum random attempts before falling back to spiral scan. */
     private static final int MAX_RANDOM_ATTEMPTS = 100;
@@ -72,6 +73,24 @@ public class EntitySpawner {
                 mapHeight);
     }
 
+    /** Tutorial start: spawn only player + lily trigger (no items/enemy). */
+    public static void spawnTutorialStart(PooledEngine engine,
+            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
+            TextureRegion lilyRegion) {
+        TileWorldComponent world = getWorldComponent(engine);
+        int mapWidth = (world != null) ? world.mapWidthTiles : 50;
+        int mapHeight = (world != null) ? world.mapHeightTiles : 50;
+
+        int pTileX = (int) (PLAYER_X / TILE_SIZE);
+        int pTileY = (int) (PLAYER_Y / TILE_SIZE);
+
+        EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
+
+        // Lily near the player.
+        int[] lilySafe = findSafeTileRandom(world, pTileX, pTileY, 5, 3, mapWidth, mapHeight);
+        EntityFactory.createLily(engine, lilySafe[0] * TILE_SIZE, lilySafe[1] * TILE_SIZE, lilyRegion, "LILY_TRIGGER");
+    }
+
     public static void spawnEnemy(PooledEngine engine, TextureRegion enemyRegion) {
         EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
         Gdx.app.log("SPAWNER", "The hunter has entered the maze...");
@@ -109,7 +128,7 @@ public class EntitySpawner {
         }
 
         // --- SAFE BEEP CARDS POSITION ---
-        totalBeepCardsSpawned = 3 + (int) (Math.random() * 3);
+        totalBeepCardsSpawned = REQUIRED_BEEP_CARDS;
         for (int i = 0; i < totalBeepCardsSpawned; i++) {
             com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint)
                     : null;
@@ -171,7 +190,7 @@ public class EntitySpawner {
         com.badlogic.gdx.math.GridPoint2 usedPoint = null;
 
         EntityFactory.createPlayer(engine, saveData.playerX, saveData.playerY, 24f, 15f, walkAnimation, idleAnimation);
-        totalBeepCardsSpawned = saveData.totalBeepCardsSpawned > 0 ? saveData.totalBeepCardsSpawned : 3;
+        totalBeepCardsSpawned = REQUIRED_BEEP_CARDS;
 
         for (int i = 0; i < 1; i++) {
             com.badlogic.gdx.math.GridPoint2 randomPotSpawn = (world != null) ? world.getRandomSpawnPoint(usedPoint)

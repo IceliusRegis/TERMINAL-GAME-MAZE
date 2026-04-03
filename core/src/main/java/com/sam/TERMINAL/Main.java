@@ -7,10 +7,12 @@ import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.utils.Timer;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
@@ -44,6 +46,7 @@ public class Main extends ApplicationAdapter {
     private DebugManager debugManager;
     private Music titleMusic;
     private Music tutorialMusic;
+    private Music triBgmMusic;
     private float titleMusicDelayTimer;
     private boolean titleMusicStarted;
     private static final float CURSOR_HIDE_DELAY_SECONDS = 5f;
@@ -51,13 +54,23 @@ public class Main extends ApplicationAdapter {
     private int lastPointerX = Integer.MIN_VALUE;
     private int lastPointerY = Integer.MIN_VALUE;
     private boolean cursorVisible;
+    private boolean startedGameProperFromTutorial = false;
+    private boolean disableLightingDuringTutorial = false;
+    private boolean timeSignalPlayedForRun = false;
+    private boolean tutorialMovementAllowed = true;
+    private boolean lilyTriggered = false;
+
+    private Sound timeSignalSound;
+    private Sound lilyTriggerSound;
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
     private Texture beepTexture, flashlightTexture, batteryTexture, potionTexture; // ADDED potionTexture
+    private Texture lilyTexture;
 
     // Regions and Animation
     private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion, potionRegion; // ADDED potionRegion
+    private TextureRegion lilyRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -103,24 +116,43 @@ public class Main extends ApplicationAdapter {
     }
 
     private void startTutorial() {
-        stopTitleMusic();
+        fadeOutTitleMusic(1.0f);
         playTutorialMusic();
-        tutorialScene = new TutorialScene(batch, this::onTutorialComplete);
+        timeSignalPlayedForRun = false;
+        // Start in full-bright mode for the entire tutorial run.
+        disableLightingDuringTutorial = true;
+        tutorialMovementAllowed = false;
+        lilyTriggered = false;
+        tutorialScene = new TutorialScene(batch, new TutorialScene.TutorialListener() {
+            @Override
+            public void onSpawnIntoMaze() {
+                if (startedGameProperFromTutorial) return;
+                startedGameProperFromTutorial = true;
+                // Start the actual game after the current Scene2D frame finishes.
+                Gdx.app.postRunnable(Main.this::startGameProper);
+            }
+
+            @Override
+            public void onTutorialComplete() {
+                // Never dispose the tutorial Stage inside Scene2D update/render.
+                Gdx.app.postRunnable(() -> {
+                    if (tutorialScene != null) {
+                        tutorialScene.dispose();
+                        tutorialScene = null;
+                    }
+
+                    tutorialMovementAllowed = true;
+
+                    if (menuScreen != null) {
+                        menuScreen.reapplyInputProcessor();
+                    }
+                });
+            }
+        });
         flowState = FlowState.TUTORIAL;
     }
 
-    private void onTutorialComplete() {
-        // Never dispose the tutorial Stage or swap game state from inside Scene2D
-        // input;
-        // that re-enters Stage and can crash. Run after the frame/input stack unwinds.
-        Gdx.app.postRunnable(() -> {
-            if (tutorialScene != null) {
-                tutorialScene.dispose();
-                tutorialScene = null;
-            }
-            startGameProper();
-        });
-    }
+    // onTutorialComplete handled via the TutorialListener in startTutorial()
 
     private void startGameProper() {
         stopTitleMusic();
@@ -164,6 +196,117 @@ public class Main extends ApplicationAdapter {
 
         enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
         enemyRegion = new TextureRegion(enemyTexture);
+
+        if (Gdx.files.internal("ui/LilyOUTLINED.png").exists()) {
+            lilyTexture = new Texture(Gdx.files.internal("ui/LilyOUTLINED.png"));
+            lilyRegion = new TextureRegion(lilyTexture);
+        }
+    }
+
+    public boolean isTutorialMovementAllowed() {
+        return tutorialMovementAllowed;
+    }
+
+    public boolean isLilyTriggered() {
+        return lilyTriggered;
+    }
+
+    public void onLilyTriggered() {
+        if (lilyTriggered) return;
+        lilyTriggered = true;
+
+        // Lily interaction transitions BGM to triBGM.wav.
+        transitionToTriBgm();
+
+        if (Gdx.files.internal("sfx/shdemo-sfx-79.ogg").exists()) {
+            if (lilyTriggerSound == null) {
+                lilyTriggerSound = Gdx.audio.newSound(Gdx.files.internal("sfx/shdemo-sfx-79.ogg"));
+            }
+            lilyTriggerSound.play(0.7f);
+        }
+
+        // Flicker before fully switching darkness ON.
+        if (lightingSystem != null) {
+            lightingSystem.lightingEnabled = false;
+            Timer.schedule(new Timer.Task() {
+                @Override public void run() { if (lightingSystem != null) lightingSystem.lightingEnabled = true; }
+            }, 0.08f);
+            Timer.schedule(new Timer.Task() {
+                @Override public void run() { if (lightingSystem != null) lightingSystem.lightingEnabled = false; }
+            }, 0.16f);
+            Timer.schedule(new Timer.Task() {
+                @Override public void run() { if (lightingSystem != null) lightingSystem.lightingEnabled = true; }
+            }, 0.24f);
+            Timer.schedule(new Timer.Task() {
+                @Override public void run() { if (lightingSystem != null) lightingSystem.lightingEnabled = false; }
+            }, 0.32f);
+            Timer.schedule(new Timer.Task() {
+                @Override public void run() { if (lightingSystem != null) lightingSystem.lightingEnabled = true; }
+            }, 0.45f);
+        }
+        disableLightingDuringTutorial = false;
+
+        if (menuScreen != null) {
+            menuScreen.showNarrativeDialog("?!\nThe lights went off! That sound must have something to do with it...");
+            Timer.schedule(new Timer.Task() {
+                @Override
+                public void run() {
+                    if (menuScreen != null) {
+                        menuScreen.showNarrativeDialog("This overtime shift is by far the weirdest.", 2.2f);
+                    }
+                }
+            }, 2.0f);
+        }
+
+        // Spawn items + enemy only after the post-lily dialogue sequence ends.
+        Timer.schedule(new Timer.Task() {
+            @Override
+            public void run() {
+                spawnPostLilyEntities();
+            }
+        }, 4.3f);
+    }
+
+    private void spawnPostLilyEntities() {
+        // Spawn items now (beep cards, flashlight, battery, sting).
+        ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
+        ImmutableArray<Entity> worldEntities = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
+        if (players.size() > 0 && worldEntities.size() > 0) {
+            TransformComponent t = players.first().getComponent(TransformComponent.class);
+            TileWorldComponent world = worldEntities.first().getComponent(TileWorldComponent.class);
+            int pTileX = (int) (t.pos.x / 32f);
+            int pTileY = (int) (t.pos.y / 32f);
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
+                    pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
+
+            // Spawn enemy immediately after dialogue closes.
+            if (enemyRegion != null) {
+                EntitySpawner.spawnEnemy(engine, enemyRegion);
+            }
+        }
+    }
+
+    private void fadeOutTitleMusic(float durationSeconds) {
+        if (titleMusic == null) return;
+        final float startVolume = titleMusic.getVolume();
+        final float step = 0.1f;
+        final int steps = Math.max(1, (int) (durationSeconds / step));
+        for (int i = 1; i <= steps; i++) {
+            final int idx = i;
+            Timer.schedule(new Timer.Task() {
+                @Override
+                public void run() {
+                    if (titleMusic == null) return;
+                    float t = idx / (float) steps;
+                    float v = startVolume * (1f - t);
+                    titleMusic.setVolume(Math.max(0f, v));
+                    if (idx == steps) {
+                        titleMusic.stop();
+                        titleMusic.setVolume(startVolume);
+                    }
+                }
+            }, i * step);
+        }
     }
 
     private void loadTitleMusic() {
@@ -207,11 +350,56 @@ public class Main extends ApplicationAdapter {
         }
     }
 
+    private void transitionToTriBgm() {
+        if (!Gdx.files.internal("music/triBGM.wav").exists()) return;
+
+        if (triBgmMusic == null) {
+            triBgmMusic = Gdx.audio.newMusic(Gdx.files.internal("music/triBGM.wav"));
+            triBgmMusic.setLooping(true);
+            triBgmMusic.setVolume(0f);
+        }
+        if (!triBgmMusic.isPlaying()) {
+            triBgmMusic.play();
+        }
+
+        final float duration = 1.2f;
+        final float step = 0.1f;
+        final int steps = Math.max(1, (int) (duration / step));
+        final float tutorialStart = tutorialMusic != null ? tutorialMusic.getVolume() : 0f;
+        final float triTarget = 0.65f;
+
+        for (int i = 1; i <= steps; i++) {
+            final int idx = i;
+            Timer.schedule(new Timer.Task() {
+                @Override
+                public void run() {
+                    float t = idx / (float) steps;
+                    if (tutorialMusic != null) {
+                        tutorialMusic.setVolume(Math.max(0f, tutorialStart * (1f - t)));
+                        if (idx == steps) {
+                            tutorialMusic.stop();
+                            tutorialMusic.dispose();
+                            tutorialMusic = null;
+                        }
+                    }
+                    if (triBgmMusic != null) {
+                        triBgmMusic.setVolume(Math.min(triTarget, triTarget * t));
+                    }
+                }
+            }, i * step);
+        }
+    }
+
     private void stopTutorialMusic() {
         if (tutorialMusic != null) {
             tutorialMusic.stop();
             tutorialMusic.dispose();
             tutorialMusic = null;
+        }
+        if (triBgmMusic != null) {
+            triBgmMusic.stop();
+            triBgmMusic.dispose();
+            triBgmMusic = null;
         }
     }
 
@@ -245,6 +433,9 @@ public class Main extends ApplicationAdapter {
         lightingSystem = new LightingSystem(camera);
         if (menuScreen != null) {
             lightingSystem.setMenuScreen(menuScreen); // Add this line!
+        }
+        if (disableLightingDuringTutorial && lightingSystem != null) {
+            lightingSystem.lightingEnabled = false;
         }
         engine.addSystem(lightingSystem);
 
@@ -286,8 +477,13 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(MAIN_SAVE_FILE);
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
-            EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
+            if (startedGameProperFromTutorial && lilyRegion != null) {
+                // Tutorial run: spawn only player + lily trigger.
+                EntitySpawner.spawnTutorialStart(engine, walkAnimation, idleAnimation, lilyRegion);
+            } else {
+                EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
+                        enemyRegion, flashlightRegion, batteryRegion, potionRegion);
+            }
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
@@ -297,6 +493,17 @@ public class Main extends ApplicationAdapter {
                 Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             lightingSystem.createPlayerLight(players.first(), false);
+
+            // Snap the camera directly to the player on spawn so they are
+            // immediately visible when the maze appears (no initial pan
+            // from the map corner).
+            Entity player = players.first();
+            TransformComponent t = player.getComponent(TransformComponent.class);
+            if (t != null) {
+                camera.position.x = t.pos.x;
+                camera.position.y = t.pos.y;
+                camera.update();
+            }
         }
     }
 
@@ -408,6 +615,21 @@ public class Main extends ApplicationAdapter {
      */
     public void loadLevelTwo() {
         Gdx.app.log("TERMINAL", "=== LOADING LEVEL 2 ===");
+
+        // Play "time signal" once when the player successfully exits the station.
+        if (!timeSignalPlayedForRun) {
+            timeSignalPlayedForRun = true;
+            if (Gdx.files.internal("sfx/time-signal.ogg").exists()) {
+                if (timeSignalSound == null) {
+                    timeSignalSound = Gdx.audio.newSound(Gdx.files.internal("sfx/time-signal.ogg"));
+                }
+                try {
+                    timeSignalSound.play(0.7f);
+                } catch (Exception ignored) {
+                    // If audio fails to start, don't break gameplay.
+                }
+            }
+        }
 
         // ------------------------------------------------------------------
         // 1. Reset system state flags so update() runs normally on the new map
@@ -602,6 +824,10 @@ public class Main extends ApplicationAdapter {
 
         // Draw UI on top
         menuScreen.render(delta);
+        // Tutorial overlay (post-spawn) still renders above the game HUD.
+        if (tutorialScene != null) {
+            tutorialScene.render(delta);
+        }
 
         // Check win/loss — guarded so jumpscare isn't interrupted.
         // During a jumpscare, showGameOver() is called by the jumpscare's own
@@ -729,6 +955,10 @@ public class Main extends ApplicationAdapter {
             batteryTexture.dispose();
         if (potionTexture != null)
             potionTexture.dispose();
+        if (lilyTexture != null)
+            lilyTexture.dispose();
+        if (lilyTriggerSound != null)
+            lilyTriggerSound.dispose();
         WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
         if (wlsDispose != null)
             wlsDispose.dispose();
@@ -751,4 +981,6 @@ public class Main extends ApplicationAdapter {
     }
 
     public TextureRegion getEnemyRegion() { return enemyRegion; }
+
+    public MenuScreen getMenuScreen() { return menuScreen; }
 }

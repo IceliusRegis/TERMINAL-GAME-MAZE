@@ -14,9 +14,7 @@ public class SubmenuPanel extends Table {
 
     private static NinePatchDrawable getFrameDrawable() {
         if (frameDrawable == null) {
-            frameTexture = new Texture(Gdx.files.internal("ui/Chunky white 2b.png"));
-            // Split border into scalable 9-patch regions.
-            // Tune these numbers if you adjust the source asset.
+            frameTexture = new Texture(Gdx.files.internal("ui/reupanel.png"));
             NinePatch ninePatch = new NinePatch(frameTexture, 6, 6, 6, 6);
             frameDrawable = new NinePatchDrawable(ninePatch);
         }
@@ -34,8 +32,6 @@ public class SubmenuPanel extends Table {
         center();              // center content
         defaults().center();
     }
-
-    /** Dispose shared NinePatch texture if you no longer need any SubmenuPanels. */
     public static void disposeShared() {
         if (frameTexture != null) {
             frameTexture.dispose();

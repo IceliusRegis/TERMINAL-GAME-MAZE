@@ -6,7 +6,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.audio.Sound;
 import com.sam.TERMINAL.Main;
 import com.sam.TERMINAL.components.*;
 
@@ -22,9 +22,10 @@ public class MovementSystem extends IteratingSystem {
     private float batteryRespawnTimer = 0f;
     private boolean isWaitingForBattery = false;
     private final float BATTERY_RESPAWN_DELAY = 15f;
-    private float enemySpawnTimer = 0f;
-    private boolean enemySpawned = false;
-    private final float ENEMY_SPAWN_DELAY = 45f; // 60 seconds
+
+    // Footsteps SFX (loop while movement keys are held).
+    private Sound footstepsSound;
+    private long footstepsSoundId = -1L;
 
     public MovementSystem() {
         super(Family.all(TransformComponent.class, PlayerComponent.class).get());
@@ -35,7 +36,14 @@ public class MovementSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        Main game = (Main) Gdx.app.getApplicationListener();
+        if (game != null && !game.isTutorialMovementAllowed()) {
+            stopFootsteps();
+            return;
+        }
+
         if (menuScreen != null && (menuScreen.isSettingsVisible() || menuScreen.isInventoryVisible())) {
+            stopFootsteps();
             return;
         }
 
@@ -67,40 +75,14 @@ public class MovementSystem extends IteratingSystem {
             }
         }
 
-        // --- ENEMY SPAWN DELAY LOGIC ---
-        if (!enemySpawned) {
-            enemySpawnTimer += deltaTime;
-
-            // Calculate seconds remaining
-            float remaining = ENEMY_SPAWN_DELAY - enemySpawnTimer;
-
-            if (remaining > 0) {
-                if (menuScreen != null) {
-                    // Math.ceil makes it feel more natural (starts at 60, ends at 1)
-                    menuScreen.updateMonsterTimer((int) Math.ceil(remaining));
-                }
-            }
-
-            if (enemySpawnTimer >= ENEMY_SPAWN_DELAY) {
-                Main game = (Main) Gdx.app.getApplicationListener();
-                TextureRegion enemyTex = game.getEnemyRegion();
-
-                if (enemyTex != null) {
-                    com.sam.TERMINAL.entities.EntitySpawner.spawnEnemy(
-                        (com.badlogic.ashley.core.PooledEngine)getEngine(),
-                        enemyTex
-                    );
-                    enemySpawned = true;
-
-                    // Hide the timer once the monster is spawned
-                    if (menuScreen != null) menuScreen.hideMonsterTimer();
-                }
-            }
+        // Enemy spawn is now handled immediately by Main.onLilyTriggered().
+        if (menuScreen != null) {
+            menuScreen.hideMonsterTimer();
         }
 
         boolean playerHasBattery = (inv != null && inv.hasItem("battery"));
 
-        if (!batteryExistsInWorld && !playerHasBattery) {
+        if (game != null && game.isLilyTriggered() && !batteryExistsInWorld && !playerHasBattery) {
             if (!isWaitingForBattery) {
                 isWaitingForBattery = true;
                 batteryRespawnTimer = BATTERY_RESPAWN_DELAY;
@@ -144,6 +126,8 @@ public class MovementSystem extends IteratingSystem {
         if (Gdx.input.isKeyPressed(Input.Keys.A)) xInput -= 1;
         if (Gdx.input.isKeyPressed(Input.Keys.D)) xInput += 1;
 
+        updateFootstepsSound(xInput, yInput);
+
         if (xInput != 0 || yInput != 0) {
             float angle = (float) Math.toDegrees(Math.atan2(yInput, xInput));
             if (angle < 0) angle += 360;
@@ -156,8 +140,13 @@ public class MovementSystem extends IteratingSystem {
             }
         }
 
-        float xMove = xInput * pc.speed * deltaTime;
-        float yMove = yInput * pc.speed * deltaTime;
+        float effectiveSpeed = pc.speed;
+        if (game != null && !game.isLilyTriggered()) {
+            // Pre-entity phase: slightly slower movement.
+            effectiveSpeed *= 0.72f;
+        }
+        float xMove = xInput * effectiveSpeed * deltaTime;
+        float yMove = yInput * effectiveSpeed * deltaTime;
 
         TileWorldComponent world = null;
         if (getEngine().getEntitiesFor(Family.all(TileWorldComponent.class).get()).size() > 0) {
@@ -181,6 +170,31 @@ public class MovementSystem extends IteratingSystem {
         if(checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
             transform.pos.y = oldY;
             transform.updateBounds();
+        }
+    }
+
+    private void updateFootstepsSound(float xInput, float yInput) {
+        boolean isMovingIntent = (xInput != 0 || yInput != 0);
+
+        if (!isMovingIntent) {
+            stopFootsteps();
+            return;
+        }
+
+        if (footstepsSound == null) {
+            if (!Gdx.files.internal("sfx/walking.ogg").exists()) return;
+            footstepsSound = Gdx.audio.newSound(Gdx.files.internal("sfx/walking.ogg"));
+        }
+
+        if (footstepsSoundId == -1L && footstepsSound != null) {
+            footstepsSoundId = footstepsSound.loop(0.35f);
+        }
+    }
+
+    private void stopFootsteps() {
+        if (footstepsSound != null && footstepsSoundId != -1L) {
+            footstepsSound.stop(footstepsSoundId);
+            footstepsSoundId = -1L;
         }
     }
 
@@ -238,8 +252,6 @@ public class MovementSystem extends IteratingSystem {
     }
 
     public void resetEnemyTimer() {
-        this.enemySpawnTimer = 0f;
-        this.enemySpawned = false;
-        Gdx.app.log("MOVEMENT_SYSTEM", "Enemy timer reset to 45s");
+        Gdx.app.log("MOVEMENT_SYSTEM", "Enemy timer disabled (lily-trigger flow)");
     }
 }
