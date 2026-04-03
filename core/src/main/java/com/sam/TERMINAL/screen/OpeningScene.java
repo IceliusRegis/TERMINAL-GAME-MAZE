@@ -55,7 +55,7 @@ public class OpeningScene {
         batch.setProjectionMatrix(viewport.getCamera().combined);
         batch.begin();
         drawCenteredText("Use headphones for better experience.", bodyFont, 2f, 5f);
-        drawCenteredText("Gateway presents", bodyFont, 8f, 5f);
+        drawCenteredText("GATEWAY presents", bodyFont, 8f, 5f);
         drawCenteredText("TERMINAL", terminalFont, 14f, 5f);
         batch.end();
     }

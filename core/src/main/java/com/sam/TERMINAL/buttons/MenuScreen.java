@@ -111,9 +111,13 @@ public class MenuScreen {
 
     private float stingEffectTimer = 0f;
     private float warningDisplayTimer = 0f;
+    private float batteryDrainTimer = 0f;
 
     private final float STING_DURATION = 10f;
     private final float WARNING_DURATION = 3f;
+
+    private BitmapFont bodyFont;
+    private BitmapFont terminalFont;
 
     // =========================================================================
     // Constructor
@@ -135,6 +139,8 @@ public class MenuScreen {
         settingsTexture = new Texture(Gdx.files.internal("ui/settings.png"));
         invTexture = new Texture(Gdx.files.internal("ui/inventory.png"));
         jumpscareSound = Gdx.audio.newSound(Gdx.files.internal("sfx/jumpscare.mp3"));
+        bodyFont = loadFont("fonts/Abaddon Light.ttf", 34);
+        terminalFont = loadFont("fonts/BIOSfontII.ttf", 76);
 
         createDimmerTexture();
 
@@ -148,19 +154,19 @@ public class MenuScreen {
 
         // BUG 3 FIX: store the reference.
         settingsButtonWidget = new SettingsButton(
-                settingsRoot,
-                () -> { // onClose — Return button
-                    isSettingsVisible = false;
-                    updateInputProcessor();
-                },
-                () -> { // onSave
-                    saveMapLogic();
-                },
-                () -> { // onReset
-                    mainGame.resetGame();
-                    isSettingsVisible = false;
-                    updateInputProcessor();
-                });
+            settingsRoot,
+            () -> { // onClose — Return button
+                isSettingsVisible = false;
+                updateInputProcessor();
+            },
+            () -> { // onSave
+                saveMapLogic();
+            },
+            () -> { // onReset
+                mainGame.resetGame();
+                isSettingsVisible = false;
+                updateInputProcessor();
+            });
 
         // --- INVENTORY SETUP ---
         Table inventoryRoot = new Table();
@@ -415,7 +421,9 @@ public class MenuScreen {
                     // --- START LOADING & FADE SEQUENCE ---
                     table.clearChildren();
 
-                    Label loadingLabel = new Label("Loading...", new Label.LabelStyle(font, Color.WHITE));
+                    // CHANGED: Using bodyFont (Abaddon Light) instead of the generic font
+                    Label.LabelStyle loadingStyle = new Label.LabelStyle(bodyFont, Color.WHITE);
+                    Label loadingLabel = new Label("Loading...", loadingStyle);
                     table.add(loadingLabel).center();
 
                     // 1. Wait 5 seconds
@@ -448,6 +456,21 @@ public class MenuScreen {
         uiStage.setKeyboardFocus(actionBtn);
     }
 
+    private BitmapFont loadFont(String path, int size) {
+        if (Gdx.files.internal(path).exists()) {
+            com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator gen =
+                new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator(Gdx.files.internal(path));
+            com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter param =
+                new com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter();
+            param.size = size;
+            BitmapFont fontGenerated = gen.generateFont(param);
+            gen.dispose();
+            return fontGenerated;
+        }
+        // Fallback if file is missing
+        return new BitmapFont();
+    }
+
     // =========================================================================
     // Jumpscare
     // =========================================================================
@@ -478,19 +501,19 @@ public class MenuScreen {
 
         // 3. Sequence: Stay full alpha -> Fade out -> Clean up & Game Over
         jumpscareImg.addAction(Actions.sequence(
-                Actions.delay(3.0f), // Show jumpscare for 3 seconds
-                Actions.fadeOut(1.0f), // Fade to black over 1 second
-                Actions.run(() -> {
-                    isJumpscaring = false;
-                    if (jumpscareTexture != null) {
-                        jumpscareTexture.dispose();
-                        jumpscareTexture = null;
-                    }
-                    // Reset the guard so showGameOver() rebuilds the UI even if
-                    // WinLossSystem set gameOver = true in an earlier frame.
-                    isGameOver = false;
-                    showGameOver(false); // Trigger the death screen
-                })));
+            Actions.delay(3.0f), // Show jumpscare for 3 seconds
+            Actions.fadeOut(1.0f), // Fade to black over 1 second
+            Actions.run(() -> {
+                isJumpscaring = false;
+                if (jumpscareTexture != null) {
+                    jumpscareTexture.dispose();
+                    jumpscareTexture = null;
+                }
+                // Reset the guard so showGameOver() rebuilds the UI even if
+                // WinLossSystem set gameOver = true in an earlier frame.
+                isGameOver = false;
+                showGameOver(false); // Trigger the death screen
+            })));
 
         Gdx.input.setInputProcessor(uiStage);
     }
@@ -519,8 +542,8 @@ public class MenuScreen {
         stage.getBatch().begin();
         stage.getBatch().setColor(0, 0, 0, 0.6f);
         stage.getBatch().draw(whitePixel, 0, 0,
-                stage.getViewport().getWorldWidth(),
-                stage.getViewport().getWorldHeight());
+            stage.getViewport().getWorldWidth(),
+            stage.getViewport().getWorldHeight());
         stage.getBatch().setColor(1, 1, 1, 1);
         stage.getBatch().end();
     }
@@ -530,14 +553,17 @@ public class MenuScreen {
         stage.getBatch().begin();
         stage.getBatch().setColor(0, 0, 0, 0.5f);
         stage.getBatch().draw(whitePixel,
-                (stage.getViewport().getWorldWidth() - 500) / 2f,
-                (stage.getViewport().getWorldHeight() - 400) / 2f,
-                500, 400);
+            (stage.getViewport().getWorldWidth() - 500) / 2f,
+            (stage.getViewport().getWorldHeight() - 400) / 2f,
+            500, 400);
         stage.getBatch().setColor(1, 1, 1, 1);
         stage.getBatch().end();
     }
 
     private void updateDynamicHUD() {
+        // Move delta to the top so it's available for the battery logic
+        float delta = Gdx.graphics.getDeltaTime();
+
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0) return;
         Entity player = engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).first();
         InventoryComponent inv = player.getComponent(InventoryComponent.class);
@@ -553,23 +579,41 @@ public class MenuScreen {
             beepCardLabel.setText("Beep Cards: " + heldCards + " / " + totalExpected);
         }
 
+        // --- FLASHLIGHT & BATTERY LOGIC ---
         if (bat != null && inv != null && inv.hasItem("flashlight")) {
+
+            // 1. Drain battery every 5 seconds
+            batteryDrainTimer += delta;
+            if (batteryDrainTimer >= 5.0f) {
+                if (bat.battery > 0) {
+                    bat.battery -= 1f;
+                }
+                batteryDrainTimer = 0f;
+            }
+
+            // 2. Update Label Text & Color (Using bodyFont/Abaddon)
             if (batteryLabel != null) {
                 batteryLabel.setText(String.format("Flashlight Battery: %.0f%%", bat.battery));
-                batteryLabel.getStyle().fontColor = (bat.battery <= 15f) ? Color.RED : Color.GREEN;
+                batteryLabel.setColor(bat.battery <= 15f ? Color.RED : Color.GREEN);
             }
-            // NULL CHECK: lowBatteryWarningLabel
+
+            // 3. Low Battery Warning + Pulse Effect
             if (lowBatteryWarningLabel != null) {
-                lowBatteryWarningLabel.setVisible(bat.battery <= 15f && bat.battery > 0f);
+                boolean isLow = bat.battery <= 15f && bat.battery > 0f;
+                lowBatteryWarningLabel.setVisible(isLow);
+
+                if (isLow) {
+                    // Pulses based on sine wave for a "warning light" feel
+                    float alpha = 0.5f + (float)Math.sin(Gdx.graphics.getFrameId() * 0.1f) * 0.5f;
+                    lowBatteryWarningLabel.getColor().a = alpha;
+                }
             }
         } else {
             if (batteryLabel != null) batteryLabel.setText("");
             if (lowBatteryWarningLabel != null) lowBatteryWarningLabel.setVisible(false);
         }
 
-        float delta = Gdx.graphics.getDeltaTime();
-
-        // NULL CHECK: Warning Label Logic
+        // --- WARNING & STING LOGIC ---
         if (noFlashlightWarningLabel != null) {
             if (warningDisplayTimer > 0) {
                 warningDisplayTimer -= delta;
@@ -579,7 +623,6 @@ public class MenuScreen {
             }
         }
 
-        // NULL CHECK: Sting Timer Logic
         if (stingTimerLabel != null) {
             if (stingEffectTimer > 0) {
                 stingEffectTimer -= delta;
@@ -604,6 +647,9 @@ public class MenuScreen {
     private void setupHUD() {
         uiStage.clear();
 
+        // The style for all "Terminal/BIOS" looking HUD elements
+        Label.LabelStyle biosStyle = new Label.LabelStyle(bodyFont, Color.WHITE);
+
         // --- 1. TOP LEFT: Settings ---
         Table topLeftTable = new Table();
         topLeftTable.setFillParent(true);
@@ -623,15 +669,11 @@ public class MenuScreen {
         // --- 2. BOTTOM CENTER: Inventory & Monster Timer ---
         Table bottomCenterTable = new Table();
         bottomCenterTable.setFillParent(true);
-        bottomCenterTable.bottom(); // Align table to bottom
+        bottomCenterTable.bottom();
         uiStage.addActor(bottomCenterTable);
 
-        // Initialize the Monster Label
-        monsterWarningLabel = new Label("", new Label.LabelStyle(font, Color.YELLOW));
-        monsterWarningLabel.setFontScale(2f); // Same scale as stingTimerLabel
-        monsterWarningLabel.setVisible(false);
-
-        // Add Label FIRST so it sits ABOVE the inventory button
+        monsterWarningLabel = new Label("", biosStyle);
+        monsterWarningLabel.setColor(Color.YELLOW);
         bottomCenterTable.add(monsterWarningLabel).padBottom(20).row();
 
         ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
@@ -642,7 +684,6 @@ public class MenuScreen {
                 updateInputProcessor();
             }
         });
-        // Add Inventory Button SECOND
         bottomCenterTable.add(inventoryBtn).size(55, 55).padBottom(5);
 
         // --- 3. TOP RIGHT: Stats & Warnings ---
@@ -651,10 +692,11 @@ public class MenuScreen {
         topRightTable.top().right();
         uiStage.addActor(topRightTable);
 
+        // Use standard font for beep cards, biosStyle for battery
         beepCardLabel = new Label("Beep Cards: 0 / 0", new Label.LabelStyle(font, Color.WHITE));
-        batteryLabel = new Label("", new Label.LabelStyle(font, Color.GREEN));
-
-        lowBatteryWarningLabel = new Label("LOW BATTERY", new Label.LabelStyle(font, Color.RED));
+        batteryLabel = new Label("", biosStyle);
+        lowBatteryWarningLabel = new Label("LOW BATTERY", biosStyle);
+        lowBatteryWarningLabel.setColor(Color.RED);
         lowBatteryWarningLabel.setVisible(false);
 
         noFlashlightWarningLabel = new Label("", new Label.LabelStyle(font, Color.ORANGE));
@@ -671,9 +713,8 @@ public class MenuScreen {
         bottomRightTable.bottom().right();
         uiStage.addActor(bottomRightTable);
 
-        stingTimerLabel = new Label("", new Label.LabelStyle(font, Color.CYAN));
-        stingTimerLabel.setFontScale(2f); // Ensuring size matches
-        stingTimerLabel.setVisible(false);
+        stingTimerLabel = new Label("", biosStyle); // Matching the look
+        stingTimerLabel.setColor(Color.CYAN);
         bottomRightTable.add(stingTimerLabel).right().padRight(20).padBottom(20);
     }
 
@@ -775,6 +816,9 @@ public class MenuScreen {
         if (inventoryButtonWidget != null) {
             inventoryButtonWidget.dispose();
         }
+
+        if (bodyFont != null) bodyFont.dispose();
+        if (terminalFont != null) terminalFont.dispose();
     }
 
     // ── State accessors ───────────────────────────────────────────────────────
