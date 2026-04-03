@@ -16,6 +16,8 @@ public class MovementSystem extends IteratingSystem {
     private ComponentMapper<SpriteComponent> spriteMapper;
     private ComponentMapper<PlayerComponent> playerMapper;
 
+    private ComponentMapper<PlayerComponent> playerMapper;
+
     private com.sam.TERMINAL.buttons.MenuScreen menuScreen;
 
     // Timer Variables
@@ -100,7 +102,8 @@ public class MovementSystem extends IteratingSystem {
 
         // Use Battery
         if (Gdx.input.isKeyJustPressed(Input.Keys.U)) {
-            if (menuScreen != null) menuScreen.useBatteryFromInventory();
+            if (menuScreen != null)
+                menuScreen.useBatteryFromInventory();
         }
 
         boolean playerHasFlashlight = (inv != null && inv.hasItem("flashlight"));
@@ -109,7 +112,8 @@ public class MovementSystem extends IteratingSystem {
         if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
             if (playerHasFlashlight && bc != null) {
                 if (bc.battery <= 0) {
-                    if (menuScreen != null) menuScreen.showWarningLabel("BATTERY EMPTY! NEED RECHARGE");
+                    if (menuScreen != null)
+                        menuScreen.showWarningLabel("BATTERY EMPTY! NEED RECHARGE");
                     bc.flashlightOn = false;
                 } else {
                     bc.flashlightOn = !bc.flashlightOn;
@@ -121,16 +125,21 @@ public class MovementSystem extends IteratingSystem {
         float xInput = 0;
         float yInput = 0;
 
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) yInput += 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) yInput -= 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) xInput -= 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) xInput += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.W))
+            yInput += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.S))
+            yInput -= 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.A))
+            xInput -= 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.D))
+            xInput += 1;
 
         updateFootstepsSound(xInput, yInput);
 
         if (xInput != 0 || yInput != 0) {
             float angle = (float) Math.toDegrees(Math.atan2(yInput, xInput));
-            if (angle < 0) angle += 360;
+            if (angle < 0)
+                angle += 360;
             sprite.facingAngle = angle;
 
             if (xInput != 0 && yInput != 0) {
@@ -158,7 +167,7 @@ public class MovementSystem extends IteratingSystem {
         float oldX = transform.pos.x;
         transform.pos.x += xMove;
         transform.updateBounds();
-        if(checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
+        if (checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
             transform.pos.x = oldX;
             transform.updateBounds();
         }
@@ -167,7 +176,7 @@ public class MovementSystem extends IteratingSystem {
         float oldY = transform.pos.y;
         transform.pos.y += yMove;
         transform.updateBounds();
-        if(checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
+        if (checkEntityCollison(entity, transform) || checkTileCollision(transform, world)) {
             transform.pos.y = oldY;
             transform.updateBounds();
         }
@@ -182,7 +191,8 @@ public class MovementSystem extends IteratingSystem {
         }
 
         if (footstepsSound == null) {
-            if (!Gdx.files.internal("sfx/walking.ogg").exists()) return;
+            if (!Gdx.files.internal("sfx/walking.ogg").exists())
+                return;
             footstepsSound = Gdx.audio.newSound(Gdx.files.internal("sfx/walking.ogg"));
         }
 
@@ -212,28 +222,32 @@ public class MovementSystem extends IteratingSystem {
             while (!valid && attempts < 50) {
                 spawnX = com.badlogic.gdx.math.MathUtils.random(50, (world.mapWidthTiles * world.tileWidth) - 50);
                 spawnY = com.badlogic.gdx.math.MathUtils.random(50, (world.mapHeightTiles * world.tileHeight) - 50);
-                if (!world.isSolid((int)(spawnX / world.tileWidth), (int)(spawnY / world.tileHeight))) {
+                if (!world.isSolid((int) (spawnX / world.tileWidth), (int) (spawnY / world.tileHeight))) {
                     valid = true;
                 }
                 attempts++;
             }
         }
 
-        com.sam.TERMINAL.entities.EntitySpawner.spawnBattery((com.badlogic.ashley.core.PooledEngine)getEngine(), spawnX, spawnY);
+        com.sam.TERMINAL.entities.EntitySpawner.spawnBattery((com.badlogic.ashley.core.PooledEngine) getEngine(),
+                spawnX, spawnY);
         Gdx.app.log("SPAWNER", "Battery respawned at: " + spawnX + ", " + spawnY);
     }
 
     private boolean checkEntityCollison(Entity player, TransformComponent playerTransform) {
         for (Entity wall : getEngine().getEntitiesFor(Family.all(CollisionComponent.class).get())) {
-            if (wall == player) continue;
+            if (wall == player)
+                continue;
             TransformComponent wallTransform = transformMapper.get(wall);
-            if (wallTransform != null && playerTransform.bounds.overlaps(wallTransform.bounds)) return true;
+            if (wallTransform != null && playerTransform.bounds.overlaps(wallTransform.bounds))
+                return true;
         }
         return false;
     }
 
-    private boolean checkTileCollision (TransformComponent transform, TileWorldComponent world) {
-        if (world == null) return false;
+    private boolean checkTileCollision(TransformComponent transform, TileWorldComponent world) {
+        if (world == null)
+            return false;
         int startX = (int) (transform.bounds.x / world.tileWidth);
         int endX = (int) ((transform.bounds.x + transform.bounds.width) / world.tileWidth);
         int startY = (int) (transform.bounds.y / world.tileHeight);
@@ -241,7 +255,8 @@ public class MovementSystem extends IteratingSystem {
 
         for (int x = startX; x <= endX; x++) {
             for (int y = startY; y <= endY; y++) {
-                if (world.isSolid(x, y)) return true;
+                if (world.isSolid(x, y))
+                    return true;
             }
         }
         return false;

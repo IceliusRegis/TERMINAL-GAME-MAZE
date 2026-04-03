@@ -17,11 +17,20 @@ import com.sam.TERMINAL.components.*;
  *
  * Responsibilities:
  * 1. Checks distance between Player and all Interactable entities.
- * 2. Performs tile-based line-of-sight checks to prevent interaction through walls.
+ * 2. Performs tile-based line-of-sight checks to prevent interaction through
+ * walls.
  * 3. Sets the nearPlayer flag on InteractableComponent for RenderSystem to use.
  * 4. Visualizes prompt ("Press E") if close enough and line-of-sight is clear.
  * 5. Listens for the 'E' key input.
- * 6. Executes specific logic based on item type (Key -> Pickup, Flashlight -> Pickup).
+ * 6. Executes specific logic based on item type (Key -> Pickup, Flashlight ->
+ * Pickup).
+ * 2. Performs tile-based line-of-sight checks to prevent interaction through
+ * walls.
+ * 3. Sets the nearPlayer flag on InteractableComponent for RenderSystem to use.
+ * 4. Visualizes prompt ("Press E") if close enough and line-of-sight is clear.
+ * 5. Listens for the 'E' key input.
+ * 6. Executes specific logic based on item type (Key -> Pickup, Flashlight ->
+ * Pickup).
  *
  * Note: This extends EntitySystem (not IteratingSystem) because we need to
  * compare one entity (Player) against many others (Items) manually.
@@ -41,11 +50,17 @@ public class InteractionSystem extends EntitySystem {
     // so renderPrompts() can draw the indicator after the lighting pass.
     private TransformComponent nearestTargetTransform = null;
 
+    // Tracks the most recent entity that is in range and has clear LoS,
+    // so renderPrompts() can draw the indicator after the lighting pass.
+    private TransformComponent nearestTargetTransform = null;
+
     private static final float PROMPT_WIDTH = 24f;
     private static final float PROMPT_HEIGHT = 24f;
     private static final float PROMPT_OFFSET_Y = 8f; // pixels above the entity top
     private static final float TILE_SIZE = 32f;
     private boolean lilyPromptShown = false;
+
+    public InteractionSystem(SpriteBatch batch) {
 
     public InteractionSystem(SpriteBatch batch) {
         this.batch = batch;
@@ -68,7 +83,7 @@ public class InteractionSystem extends EntitySystem {
 
         // 1.) Find the player tag and their position first
         ImmutableArray<Entity> players = getEngine()
-            .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
+                .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
 
         if (players.size() == 0)
             return;
@@ -77,15 +92,16 @@ public class InteractionSystem extends EntitySystem {
         TransformComponent playerPos = transformMapper.get(player);
 
         // 2.) Find all interactables
+        // 2.) Find all interactables
         ImmutableArray<Entity> interactables = getEngine()
-            .getEntitiesFor(Family.all(InteractableComponent.class, TransformComponent.class).get());
+                .getEntitiesFor(Family.all(InteractableComponent.class, TransformComponent.class).get());
 
         // Get the world component for line-of-sight checks
         ImmutableArray<Entity> worldEntities = getEngine()
-            .getEntitiesFor(Family.all(TileWorldComponent.class).get());
+                .getEntitiesFor(Family.all(TileWorldComponent.class).get());
         TileWorldComponent world = (worldEntities.size() > 0)
-            ? worldEntities.first().getComponent(TileWorldComponent.class)
-            : null;
+                ? worldEntities.first().getComponent(TileWorldComponent.class)
+                : null;
 
         // Pre-pass: reset nearPlayer on all interactables
         for (Entity target : interactables) {
@@ -108,8 +124,8 @@ public class InteractionSystem extends EntitySystem {
             float targetCenterX = targetPos.pos.x + (targetPos.width / 2f);
             float targetCenterY = targetPos.pos.y + (targetPos.height / 2f);
             float dist = (float) Math.sqrt(
-                Math.pow(playerCenterX - targetCenterX, 2) +
-                    Math.pow(playerCenterY - targetCenterY, 2));
+                    Math.pow(playerCenterX - targetCenterX, 2) +
+                            Math.pow(playerCenterY - targetCenterY, 2));
 
             if (dist <= interact.radius) {
                 // Line-of-sight check: ensure no wall between player and item

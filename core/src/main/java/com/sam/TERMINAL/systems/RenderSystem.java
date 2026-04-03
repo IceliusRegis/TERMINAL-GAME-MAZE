@@ -67,33 +67,32 @@ public class RenderSystem extends SortedIteratingSystem {
             if (r2 != null)
                 y2 -= r2.sortYShift;
 
-            // TIE BREAKER 1: If Y is identical, force static walls to draw AFTER
-            // the player (occluding them)
-            if (y1 == y2) {
-                boolean e1IsStatic = (w1 != null || r1 != null);
-                boolean e2IsStatic = (w2 != null || r2 != null);
-                if (e1IsStatic && !e2IsStatic)
-                    return 1;
-                if (!e1IsStatic && e2IsStatic)
-                    return -1;
-            }
-
-            // TIE BREAKER 2: Items near the player draw ON TOP of walls.
-            // When an interactable has nearPlayer=true, it sorts after walls.
+            // Z-layer: items near player draw on top of everything
             InteractableComponent ic1 = e1.getComponent(InteractableComponent.class);
             InteractableComponent ic2 = e2.getComponent(InteractableComponent.class);
             boolean e1IsNearItem = (ic1 != null && ic1.nearPlayer);
             boolean e2IsNearItem = (ic2 != null && ic2.nearPlayer);
-            boolean e1IsStructure = (w1 != null || r1 != null);
-            boolean e2IsStructure = (w2 != null || r2 != null);
 
-            // Near-player item vs wall/roof: item draws on top (after)
-            if (e1IsNearItem && e2IsStructure)
+            if (e1IsNearItem && !e2IsNearItem)
                 return 1;
-            if (e2IsNearItem && e1IsStructure)
+            if (e2IsNearItem && !e1IsNearItem)
                 return -1;
 
-            return Float.compare(y2, y1);
+            int yCompare = Float.compare(y2, y1);
+            if (yCompare != 0) {
+                return yCompare;
+            }
+
+            // TIE BREAKER: If Y is identical, force static walls to draw AFTER
+            // the player (occluding them)
+            boolean e1IsStatic = (w1 != null || r1 != null);
+            boolean e2IsStatic = (w2 != null || r2 != null);
+            if (e1IsStatic && !e2IsStatic)
+                return 1;
+            if (!e1IsStatic && e2IsStatic)
+                return -1;
+
+            return 0;
         }
     }
 
@@ -166,11 +165,11 @@ public class RenderSystem extends SortedIteratingSystem {
             }
 
             batch.draw(currentFrame,
-                drawX, drawY,
-                width / 2f, height / 2f,
-                width, height,
-                scaleX, scaleY,
-                0f);
+                    drawX, drawY,
+                    width / 2f, height / 2f,
+                    width, height,
+                    scaleX, scaleY,
+                    0f);
         }
     }
 
@@ -210,9 +209,9 @@ public class RenderSystem extends SortedIteratingSystem {
         float playerY = pTransform.pos.y;
 
         com.badlogic.ashley.utils.ImmutableArray<Entity> walls = getEngine().getEntitiesFor(
-            Family.all(WallComponent.class, TransformComponent.class).get());
+                Family.all(WallComponent.class, TransformComponent.class).get());
         com.badlogic.ashley.utils.ImmutableArray<Entity> roofs = getEngine().getEntitiesFor(
-            Family.all(RoofComponent.class, TransformComponent.class).get());
+                Family.all(RoofComponent.class, TransformComponent.class).get());
 
         // 1. Gather anchor points for walls covering the feet
         feetAnchors.clear();
@@ -251,9 +250,9 @@ public class RenderSystem extends SortedIteratingSystem {
      * specific point.
      */
     private void getOccludingAnchors(float px, float py, float playerY,
-                                     com.badlogic.ashley.utils.ImmutableArray<Entity> walls,
-                                     com.badlogic.ashley.utils.ImmutableArray<Entity> roofs,
-                                     FloatArray outAnchors) {
+            com.badlogic.ashley.utils.ImmutableArray<Entity> walls,
+            com.badlogic.ashley.utils.ImmutableArray<Entity> roofs,
+            FloatArray outAnchors) {
 
         // Check Wall Faces
         for (int j = 0; j < walls.size(); ++j) {
@@ -280,7 +279,7 @@ public class RenderSystem extends SortedIteratingSystem {
 
     private void renderSilhouettes() {
         com.badlogic.ashley.utils.ImmutableArray<Entity> players = getEngine().getEntitiesFor(
-            Family.all(PlayerComponent.class, TransformComponent.class, SpriteComponent.class).get());
+                Family.all(PlayerComponent.class, TransformComponent.class, SpriteComponent.class).get());
 
         if (players.size() == 0)
             return;

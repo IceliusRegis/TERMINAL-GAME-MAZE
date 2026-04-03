@@ -18,9 +18,9 @@ import com.sam.TERMINAL.buttons.MenuScreen;
  * WinLossSystem — Checks win and lose conditions each frame.
  *
  * Win condition: Player must:
- *   1. Be adjacent to a non-zero tile on the "Winning" map layer, AND
- *   2. Have "beep_card" in their InventoryComponent.
- *   Then pressing E triggers the win.
+ * 1. Be adjacent to a non-zero tile on the "Winning" map layer, AND
+ * 2. Have "beep_card" in their InventoryComponent.
+ * Then pressing E triggers the win.
  *
  * The 'E' prompt is shown whenever the player is near the win tile, regardless
  * of whether they hold the Beep Card. If E is pressed without the card, a
@@ -110,9 +110,9 @@ public class WinLossSystem extends EntitySystem {
 
         // --- LOSE: Enemy touches player ---
         ImmutableArray<Entity> players = getEngine()
-            .getEntitiesFor(Family.all(PlayerComponent.class).get());
+                .getEntitiesFor(Family.all(PlayerComponent.class).get());
         ImmutableArray<Entity> enemies = getEngine()
-            .getEntitiesFor(Family.all(EnemyComponent.class).get());
+                .getEntitiesFor(Family.all(EnemyComponent.class).get());
 
         if (players.size() > 0 && enemies.size() > 0) {
             TransformComponent pT = players.first().getComponent(TransformComponent.class);
@@ -134,7 +134,7 @@ public class WinLossSystem extends EntitySystem {
             return;
 
         ImmutableArray<Entity> worldEntities = getEngine()
-            .getEntitiesFor(Family.all(TileWorldComponent.class).get());
+                .getEntitiesFor(Family.all(TileWorldComponent.class).get());
         if (worldEntities.size() == 0)
             return;
 
@@ -152,10 +152,10 @@ public class WinLossSystem extends EntitySystem {
 
         // Check the player's tile and 4 adjacent tiles for a Winning cell.
         nearWinTile = isWinningTile(world, playerTileX, playerTileY)
-            || isWinningTile(world, playerTileX + 1, playerTileY)
-            || isWinningTile(world, playerTileX - 1, playerTileY)
-            || isWinningTile(world, playerTileX, playerTileY + 1)
-            || isWinningTile(world, playerTileX, playerTileY - 1);
+                || isWinningTile(world, playerTileX + 1, playerTileY)
+                || isWinningTile(world, playerTileX - 1, playerTileY)
+                || isWinningTile(world, playerTileX, playerTileY + 1)
+                || isWinningTile(world, playerTileX, playerTileY - 1);
 
         if (!nearWinTile)
             return;
@@ -185,10 +185,13 @@ public class WinLossSystem extends EntitySystem {
         // If E is pressed, attempt the win or start the warning timer.
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             if (playerHasBeepCard) {
-                Gdx.app.log("TERMINAL", "WIN CONDITION MET — Transitioning to Level 2...");
-                // Defer the heavy level-load to after the current frame/input stack
-                // unwinds, preventing concurrent-modification issues inside Ashley.
-                Gdx.app.postRunnable(() -> mainGame.loadLevelTwo());
+                Gdx.app.log("TERMINAL", "WIN CONDITION MET — Showing Escape Screen");
+
+                win = true; // Set the local flag to stop system updates
+
+                if (menuScreen != null) {
+                    menuScreen.showGameOver(true); // This shows your "YOU ESCAPED" window
+                }
             } else {
                 // Restart (or extend) the warning display timer.
                 missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;
@@ -202,10 +205,10 @@ public class WinLossSystem extends EntitySystem {
      * indicators are always visible above the darkness overlay.
      *
      * Behavior:
-     *   - Player near win tile → always draws the Press-E icon to the side of
-     *     the player bounding box.
-     *   - E pressed without Beep Card → also draws the timed warning text until
-     *     missingCardWarningTimer reaches zero.
+     * - Player near win tile → always draws the Press-E icon to the side of
+     * the player bounding box.
+     * - E pressed without Beep Card → also draws the timed warning text until
+     * missingCardWarningTimer reaches zero.
      */
     public void renderPrompt() {
         // Draw the warning message whenever its timer is still active,
@@ -251,8 +254,8 @@ public class WinLossSystem extends EntitySystem {
         // Fade out the text smoothly over the final 0.5 s of the timer.
         float fadeWindow = 0.5f;
         float alpha = (missingCardWarningTimer < fadeWindow)
-            ? missingCardWarningTimer / fadeWindow
-            : 1f;
+                ? missingCardWarningTimer / fadeWindow
+                : 1f;
         notificationFont.setColor(1f, 1f, 0f, alpha); // yellow with fade
 
         glyphLayout.setText(notificationFont, currentMissingMessage);
