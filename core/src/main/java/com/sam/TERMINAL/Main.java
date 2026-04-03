@@ -238,7 +238,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion, potionRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(batch));
 
