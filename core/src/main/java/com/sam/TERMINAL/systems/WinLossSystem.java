@@ -185,10 +185,13 @@ public class WinLossSystem extends EntitySystem {
         // If E is pressed, attempt the win or start the warning timer.
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             if (playerHasBeepCard) {
-                Gdx.app.log("TERMINAL", "WIN CONDITION MET — Transitioning to Level 2...");
-                // Defer the heavy level-load to after the current frame/input stack
-                // unwinds, preventing concurrent-modification issues inside Ashley.
-                Gdx.app.postRunnable(() -> mainGame.loadLevelTwo());
+                Gdx.app.log("TERMINAL", "WIN CONDITION MET — Showing Escape Screen");
+
+                win = true; // Set the local flag to stop system updates
+
+                if (menuScreen != null) {
+                    menuScreen.showGameOver(true); // This shows your "YOU ESCAPED" window
+                }
             } else {
                 // Restart (or extend) the warning display timer.
                 missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;

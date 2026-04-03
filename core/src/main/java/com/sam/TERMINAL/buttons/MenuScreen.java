@@ -381,7 +381,7 @@ public class MenuScreen {
     // =========================================================================
 
     /** Shows the Win ("YOU ESCAPED!") or Lose ("YOU DIED") end screen. */
-    public void showGameOver(boolean win) {
+    public void showGameOver(final boolean win) {
         if (isGameOver)
             return;
         isGameOver = true;
@@ -389,37 +389,63 @@ public class MenuScreen {
         isInventoryVisible = false;
         uiStage.clear();
 
-        // Dark background
-        Image dimmer = new Image(whitePixel);
-        dimmer.setColor(0, 0, 0, 1f);
+        // 1. PITCH BLACK BACKGROUND (The Dimmer)
+        final Image dimmer = new Image(whitePixel);
+        dimmer.setColor(Color.BLACK);
+        dimmer.getColor().a = 1f;
         dimmer.setFillParent(true);
         uiStage.addActor(dimmer);
 
-        // Centred text + restart button
-        Table table = new Table();
+        final Table table = new Table();
         table.setFillParent(true);
         table.center();
+        uiStage.addActor(table);
 
         String text = win ? "YOU ESCAPED!" : "YOU DIED";
         Color color = win ? Color.GREEN : Color.RED;
         Label.LabelStyle style = new Label.LabelStyle(font, color);
         Label label = new Label(text, style);
 
-        ImageButton restartBtn = new ImageButton(
-                new TextureRegionDrawable(new TextureRegion(restartTexture)));
-        restartBtn.addListener(new ClickListener() {
+        ImageButton actionBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(restartTexture)));
+
+        actionBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                mainGame.resetGame();
+                if (win) {
+                    // --- START LOADING & FADE SEQUENCE ---
+                    table.clearChildren();
+
+                    Label loadingLabel = new Label("Loading...", new Label.LabelStyle(font, Color.WHITE));
+                    table.add(loadingLabel).center();
+
+                    // 1. Wait 5 seconds
+                    // 2. Fade out the "Loading..." text
+                    // 3. Fade out the black dimmer over 1.5 seconds
+                    // 4. Finally load the level
+                    loadingLabel.addAction(Actions.sequence(
+                        Actions.delay(5.0f),
+                        Actions.fadeOut(1.0f)
+                    ));
+
+                    dimmer.addAction(Actions.sequence(
+                        Actions.delay(5.0f),      // Wait during loading
+                        Actions.fadeOut(1.5f),    // Fade the black screen to transparent
+                        Actions.run(() -> {
+                            Gdx.app.log("TERMINAL", "Transition complete. Revealing Level 2.");
+                            mainGame.loadLevelTwo();
+                        })
+                    ));
+                } else {
+                    mainGame.resetGame();
+                }
             }
         });
 
         table.add(label).padBottom(20).row();
-        table.add(restartBtn).size(64, 64);
+        table.add(actionBtn).size(64, 64);
 
-        uiStage.addActor(table);
         updateInputProcessor();
-        uiStage.setKeyboardFocus(restartBtn); // ENTER/SPACE triggers restart
+        uiStage.setKeyboardFocus(actionBtn);
     }
 
     // =========================================================================
