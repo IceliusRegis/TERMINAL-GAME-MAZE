@@ -54,10 +54,10 @@ public class Main extends ApplicationAdapter {
 
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
-    private Texture beepTexture, flashlightTexture, batteryTexture;
+    private Texture beepTexture, flashlightTexture, batteryTexture, potionTexture; // ADDED potionTexture
 
     // Regions and Animation
-    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion;
+    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion, potionRegion; // ADDED potionRegion
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -149,6 +149,9 @@ public class Main extends ApplicationAdapter {
         batteryTexture = new Texture(Gdx.files.internal("sprites/battery.png"));
         batteryRegion = new TextureRegion(batteryTexture);
 
+        potionTexture = new Texture(Gdx.files.internal("sprites/sting.png")); // Ensure this file exists!
+        potionRegion = new TextureRegion(potionTexture);
+
         cursorTexture = new Texture(Gdx.files.internal("ui/cursor.png"));
 
         playerSpriteSheet = new Texture("sprites/MC (Walk).png");
@@ -235,7 +238,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion, potionRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(batch));
 
@@ -272,7 +275,7 @@ public class Main extends ApplicationAdapter {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
             }
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
-                enemyRegion, flashlightRegion, batteryRegion);
+                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -284,14 +287,14 @@ public class Main extends ApplicationAdapter {
             SaveManager.delete(TEMP_SAVE_FILE);
             engine.getSystem(SaveSystem.class).generateNewRunId();
             EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                enemyRegion, flashlightRegion, batteryRegion);
+                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
             Gdx.app.log("TERMINAL", "New Instance Started");
         }
 
         // Attach the player's ConeLight after all entities have been spawned
         ImmutableArray<Entity> players = engine.getEntitiesFor(
-            Family.all(PlayerComponent.class).get());
+                Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             lightingSystem.createPlayerLight(players.first(), false);
         }
@@ -315,25 +318,33 @@ public class Main extends ApplicationAdapter {
         // 3. Remove all enemies from the old run
         ImmutableArray<Entity> enemies = engine.getEntitiesFor(Family.all(EnemyComponent.class).get());
         com.badlogic.gdx.utils.Array<Entity> toRemoveEnemies = new com.badlogic.gdx.utils.Array<>();
-        for (Entity e : enemies) toRemoveEnemies.add(e);
-        for (Entity e : toRemoveEnemies) engine.removeEntity(e);
+        for (Entity e : enemies)
+            toRemoveEnemies.add(e);
+        for (Entity e : toRemoveEnemies)
+            engine.removeEntity(e);
 
-        // 4. First, physically remove the old items so we can re-generate a new random count
+        // 4. First, physically remove the old items so we can re-generate a new random
+        // count
         ImmutableArray<Entity> currentItems = engine.getEntitiesFor(Family.all(InteractableComponent.class).get());
         com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
-        for (Entity e : currentItems) toRemove.add(e);
-        for (Entity e : toRemove) engine.removeEntity(e);
+        for (Entity e : currentItems)
+            toRemove.add(e);
+        for (Entity e : toRemove)
+            engine.removeEntity(e);
 
-        // 5. Load the temp save — this restores player position, inventory, and resets battery component context
-        //    (It won't affect items because we just removed them!)
+        // 5. Load the temp save — this restores player position, inventory, and resets
+        // battery component context
+        // (It won't affect items because we just removed them!)
         engine.getSystem(SaveSystem.class).forceImmediateLoad(TEMP_SAVE_FILE);
 
-        // 6. Provide a clean slate for the player's runtime components (sometimes items could erroneously persist in load state if not checked)
+        // 6. Provide a clean slate for the player's runtime components (sometimes items
+        // could erroneously persist in load state if not checked)
         ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
             Entity p = players.first();
             InventoryComponent inv = p.getComponent(InventoryComponent.class);
-            if (inv != null) inv.items.clear();
+            if (inv != null)
+                inv.items.clear();
 
             BatteryComponent bat = p.getComponent(BatteryComponent.class);
             if (bat != null) {
@@ -343,25 +354,27 @@ public class Main extends ApplicationAdapter {
         }
 
         // 7. Spawn fresh completely randomized items (Beep Cards, Battery, Flashlight)
-        //    AND spawn a fresh enemy.
+        // AND spawn a fresh enemy.
         ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
         TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
         if (world != null) {
-            int pTileX = 5;
-            int pTileY = 5;
+            int pTileX = 15;
+            int pTileY = 42;
             if (players.size() > 0) {
                 TransformComponent t = players.first().getComponent(TransformComponent.class);
                 if (t != null) {
-                    pTileX = (int)(t.pos.x / 32f);
-                    pTileY = (int)(t.pos.y / 32f);
+                    pTileX = (int) (t.pos.x / 32f);
+                    pTileY = (int) (t.pos.y / 32f);
                 }
             }
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, world, pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
+                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
             // Re-spawn the enemy cleanly
             com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 40 * 32f, enemyRegion);
 
-            // Re-save temp snapshot to cement these new random locations and the new random count
+            // Re-save temp snapshot to cement these new random locations and the new random
+            // count
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
@@ -430,7 +443,7 @@ public class Main extends ApplicationAdapter {
         }
 
         // 4. Draw interaction prompts on top of the lighting layer so they
-        //    are never blacked out by the Box2DLights ambient darkness.
+        // are never blacked out by the Box2DLights ambient darkness.
         renderInteractionPrompts();
 
         // --- DEBUG POLLING & HITBOX RENDERING ---
@@ -497,7 +510,8 @@ public class Main extends ApplicationAdapter {
     }
 
     private void drawCursor() {
-        if (!cursorVisible) return;
+        if (!cursorVisible)
+            return;
         batch.getProjectionMatrix().setToOrtho2D(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         float scale = Gdx.graphics.getWidth() / 800f;
         float cursorSize = 48 * scale;
@@ -544,23 +558,40 @@ public class Main extends ApplicationAdapter {
     public void dispose() {
         // Clean up resources to prevent memory leaks
         batch.dispose();
-        if (mapManager != null) mapManager.dispose();
-        if (lightingSystem != null) lightingSystem.dispose();
-        if (debugManager != null) debugManager.dispose();
-        if (openingScene != null) openingScene.dispose();
-        if (titleScreen != null) titleScreen.dispose();
-        if (tutorialScene != null) tutorialScene.dispose();
-        if (menuScreen != null) menuScreen.dispose();
-        if (titleMusic != null) titleMusic.dispose();
+        if (mapManager != null)
+            mapManager.dispose();
+        if (lightingSystem != null)
+            lightingSystem.dispose();
+        if (debugManager != null)
+            debugManager.dispose();
+        if (openingScene != null)
+            openingScene.dispose();
+        if (titleScreen != null)
+            titleScreen.dispose();
+        if (tutorialScene != null)
+            tutorialScene.dispose();
+        if (menuScreen != null)
+            menuScreen.dispose();
+        if (titleMusic != null)
+            titleMusic.dispose();
         stopTutorialMusic();
-        if (playerSpriteSheet != null) playerSpriteSheet.dispose();
-        if (cursorTexture != null) cursorTexture.dispose();
-        if (beepTexture != null) beepTexture.dispose();
-        if (enemyTexture != null) enemyTexture.dispose();
-        if (flashlightTexture != null) flashlightTexture.dispose();
-        if (batteryTexture != null) batteryTexture.dispose();
+        if (playerSpriteSheet != null)
+            playerSpriteSheet.dispose();
+        if (cursorTexture != null)
+            cursorTexture.dispose();
+        if (beepTexture != null)
+            beepTexture.dispose();
+        if (enemyTexture != null)
+            enemyTexture.dispose();
+        if (flashlightTexture != null)
+            flashlightTexture.dispose();
+        if (batteryTexture != null)
+            batteryTexture.dispose();
+        if (potionTexture != null)
+            potionTexture.dispose();
         WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
-        if (wlsDispose != null) wlsDispose.dispose();
+        if (wlsDispose != null)
+            wlsDispose.dispose();
     }
 
     public TextureRegion getBeepRegion() {
@@ -571,5 +602,11 @@ public class Main extends ApplicationAdapter {
         return flashlightRegion;
     }
 
-    public TextureRegion getBatteryRegion() { return batteryRegion; }
+    public TextureRegion getBatteryRegion() {
+        return batteryRegion;
+    }
+
+    public TextureRegion getPotionRegion() {
+        return potionRegion;
+    }
 }

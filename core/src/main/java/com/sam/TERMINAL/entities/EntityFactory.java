@@ -152,6 +152,36 @@ public class EntityFactory {
         engine.addEntity(battery);
     }
 
+    public static Entity createPotion(PooledEngine engine, float x, float y, TextureRegion region, String saveId) {
+        Entity potion = engine.createEntity();
+
+        // 1. Position and Bounds (Matching your TransformComponent style)
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 50;  // Adjust size as needed
+        transform.height = 50;
+        transform.updateBounds();
+        potion.add(transform);
+
+        // 2. Visuals (Matching your SpriteComponent style)
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = region;
+        sprite.isStatic = true;
+        sprite.drawWidth = 50;
+        sprite.drawHeight = 50;
+        potion.add(sprite);
+
+        // 3. Interaction (This makes it pick-up-able)
+        // We call the type "potion" so your Inventory knows what it is
+        potion.add(new InteractableComponent("potion", 40f));
+
+        // 4. Persistence (So it saves/loads correctly)
+        potion.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(potion);
+        return potion;
+    }
+
     /**
      * TODO: Future entity creation methods
      * - createCommuter(engine, x, y)

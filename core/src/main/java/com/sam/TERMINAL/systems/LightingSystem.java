@@ -40,7 +40,6 @@ public class LightingSystem extends IteratingSystem {
     private static final float CONE_DEGREES = 90f; // Focused, narrow flashlight beam
     private static final Color CONE_COLOR = new Color(1f, 0.95f, 0.85f, 0.5f); // Dimmer warm white
     private static final Color AMBIENT_COLOR = new Color(0f, 0f, 0f, 1f); // Pitch black
-    private float drainTimer = 0; // Tracks elapsed time for battery drain
 
     // --- Box2DLights Core ---
     private final World box2dWorld; // Dummy physics world — never stepped
@@ -176,34 +175,6 @@ public class LightingSystem extends IteratingSystem {
         boolean hasFlashlight = (inv != null && inv.hasItem("flashlight"));
 
         if (batteryState != null) {
-            // Toggle Logic
-            if (hasFlashlight && Gdx.input.isKeyJustPressed(Input.Keys.F)) {
-                // Only allow turning ON if there is battery left
-                if (!batteryState.flashlightOn) {
-                    if (batteryState.battery > 0) batteryState.flashlightOn = true;
-                } else {
-                    batteryState.flashlightOn = false;
-                }
-            }
-
-            // Timer-based Drain (Every 5 Seconds)
-            if (batteryState.flashlightOn && batteryState.battery > 0) {
-                drainTimer += deltaTime; // Count up the time
-
-                if (drainTimer >= 3.5f) {
-                    batteryState.battery -= 1.0f; // Drop 1% every 5 seconds
-                    drainTimer = 0; // Reset the clock
-
-                    if (batteryState.battery <= 0) {
-                        batteryState.battery = 0;
-                        batteryState.flashlightOn = false;
-                    }
-                }
-            } else {
-                // Reset timer when off so it starts fresh at 0 next time it's toggled
-                drainTimer = 0;
-            }
-
             // Sync cone activity
             if (light.cone != null) {
                 // Light is active only if you have the item AND it's toggled on

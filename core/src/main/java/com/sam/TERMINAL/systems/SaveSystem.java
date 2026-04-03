@@ -56,8 +56,9 @@ public class SaveSystem extends IteratingSystem {
     private final TextureRegion flashlightSprite;
     private final TextureRegion enemySprite;
     private final TextureRegion batterySprite;
+    private final TextureRegion potionSprite;
 
-    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite, TextureRegion batterySprite) {
+    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite, TextureRegion batterySprite, TextureRegion potionSprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
@@ -65,6 +66,7 @@ public class SaveSystem extends IteratingSystem {
         this.flashlightSprite = flashlightSprite;
         this.enemySprite = enemySprite;
         this.batterySprite = batterySprite;
+        this.potionSprite = potionSprite;
 
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
@@ -141,6 +143,8 @@ public class SaveSystem extends IteratingSystem {
                                 com.sam.TERMINAL.entities.EntityFactory.createFlashlight((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite, iData.saveId);
                             } else if (iData.type.equals("battery")) {
                                 com.sam.TERMINAL.entities.EntityFactory.createBattery((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite, iData.saveId);
+                            } else if (iData.type.equals("potion")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createPotion((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite, iData.saveId);
                             }
                         }
                     }
@@ -286,11 +290,7 @@ public class SaveSystem extends IteratingSystem {
 
                             //If Item was taken
                             if (!shouldBeActive) {
-                                if (interactLoad.type.equals("beep")) {
-                                    entity.remove((SpriteComponent.class));
-                                } else if (interactLoad.type.equals("flashlight")) {
-                                    entity.remove((SpriteComponent.class));
-                                }
+                                entity.remove((SpriteComponent.class));
                             }
 
                             //If item was not picked, restore its sprite
@@ -333,6 +333,28 @@ public class SaveSystem extends IteratingSystem {
                                             flTransform.width  = 50;
                                             flTransform.height = 50;
                                             flTransform.updateBounds();
+                                        }
+                                    } else if (interactLoad.type.equals("battery")) {
+                                        restoredSprite.staticSprite = batterySprite;
+                                        restoredSprite.drawWidth  = 70;
+                                        restoredSprite.drawHeight = 70;
+
+                                        TransformComponent batTransform = transformMapper.get(entity);
+                                        if (batTransform != null) {
+                                            batTransform.width  = 70;
+                                            batTransform.height = 70;
+                                            batTransform.updateBounds();
+                                        }
+                                    } else if (interactLoad.type.equals("potion")) {
+                                        restoredSprite.staticSprite = potionSprite;
+                                        restoredSprite.drawWidth  = 50;
+                                        restoredSprite.drawHeight = 50;
+
+                                        TransformComponent potTransform = transformMapper.get(entity);
+                                        if (potTransform != null) {
+                                            potTransform.width  = 50;
+                                            potTransform.height = 50;
+                                            potTransform.updateBounds();
                                         }
                                     }
 
