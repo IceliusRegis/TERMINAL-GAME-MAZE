@@ -16,6 +16,7 @@ import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.components.WallComponent;
+import com.sam.TERMINAL.components.StaticLightComponent;
 
 /**
  * MapManager - Owns the TiledMap lifecycle and rendering.
@@ -35,6 +36,7 @@ public class MapManager {
     private PooledEngine engine;
     private int[] backgroundLayers;
     private final Array<Entity> wallEntities = new Array<>();
+    private final Array<Entity> lightEntities = new Array<>();
 
     public MapManager(PooledEngine engine) {
         this.engine = engine;
@@ -155,6 +157,45 @@ public class MapManager {
                 }
             }
 
+            // --- LIGHTS LAYER EXTRACTION LOGIC ---
+            MapLayer lightsLayer = allLayers.get("Lights");
+            if (lightsLayer instanceof TiledMapTileLayer) {
+                TiledMapTileLayer tileLayer = (TiledMapTileLayer) lightsLayer;
+                for (int x = 0; x < tileLayer.getWidth(); x++) {
+                    for (int y = 0; y < tileLayer.getHeight(); y++) {
+                        TiledMapTileLayer.Cell cell = tileLayer.getCell(x, y);
+                        if (cell != null && cell.getTile() != null) {
+                            Entity lightEntity = engine.createEntity();
+                            TransformComponent transform = engine.createComponent(TransformComponent.class);
+                            
+                            com.badlogic.gdx.graphics.g2d.TextureRegion region = cell.getTile().getTextureRegion();
+                            float actualWidth = region.getRegionWidth();
+                            float actualHeight = region.getRegionHeight();
+                            float offsetX = cell.getTile().getOffsetX();
+                            float offsetY = cell.getTile().getOffsetY();
+                            
+                            transform.pos.set((x * tileLayer.getTileWidth()) + offsetX,
+                                    (y * tileLayer.getTileHeight()) + offsetY);
+                            transform.width = actualWidth;
+                            transform.height = actualHeight;
+                            transform.updateBounds();
+                            
+                            StaticLightComponent slComponent = engine.createComponent(StaticLightComponent.class);
+                            slComponent.pointLight = null;
+                            
+                            lightEntity.add(transform);
+                            lightEntity.add(slComponent);
+                            
+                            engine.addEntity(lightEntity);
+                            lightEntities.add(lightEntity);
+                        }
+                    }
+                }
+                Gdx.app.log("MAP_MANAGER", "Lights layer: found and converted to static light entities");
+            } else {
+                Gdx.app.log("MAP_MANAGER", "Lights layer: MISSING or not a TileLayer");
+            }
+
             // 5. Create your new TileWorldComponent
             TileWorldComponent worldComp = new TileWorldComponent(tiledMap);
             // 6. Create an Ashley Entity to hold the map data
@@ -196,8 +237,17 @@ public class MapManager {
             for (Entity wall : wallEntities) {
                 engine.removeEntity(wall);
             }
+            for (Entity light : lightEntities) {
+                StaticLightComponent sl = light.getComponent(StaticLightComponent.class);
+                if (sl != null && sl.pointLight != null) {
+                    sl.pointLight.remove();
+                    sl.pointLight = null;
+                }
+                engine.removeEntity(light);
+            }
         }
         wallEntities.clear();
+        lightEntities.clear();
     }
 
     // --- HELPER METHOD TO CHECK TILE LAYERS SAFELY ---

@@ -17,6 +17,7 @@ import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.components.BatteryComponent;
 import com.sam.TERMINAL.components.InventoryComponent;
+import com.sam.TERMINAL.components.StaticLightComponent;
 
 /**
  * LightingSystem — Manages Box2DLights for the player's FOV cone.
@@ -53,16 +54,13 @@ public class LightingSystem extends IteratingSystem {
         .getFor(TransformComponent.class);
     private final ComponentMapper<SpriteComponent> spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     private final ComponentMapper<LightComponent> lightMapper = ComponentMapper.getFor(LightComponent.class);
+    private final ComponentMapper<StaticLightComponent> staticLightMapper = ComponentMapper.getFor(StaticLightComponent.class);
 
     public boolean lightingEnabled = true;
     private com.sam.TERMINAL.buttons.MenuScreen menuScreen;
 
     public LightingSystem(OrthographicCamera camera) {
-        super(Family.all(
-            PlayerComponent.class,
-            TransformComponent.class,
-            SpriteComponent.class,
-            LightComponent.class).get());
+        super(Family.all(TransformComponent.class).one(LightComponent.class, StaticLightComponent.class).get());
 
         this.camera = camera;
 
@@ -149,10 +147,31 @@ public class LightingSystem extends IteratingSystem {
         }
 
         TransformComponent transform = transformMapper.get(entity);
+        StaticLightComponent staticLight = staticLightMapper.get(entity);
+
+        if (staticLight != null) {
+            if (staticLight.pointLight == null) {
+                float centerX = transform.pos.x + transform.width / 2f;
+                float centerY = transform.pos.y + transform.height / 2f;
+                staticLight.pointLight = new PointLight(
+                    rayHandler,
+                    50,
+                    new Color(1f, 0.95f, 0.85f, 0.8f), 
+                    250f,
+                    centerX,
+                    centerY
+                );
+                staticLight.pointLight.setXray(true);
+                staticLight.pointLight.setSoft(true);
+                staticLight.pointLight.setSoftnessLength(60f);
+            }
+            return;
+        }
+
         SpriteComponent sprite = spriteMapper.get(entity);
         LightComponent light = lightMapper.get(entity);
 
-        if (light == null || light.cone == null) return;
+        if (light == null || light.cone == null || sprite == null) return;
 
         // 2. Update Position to Player Center
         float centerX = transform.pos.x + transform.width / 2f;

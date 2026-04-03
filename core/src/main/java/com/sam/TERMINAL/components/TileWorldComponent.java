@@ -20,6 +20,7 @@ public class TileWorldComponent implements Component {
     public TiledMapTileLayer wallsLayer;
     public TiledMapTileLayer winningLayer;
     public TiledMapTileLayer groundLayer;
+    public TiledMapTileLayer noSpawnLayer;
     public java.util.List<com.badlogic.gdx.math.GridPoint2> validSpawnPoints = new java.util.ArrayList<>();
 
     // Size of map in tiles
@@ -49,6 +50,12 @@ public class TileWorldComponent implements Component {
         Object winningRaw = tiledMap.getLayers().get("Winning");
         this.winningLayer = (winningRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) winningRaw : null;
         
+        Object noSpawnRaw = tiledMap.getLayers().get("No Spawn");
+        if (noSpawnRaw == null) {
+            noSpawnRaw = tiledMap.getLayers().get("NoSpawn");
+        }
+        this.noSpawnLayer = (noSpawnRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) noSpawnRaw : null;
+
         for (com.badlogic.gdx.maps.MapLayer layer : tiledMap.getLayers()) {
             if (layer instanceof TiledMapTileLayer) {
                 String name = layer.getName().toLowerCase();
@@ -128,6 +135,9 @@ public class TileWorldComponent implements Component {
             return true;
         }
         if (wallsLayer != null && wallsLayer.getCell(tileX, tileY) != null) {
+            return true;
+        }
+        if (noSpawnLayer != null && noSpawnLayer.getCell(tileX, tileY) != null) {
             return true;
         }
         return false;
