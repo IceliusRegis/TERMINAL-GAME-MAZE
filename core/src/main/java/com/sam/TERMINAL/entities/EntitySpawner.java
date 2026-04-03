@@ -21,16 +21,11 @@ public class EntitySpawner {
     // Tiled coordinates (15, 7) on a 50x50 map equal LibGDX coordinates (15, 42)
     private static final float PLAYER_X = 15 * TILE_SIZE;
     private static final float PLAYER_Y = 42 * TILE_SIZE;
-    // Default hardcoded tile positions (calculated from LibGDX bottom-left origin)
-    // Tiled coordinates (15, 7) on a 50x50 map equal LibGDX coordinates (15, 42)
-    private static final float PLAYER_X = 15 * TILE_SIZE;
-    private static final float PLAYER_Y = 42 * TILE_SIZE;
     private static final int KEY_TILE_X = 20;
     private static final int KEY_TILE_Y = 10;
     private static final float ENEMY_X = 5 * TILE_SIZE;
     private static final float ENEMY_Y = 40 * TILE_SIZE;
 
-    public static final String KEY_SAVE_ID = "KEY_BEEP_MAIN";
     public static final String KEY_SAVE_ID = "KEY_BEEP_MAIN";
     public static final String FLASHLIGHT_SAVE_ID = "ITEM_FLASHLIGHT";
     public static final String BATTERY_SAVE_ID = "ITEM_BATTERY";
@@ -184,7 +179,6 @@ public class EntitySpawner {
         EntityFactory.createBattery(engine, batTileX * TILE_SIZE, batTileY * TILE_SIZE, batteryRegion, BATTERY_SAVE_ID);
     }
 
-    // Rest of class remains unchanged (spawnForLoad, helper methods)...
     // Rest of class remains unchanged (spawnForLoad, helper methods)...
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
             TextureRegion beepRegion,

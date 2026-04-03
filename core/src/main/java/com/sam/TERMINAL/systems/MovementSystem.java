@@ -16,8 +16,6 @@ public class MovementSystem extends IteratingSystem {
     private ComponentMapper<SpriteComponent> spriteMapper;
     private ComponentMapper<PlayerComponent> playerMapper;
 
-    private ComponentMapper<PlayerComponent> playerMapper;
-
     private com.sam.TERMINAL.buttons.MenuScreen menuScreen;
 
     // Timer Variables

@@ -24,13 +24,6 @@ import com.sam.TERMINAL.components.*;
  * 5. Listens for the 'E' key input.
  * 6. Executes specific logic based on item type (Key -> Pickup, Flashlight ->
  * Pickup).
- * 2. Performs tile-based line-of-sight checks to prevent interaction through
- * walls.
- * 3. Sets the nearPlayer flag on InteractableComponent for RenderSystem to use.
- * 4. Visualizes prompt ("Press E") if close enough and line-of-sight is clear.
- * 5. Listens for the 'E' key input.
- * 6. Executes specific logic based on item type (Key -> Pickup, Flashlight ->
- * Pickup).
  *
  * Note: This extends EntitySystem (not IteratingSystem) because we need to
  * compare one entity (Player) against many others (Items) manually.
@@ -50,17 +43,11 @@ public class InteractionSystem extends EntitySystem {
     // so renderPrompts() can draw the indicator after the lighting pass.
     private TransformComponent nearestTargetTransform = null;
 
-    // Tracks the most recent entity that is in range and has clear LoS,
-    // so renderPrompts() can draw the indicator after the lighting pass.
-    private TransformComponent nearestTargetTransform = null;
-
     private static final float PROMPT_WIDTH = 24f;
     private static final float PROMPT_HEIGHT = 24f;
     private static final float PROMPT_OFFSET_Y = 8f; // pixels above the entity top
     private static final float TILE_SIZE = 32f;
     private boolean lilyPromptShown = false;
-
-    public InteractionSystem(SpriteBatch batch) {
 
     public InteractionSystem(SpriteBatch batch) {
         this.batch = batch;
@@ -91,7 +78,6 @@ public class InteractionSystem extends EntitySystem {
         Entity player = players.first();
         TransformComponent playerPos = transformMapper.get(player);
 
-        // 2.) Find all interactables
         // 2.) Find all interactables
         ImmutableArray<Entity> interactables = getEngine()
                 .getEntitiesFor(Family.all(InteractableComponent.class, TransformComponent.class).get());
