@@ -88,6 +88,7 @@ public class MenuScreen {
     private Label beepCardLabel;
     private Label batteryLabel;
     private Label lowBatteryWarningLabel;
+    private Label monsterWarningLabel;
 
     // ── ECS / Game references ─────────────────────────────────────────────────
     private final PooledEngine engine;
@@ -592,11 +593,19 @@ public class MenuScreen {
         });
         topLeftTable.add(settingsBtn).size(40, 40).pad(10);
 
-        // --- 2. BOTTOM CENTER: Inventory ---
+        // --- 2. BOTTOM CENTER: Inventory & Monster Timer ---
         Table bottomCenterTable = new Table();
         bottomCenterTable.setFillParent(true);
-        bottomCenterTable.bottom();
+        bottomCenterTable.bottom(); // Align table to bottom
         uiStage.addActor(bottomCenterTable);
+
+        // Initialize the Monster Label
+        monsterWarningLabel = new Label("", new Label.LabelStyle(font, Color.YELLOW));
+        monsterWarningLabel.setFontScale(2f); // Same scale as stingTimerLabel
+        monsterWarningLabel.setVisible(false);
+
+        // Add Label FIRST so it sits ABOVE the inventory button
+        bottomCenterTable.add(monsterWarningLabel).padBottom(20).row();
 
         ImageButton inventoryBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(invTexture)));
         inventoryBtn.addListener(new ClickListener() {
@@ -606,6 +615,7 @@ public class MenuScreen {
                 updateInputProcessor();
             }
         });
+        // Add Inventory Button SECOND
         bottomCenterTable.add(inventoryBtn).size(55, 55).padBottom(5);
 
         // --- 3. TOP RIGHT: Stats & Warnings ---
@@ -617,7 +627,6 @@ public class MenuScreen {
         beepCardLabel = new Label("Beep Cards: 0 / 0", new Label.LabelStyle(font, Color.WHITE));
         batteryLabel = new Label("", new Label.LabelStyle(font, Color.GREEN));
 
-        // RE-ADDED MISSING LABELS:
         lowBatteryWarningLabel = new Label("LOW BATTERY", new Label.LabelStyle(font, Color.RED));
         lowBatteryWarningLabel.setVisible(false);
 
@@ -636,6 +645,7 @@ public class MenuScreen {
         uiStage.addActor(bottomRightTable);
 
         stingTimerLabel = new Label("", new Label.LabelStyle(font, Color.CYAN));
+        stingTimerLabel.setFontScale(2f); // Ensuring size matches
         stingTimerLabel.setVisible(false);
         bottomRightTable.add(stingTimerLabel).right().padRight(20).padBottom(20);
     }
@@ -700,6 +710,19 @@ public class MenuScreen {
 
         itemTable.invalidateHierarchy();
     } // <--- Added this closing brace for the METHOD
+
+    public void updateMonsterTimer(int seconds) {
+        if (monsterWarningLabel != null) {
+            monsterWarningLabel.setVisible(true);
+            monsterWarningLabel.setText("A monster will enter the station in " + seconds + "s");
+        }
+    }
+
+    public void hideMonsterTimer() {
+        if (monsterWarningLabel != null) {
+            monsterWarningLabel.setVisible(false);
+        }
+    }
 
     public void dispose() {
         uiStage.dispose();

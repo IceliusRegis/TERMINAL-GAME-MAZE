@@ -383,6 +383,12 @@ public class Main extends ApplicationAdapter {
             lightingSystem.createPlayerLight(players.first(), false);
         }
 
+        MovementSystem moveSystem = engine.getSystem(MovementSystem.class);
+        if (moveSystem != null) {
+            // You'll need to create a reset method in MovementSystem or make these public
+            moveSystem.resetEnemyTimer();
+        }
+
         // 9. Restore the HUD to its normal in-game state.
         menuScreen.resetUI();
     }
@@ -609,4 +615,6 @@ public class Main extends ApplicationAdapter {
     public TextureRegion getPotionRegion() {
         return potionRegion;
     }
+
+    public TextureRegion getEnemyRegion() { return enemyRegion; }
 }

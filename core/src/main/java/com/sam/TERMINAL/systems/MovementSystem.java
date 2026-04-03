@@ -6,6 +6,8 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.sam.TERMINAL.Main;
 import com.sam.TERMINAL.components.*;
 
 public class MovementSystem extends IteratingSystem {
@@ -20,6 +22,9 @@ public class MovementSystem extends IteratingSystem {
     private float batteryRespawnTimer = 0f;
     private boolean isWaitingForBattery = false;
     private final float BATTERY_RESPAWN_DELAY = 15f;
+    private float enemySpawnTimer = 0f;
+    private boolean enemySpawned = false;
+    private final float ENEMY_SPAWN_DELAY = 45f; // 60 seconds
 
     public MovementSystem() {
         super(Family.all(TransformComponent.class, PlayerComponent.class).get());
@@ -59,6 +64,37 @@ public class MovementSystem extends IteratingSystem {
             if (sc != null && "battery".equals(sc.name)) {
                 batteryExistsInWorld = true;
                 break;
+            }
+        }
+
+        // --- ENEMY SPAWN DELAY LOGIC ---
+        if (!enemySpawned) {
+            enemySpawnTimer += deltaTime;
+
+            // Calculate seconds remaining
+            float remaining = ENEMY_SPAWN_DELAY - enemySpawnTimer;
+
+            if (remaining > 0) {
+                if (menuScreen != null) {
+                    // Math.ceil makes it feel more natural (starts at 60, ends at 1)
+                    menuScreen.updateMonsterTimer((int) Math.ceil(remaining));
+                }
+            }
+
+            if (enemySpawnTimer >= ENEMY_SPAWN_DELAY) {
+                Main game = (Main) Gdx.app.getApplicationListener();
+                TextureRegion enemyTex = game.getEnemyRegion();
+
+                if (enemyTex != null) {
+                    com.sam.TERMINAL.entities.EntitySpawner.spawnEnemy(
+                        (com.badlogic.ashley.core.PooledEngine)getEngine(),
+                        enemyTex
+                    );
+                    enemySpawned = true;
+
+                    // Hide the timer once the monster is spawned
+                    if (menuScreen != null) menuScreen.hideMonsterTimer();
+                }
             }
         }
 
@@ -199,5 +235,10 @@ public class MovementSystem extends IteratingSystem {
 
     public void setMenuScreen(com.sam.TERMINAL.buttons.MenuScreen menuScreen) {
         this.menuScreen = menuScreen;
+    }
+
+    public void resetEnemyTimer() {
+        this.enemySpawnTimer = 0f;
+        this.enemySpawned = false;
     }
 }

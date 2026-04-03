@@ -67,10 +67,14 @@ public class EntitySpawner {
         int pTileY = (int) (PLAYER_Y / TILE_SIZE);
 
         EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
-        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
 
         spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX, pTileY, mapWidth,
                 mapHeight);
+    }
+
+    public static void spawnEnemy(PooledEngine engine, TextureRegion enemyRegion) {
+        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
+        Gdx.app.log("SPAWNER", "The hunter has entered the maze...");
     }
 
     public static void spawnItems(PooledEngine engine,
@@ -188,8 +192,6 @@ public class EntitySpawner {
             EntityFactory.createKey(engine, kX * TILE_SIZE, kY * TILE_SIZE, beepRegion,
                     KEY_SAVE_ID + "_" + i);
         }
-
-        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
     }
 
     private static TileWorldComponent getWorldComponent(PooledEngine engine) {
