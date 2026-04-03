@@ -52,17 +52,21 @@ public class SaveSystem extends IteratingSystem {
     private String currentRunId = "";
 
     //Sprites
-    private final  TextureRegion openDoorSprite;
-    private final  TextureRegion closedDoorSprite;
     private final TextureRegion keySprite;
+    private final TextureRegion flashlightSprite;
+    private final TextureRegion enemySprite;
+    private final TextureRegion batterySprite;
+    private final TextureRegion potionSprite;
 
-    public SaveSystem(TextureRegion openDoorSprite, TextureRegion closedDoorSprite, TextureRegion keySprite) {
+    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite, TextureRegion batterySprite, TextureRegion potionSprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
-        this.openDoorSprite = openDoorSprite;
-        this.closedDoorSprite = closedDoorSprite;
         this.keySprite = keySprite;
+        this.flashlightSprite = flashlightSprite;
+        this.enemySprite = enemySprite;
+        this.batterySprite = batterySprite;
+        this.potionSprite = potionSprite;
 
         //Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
@@ -111,6 +115,41 @@ public class SaveSystem extends IteratingSystem {
             }
 
             if (loading) {
+                // Clear existing dynamic entities completely to prevent duplication
+                com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
+                for (Entity e : getEngine().getEntitiesFor(Family.all(EnemyComponent.class).get())) {
+                    toRemove.add(e);
+                }
+                for (Entity e : getEngine().getEntitiesFor(Family.all(InteractableComponent.class).get())) {
+                    toRemove.add(e);
+                }
+                for (Entity e : toRemove) {
+                    getEngine().removeEntity(e);
+                }
+
+                // Dynamically spawn the entities based on the saved coordinates
+                if (loadedData != null) {
+                    if (loadedData.enemies != null && !loadedData.enemies.isEmpty()) {
+                        for (GameData.EnemySaveData eData : loadedData.enemies) {
+                            com.sam.TERMINAL.entities.EntityFactory.createEnemy((com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
+                        }
+                    }
+
+                    if (loadedData.items != null && !loadedData.items.isEmpty()) {
+                        for (GameData.ItemSaveData iData : loadedData.items) {
+                            if (iData.type.equals("beep")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createKey((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, keySprite, iData.saveId);
+                            } else if (iData.type.equals("flashlight")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createFlashlight((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite, iData.saveId);
+                            } else if (iData.type.equals("battery")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createBattery((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite, iData.saveId);
+                            } else if (iData.type.equals("potion")) {
+                                com.sam.TERMINAL.entities.EntityFactory.createPotion((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite, iData.saveId);
+                            }
+                        }
+                    }
+                }
+
                 System.out.println("Loaded from: " + currentSaveFile);
                 loading = false;
                 loadedData = null;
@@ -146,6 +185,16 @@ public class SaveSystem extends IteratingSystem {
         }
     }
 
+    public void forceImmediateLoad(String fileName) {
+        triggerManualLoad(fileName);
+        if (loading) {
+            super.update(0f); // Processes entities synchronously right now
+            System.out.println("Force loaded from: " + currentSaveFile);
+            loading = false;
+            loadedData = null;
+        }
+    }
+
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
@@ -165,17 +214,34 @@ public class SaveSystem extends IteratingSystem {
                     pendingSaveData.playerX = pTrans.pos.x;
                     pendingSaveData.playerY = pTrans.pos.y;
 
-                        InventoryComponent pInventory = inventoryMapper.get(entity);
-                        if (pInventory !=null) {
-                            pendingSaveData.inventoryItems.clear();
-                            pendingSaveData.inventoryItems.addAll(pInventory.items);
-                        }
+                    BatteryComponent pBat = entity.getComponent(BatteryComponent.class);
+                    if (pBat != null) {
+                        pendingSaveData.playerBattery = pBat.battery;
+                    }
+
+                    // Save total beep cards spawned from global context
+                    pendingSaveData.totalBeepCardsSpawned = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+
+                    InventoryComponent pInventory = inventoryMapper.get(entity);
+                    if (pInventory !=null) {
+                        pendingSaveData.inventoryItems.clear();
+                        pendingSaveData.inventoryItems.addAll(pInventory.items);
+                    }
                     break;
 
                 case "INTERACTABLE":
                     InteractableComponent interact = interactMapper.get(entity);
-                    if (interact !=null) {
+                    TransformComponent iTrans = transformMapper.get(entity);
+                    if (interact !=null && iTrans != null) {
                         pendingSaveData.interactableStates.put(persistence.saveId, interact.isActive);
+                        pendingSaveData.items.add(new GameData.ItemSaveData(iTrans.pos.x, iTrans.pos.y, interact.type, persistence.saveId, interact.isActive));
+                    }
+                    break;
+
+                case "ENEMY":
+                    TransformComponent eTrans = transformMapper.get(entity);
+                    if (eTrans != null) {
+                        pendingSaveData.enemies.add(new GameData.EnemySaveData(eTrans.pos.x, eTrans.pos.y));
                     }
                     break;
             }
@@ -196,6 +262,13 @@ public class SaveSystem extends IteratingSystem {
                     pTrans.pos.y = loadedData.playerY;
                     pTrans.updateBounds();
 
+                    BatteryComponent pBatLoad = entity.getComponent(BatteryComponent.class);
+                    if (pBatLoad != null) {
+                        pBatLoad.battery = loadedData.playerBattery;
+                    }
+
+                    com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned = loadedData.totalBeepCardsSpawned;
+
 
                     InventoryComponent pInventoryLoad = inventoryMapper.get(entity);
                     if (pInventoryLoad != null && loadedData.inventoryItems !=null) {
@@ -215,42 +288,81 @@ public class SaveSystem extends IteratingSystem {
                         if (interactLoad !=null) {
                             interactLoad.isActive = shouldBeActive;
 
-                            //If Item was taken / Door was opened
+                            //If Item was taken
                             if (!shouldBeActive) {
-                                if (interactLoad.type.equals("beep")) {
-                                    entity.remove((SpriteComponent.class));
-                                } else if (interactLoad.type.equals("door")) {
-                                    entity.remove(CollisionComponent.class);
-                                    SpriteComponent doorSprite = spriteMapper.get(entity);
-                                    if (doorSprite != null) doorSprite.staticSprite = openDoorSprite;
-                                }
+                                entity.remove((SpriteComponent.class));
                             }
 
-                            //If item/door are not picked or opened restore it
+                            //If item was not picked, restore its sprite
                             else {
-                                if (interactLoad.type.equals("beep")) {
-                                    if (spriteMapper.get(entity) == null) {
-                                        SpriteComponent restoredSprite = getEngine().createComponent(SpriteComponent.class);
-                                        restoredSprite.staticSprite = keySprite;
-                                        restoredSprite.isStatic = true;
-                                        restoredSprite.drawWidth = 16;
-                                        restoredSprite.drawHeight = 16;
+                                if (spriteMapper.get(entity) == null) {
+                                    // createComponent() returns a pooled instance that may carry
+                                    // stale field values from a previous lifecycle. Explicitly
+                                    // reset every field we care about to match EntityFactory's
+                                    // canonical dimensions so the item renders at the correct size.
+                                    SpriteComponent restoredSprite = getEngine().createComponent(SpriteComponent.class);
+                                    restoredSprite.isStatic = true;
+                                    restoredSprite.staticSprite = null;
+                                    restoredSprite.drawWidth = 0;
+                                    restoredSprite.drawHeight = 0;
 
+                                    if (interactLoad.type.equals("beep")) {
+                                        // Canonical beep card dimensions from EntityFactory.createKey()
+                                        restoredSprite.staticSprite = keySprite;
+                                        restoredSprite.drawWidth  = 40;
+                                        restoredSprite.drawHeight = 30;
+
+                                        // Also reset the TransformComponent so collision bounds
+                                        // reflect the correct world-unit size, not pooled leftovers.
+                                        TransformComponent beepTransform = transformMapper.get(entity);
+                                        if (beepTransform != null) {
+                                            beepTransform.width  = 40;
+                                            beepTransform.height = 30;
+                                            beepTransform.updateBounds();
+                                        }
+
+                                    } else if (interactLoad.type.equals("flashlight")) {
+                                        // Canonical flashlight dimensions from EntityFactory.createFlashlight()
+                                        restoredSprite.staticSprite = flashlightSprite;
+                                        restoredSprite.drawWidth  = 50;
+                                        restoredSprite.drawHeight = 50;
+
+                                        // Same guard on the TransformComponent.
+                                        TransformComponent flTransform = transformMapper.get(entity);
+                                        if (flTransform != null) {
+                                            flTransform.width  = 50;
+                                            flTransform.height = 50;
+                                            flTransform.updateBounds();
+                                        }
+                                    } else if (interactLoad.type.equals("battery")) {
+                                        restoredSprite.staticSprite = batterySprite;
+                                        restoredSprite.drawWidth  = 70;
+                                        restoredSprite.drawHeight = 70;
+
+                                        TransformComponent batTransform = transformMapper.get(entity);
+                                        if (batTransform != null) {
+                                            batTransform.width  = 70;
+                                            batTransform.height = 70;
+                                            batTransform.updateBounds();
+                                        }
+                                    } else if (interactLoad.type.equals("potion")) {
+                                        restoredSprite.staticSprite = potionSprite;
+                                        restoredSprite.drawWidth  = 50;
+                                        restoredSprite.drawHeight = 50;
+
+                                        TransformComponent potTransform = transformMapper.get(entity);
+                                        if (potTransform != null) {
+                                            potTransform.width  = 50;
+                                            potTransform.height = 50;
+                                            potTransform.updateBounds();
+                                        }
+                                    }
+
+                                    // Only add the component if we assigned a valid sprite
+                                    if (restoredSprite.staticSprite != null) {
                                         entity.add(restoredSprite);
                                     }
                                 }
-                                if (interactLoad.type.equals("door")) {
-                                    if (!collisionMapper.has(entity)) {
-                                        entity.add(getEngine().createComponent(CollisionComponent.class));
-                                    }
-
-                                    SpriteComponent doorSprite = spriteMapper.get(entity);
-                                    if (doorSprite !=null) {
-                                        doorSprite.staticSprite = closedDoorSprite;
-                                    }
-
-                                }
-
                             }
                         }
                     }

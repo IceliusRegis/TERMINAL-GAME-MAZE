@@ -9,10 +9,14 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Gdx;
 import com.sam.TERMINAL.components.LightComponent;
 import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.components.SpriteComponent;
 import com.sam.TERMINAL.components.TransformComponent;
+import com.sam.TERMINAL.components.BatteryComponent;
+import com.sam.TERMINAL.components.InventoryComponent;
 
 /**
  * LightingSystem — Manages Box2DLights for the player's FOV cone.
@@ -46,7 +50,7 @@ public class LightingSystem extends IteratingSystem {
 
     // --- Component Mappers ---
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
-            .getFor(TransformComponent.class);
+        .getFor(TransformComponent.class);
     private final ComponentMapper<SpriteComponent> spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     private final ComponentMapper<LightComponent> lightMapper = ComponentMapper.getFor(LightComponent.class);
 
@@ -55,10 +59,10 @@ public class LightingSystem extends IteratingSystem {
 
     public LightingSystem(OrthographicCamera camera) {
         super(Family.all(
-                PlayerComponent.class,
-                TransformComponent.class,
-                SpriteComponent.class,
-                LightComponent.class).get());
+            PlayerComponent.class,
+            TransformComponent.class,
+            SpriteComponent.class,
+            LightComponent.class).get());
 
         this.camera = camera;
 
@@ -87,12 +91,12 @@ public class LightingSystem extends IteratingSystem {
         // --- LIGHT CONFIGURATION ---
         // If no flashlight, the cone is tiny/invisible. If hasFlashlight, it's your 90+80 degree beam.
         float finalDistance = hasFlashlight ? (CONE_DISTANCE + 100f) : 0f;
-        float finalDegrees = hasFlashlight ? (CONE_DEGREES + 80f) : 0f;
+        float finalDegrees = hasFlashlight ? (CONE_DEGREES + 100f) : 0f;
 
         // The "Small Circle" around the player
         // We make it slightly larger if they don't have a flashlight so they can at least see their feet.
-        float finalPointRadius = hasFlashlight ? 150f : 300f;
-        float brightness = hasFlashlight ? 0.2f : 0.5f;
+        float finalPointRadius = hasFlashlight ? 150f : 180f;
+        float brightness = hasFlashlight ? 0.7f : 0.5f;
 
         // Cleanup old light
         if (lightMapper.has(playerEntity)) {
@@ -155,18 +159,27 @@ public class LightingSystem extends IteratingSystem {
         float centerY = transform.pos.y + transform.height / 2f;
         light.cone.setPosition(centerX, centerY);
 
-        // 3. --- ADD THE SMOOTH TURNING CODE HERE ---
-        float targetAngle = sprite.facingAngle; // The angle from MovementSystem
+        // 3. Smooth Turning
+        float targetAngle = sprite.facingAngle;
         float currentDir = light.cone.getDirection();
-
-        // 0.15f is the speed (1.0f is instant, 0.01f is very slow)
         float smoothAngle = com.badlogic.gdx.math.MathUtils.lerpAngleDeg(currentDir, targetAngle, 0.15f);
-
         light.cone.setDirection(smoothAngle);
-        // --------------------------------------------
 
         if (light.pointLight != null) {
             light.pointLight.setPosition(centerX, centerY);
+        }
+
+        // --- UPDATED FLASH LIGHT BATTERY LOGIC ---
+        BatteryComponent batteryState = entity.getComponent(BatteryComponent.class);
+        InventoryComponent inv = entity.getComponent(InventoryComponent.class);
+        boolean hasFlashlight = (inv != null && inv.hasItem("flashlight"));
+
+        if (batteryState != null) {
+            // Sync cone activity
+            if (light.cone != null) {
+                // Light is active only if you have the item AND it's toggled on
+                light.cone.setActive(hasFlashlight && batteryState.flashlightOn);
+            }
         }
     }
 

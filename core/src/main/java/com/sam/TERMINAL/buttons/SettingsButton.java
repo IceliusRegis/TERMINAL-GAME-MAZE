@@ -56,9 +56,9 @@ public class SettingsButton {
         ImageButton refreshBtn = createBtn("ui/refresh.png");
         refreshBtn.addListener(new ClickListener() {
             @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    onReset.run();
-                }
+            public void clicked(InputEvent event, float x, float y) {
+                onReset.run();
+            }
         });
 
         ImageButton quitBtn = createBtn("ui/quit.png");

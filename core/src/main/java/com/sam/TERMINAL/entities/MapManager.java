@@ -94,7 +94,7 @@ public class MapManager {
 
                                 // 4. Set the transform
                                 transform.pos.set((x * tileLayer.getTileWidth()) + offsetX,
-                                        (y * tileLayer.getTileHeight()) + offsetY);
+                                    (y * tileLayer.getTileHeight()) + offsetY);
                                 transform.width = actualWidth;
                                 transform.height = actualHeight;
                                 transform.updateBounds();
@@ -163,7 +163,7 @@ public class MapManager {
             engine.addEntity(mapEntity);
 
             Gdx.app.log("MAP_MANAGER", "Successfully loaded map: " + tmxPath +
-                    " (" + worldComp.mapWidthTiles + "x" + worldComp.mapHeightTiles + " tiles)");
+                " (" + worldComp.mapWidthTiles + "x" + worldComp.mapHeightTiles + " tiles)");
         } catch (Exception e) {
             Gdx.app.error("MAP_MANAGER", "Failed to load map: " + tmxPath, e);
         }

@@ -22,7 +22,7 @@ public class EntityFactory {
      * @param idleAnimation
      */
     public static void createPlayer(PooledEngine engine, float x, float y, float bodyWidth, float bodyHeight,
-            Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
+                                    Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation) {
         Entity player = engine.createEntity();
 
         // Add transform component for position
@@ -52,30 +52,8 @@ public class EntityFactory {
         // Persistence Data this is where player position is saved
         player.add(new PersistenceComponent("PLAYER", "PLAYER-POGI"));
         player.add(engine.createComponent(InventoryComponent.class));
+        player.add(new BatteryComponent(100f));
         engine.addEntity(player);
-    }
-
-    public static void createDoor(PooledEngine engine, float x, float y, TextureRegion closedSprite, String saveId) {
-        Entity door = engine.createEntity();
-
-        TransformComponent transform = engine.createComponent(TransformComponent.class);
-        transform.pos.set(x, y);
-        transform.width = 32;
-        transform.height = 32;
-        transform.updateBounds();
-        door.add(transform);
-
-        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
-        sprite.staticSprite = closedSprite;
-        sprite.isStatic = true;
-        door.add(sprite);
-
-        door.add(engine.createComponent(CollisionComponent.class));
-        door.add(new InteractableComponent("door", 40f));
-
-        door.add(new PersistenceComponent("INTERACTABLE", saveId));
-
-        engine.addEntity(door);
     }
 
     public static void createKey(PooledEngine engine, float x, float y, TextureRegion beepRegion, String saveId) {
@@ -118,7 +96,33 @@ public class EntityFactory {
         enemy.add(s);
 
         enemy.add(new EnemyComponent());
+        enemy.add(new PersistenceComponent("ENEMY", "ENEMY_" + java.util.UUID.randomUUID().toString()));
         engine.addEntity(enemy);
+    }
+
+    /** Tutorial trigger object: Lily. */
+    public static void createLily(PooledEngine engine, float x, float y, TextureRegion lilyRegion, String saveId) {
+        Entity lily = engine.createEntity();
+
+        TransformComponent t = engine.createComponent(TransformComponent.class);
+        t.pos.set(x, y);
+        t.width = 48f;
+        t.height = 48f;
+        t.updateBounds();
+        lily.add(t);
+
+        SpriteComponent s = engine.createComponent(SpriteComponent.class);
+        s.staticSprite = lilyRegion;
+        s.isStatic = true;
+        s.drawWidth = 48f;
+        s.drawHeight = 48f;
+        s.name = "lily";
+        lily.add(s);
+
+        lily.add(new InteractableComponent("lily", 80f));
+        lily.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(lily);
     }
 
     public static void createFlashlight(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
@@ -148,6 +152,59 @@ public class EntityFactory {
         flashlight.add(new PersistenceComponent("INTERACTABLE", saveId));
 
         engine.addEntity(flashlight);
+    }
+
+    public static void createBattery(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
+        Entity battery = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 70;
+        transform.height = 70;
+        transform.updateBounds();
+        battery.add(transform);
+
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = texture;
+        sprite.isStatic = true;
+        sprite.drawWidth = 70;
+        sprite.drawHeight = 70;
+        battery.add(sprite);
+
+        battery.add(new InteractableComponent("battery", 40f));
+        battery.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(battery);
+    }
+
+    public static Entity createPotion(PooledEngine engine, float x, float y, TextureRegion region, String saveId) {
+        Entity potion = engine.createEntity();
+
+        // 1. Position and Bounds (Matching your TransformComponent style)
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 50;  // Adjust size as needed
+        transform.height = 50;
+        transform.updateBounds();
+        potion.add(transform);
+
+        // 2. Visuals (Matching your SpriteComponent style)
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = region;
+        sprite.isStatic = true;
+        sprite.drawWidth = 50;
+        sprite.drawHeight = 50;
+        potion.add(sprite);
+
+        // 3. Interaction (This makes it pick-up-able)
+        // We call the type "potion" so your Inventory knows what it is
+        potion.add(new InteractableComponent("potion", 40f));
+
+        // 4. Persistence (So it saves/loads correctly)
+        potion.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(potion);
+        return potion;
     }
 
     /**

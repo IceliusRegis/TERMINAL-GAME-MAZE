@@ -3,6 +3,8 @@ package com.sam.TERMINAL.systems;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.ashley.systems.IteratingSystem;
 import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.graphics.Camera;
@@ -42,7 +44,7 @@ public class EnemySystem extends IteratingSystem {
     private static final float CATCH_THRESHOLD = 16f;
 
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
-            .getFor(TransformComponent.class);
+        .getFor(TransformComponent.class);
     private final ComponentMapper<EnemyComponent> enemyMapper = ComponentMapper.getFor(EnemyComponent.class);
 
     /** Cached player entity — looked up once and reused until engine reset. */
@@ -54,10 +56,14 @@ public class EnemySystem extends IteratingSystem {
     /** Callback fired when the enemy catches the player (e.g. jumpscare). */
     private final Runnable onCatchCallback;
 
-    /**
-     * Guard flag — true once the callback has fired, preventing repeat triggers.
-     */
+    /** Guard flag — true once the callback has fired, preventing repeat triggers. */
     private boolean triggered;
+
+    // --- Audio Fields ---
+    private Sound heartbeatSound;
+    private long heartbeatSoundId = -1;
+    private static final float MAX_AUDIO_DISTANCE = 320f;
+    private float minDistanceThisFrame;
 
     /** No-arg constructor — no catch callback. */
     public EnemySystem() {
@@ -67,21 +73,61 @@ public class EnemySystem extends IteratingSystem {
     /**
      * Constructor that accepts a catch callback (e.g. a jumpscare trigger).
      *
-     * @param onCatchCallback Runnable invoked once when the enemy reaches the
-     *                        player.
+     * @param onCatchCallback Runnable invoked once when the enemy reaches the player.
      */
     public EnemySystem(Runnable onCatchCallback) {
         super(Family.all(EnemyComponent.class, TransformComponent.class).get());
         this.onCatchCallback = onCatchCallback;
+        // Load heartbeat audio file dynamically
+        this.heartbeatSound = Gdx.audio.newSound(Gdx.files.internal("sfx/heart_beat_monster_a_fast.ogg"));
     }
 
     /**
      * Resets the triggered flag so the catch callback can fire again
-     * (e.g. after a game reset).
+     * (e.g. after a game reset). Also halts audio manually.
      */
     public void reset() {
         triggered = false;
         cachedPlayer = null;
+        if (heartbeatSound != null && heartbeatSoundId != -1) {
+            heartbeatSound.stop(heartbeatSoundId);
+            heartbeatSoundId = -1;
+        }
+    }
+
+    @Override
+    public void update(float deltaTime) {
+        minDistanceThisFrame = Float.MAX_VALUE;
+        super.update(deltaTime);
+
+        if (heartbeatSound == null) return;
+
+        // Audio Lifecycle & Proximity Update
+        if (cachedPlayer == null || triggered || deltaTime == 0f) {
+            // Stop sound entirely if game is over, resetting, or frozen
+            if (heartbeatSoundId != -1) {
+                heartbeatSound.stop(heartbeatSoundId);
+                heartbeatSoundId = -1;
+            }
+        } else {
+            // Scale linearly initially, then apply exponential falloff for impact
+            float volume = 1.0f - (minDistanceThisFrame / MAX_AUDIO_DISTANCE);
+            if (volume <= 0f) {
+                if (heartbeatSoundId != -1) {
+                    heartbeatSound.stop(heartbeatSoundId);
+                    heartbeatSoundId = -1;
+                }
+            } else {
+                // Aggressive volume padding: Start heavily boosted (~40%) as soon as range triggers
+                float boostedVolume = Math.min(1.0f, 0.40f + (volume * 0.60f));
+
+                if (heartbeatSoundId == -1) {
+                    heartbeatSoundId = heartbeatSound.loop(0f);
+                }
+                heartbeatSound.setVolume(heartbeatSoundId, boostedVolume);
+                Gdx.app.log("AudioDebug", "Min Distance: " + minDistanceThisFrame + " | Volume: " + boostedVolume);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -94,7 +140,7 @@ public class EnemySystem extends IteratingSystem {
         // 1. Find player entity (cached after first frame)
         if (cachedPlayer == null) {
             ImmutableArray<Entity> players = getEngine()
-                    .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
+                .getEntitiesFor(Family.all(PlayerComponent.class, TransformComponent.class).get());
             if (players.size() == 0)
                 return;
             cachedPlayer = players.first();
@@ -105,6 +151,22 @@ public class EnemySystem extends IteratingSystem {
         TransformComponent enemyT = transformMapper.get(entity);
         TransformComponent playerT = transformMapper.get(cachedPlayer);
 
+        // 2b. Calculate Euclidean distance for proximity audio (only per-frame, not frozen)
+        if (deltaTime > 0f) {
+            float eCenterX = enemyT.pos.x + enemyT.width / 2f;
+            float eCenterY = enemyT.pos.y + enemyT.height / 2f;
+            float pCenterX = playerT.pos.x + playerT.width / 2f;
+            float pCenterY = playerT.pos.y + playerT.height / 2f;
+
+            float diffX = pCenterX - eCenterX;
+            float diffY = pCenterY - eCenterY;
+            float distToPlayer = (float) Math.sqrt(diffX * diffX + diffY * diffY);
+
+            if (distToPlayer < minDistanceThisFrame) {
+                minDistanceThisFrame = distToPlayer;
+            }
+        }
+
         // 3. Get world component (needed for BFS)
         TileWorldComponent world = getWorldComponent();
         if (world == null)
@@ -113,7 +175,7 @@ public class EnemySystem extends IteratingSystem {
         // 4. Accumulate timer; recalculate path when interval fires or path exhausted
         enemy.pathTimer += deltaTime;
         boolean shouldRepath = enemy.pathTimer >= enemy.pathRecalcInterval
-                || enemy.path.isEmpty();
+            || enemy.path.isEmpty();
 
         if (shouldRepath) {
             enemy.pathTimer = 0f;
@@ -126,7 +188,7 @@ public class EnemySystem extends IteratingSystem {
 
             // Run BFS and cache the result
             Queue<GridPoint2> newPath = findPath(
-                    world, startTileX, startTileY, goalTileX, goalTileY);
+                world, startTileX, startTileY, goalTileX, goalTileY);
             enemy.path.clear();
             if (newPath != null) {
                 enemy.path.addAll(newPath);
@@ -139,11 +201,11 @@ public class EnemySystem extends IteratingSystem {
 
             // Target pixel: center of the next tile, offset by half entity size
             float targetX = nextTile.x * world.tileWidth
-                    + world.tileWidth / 2f
-                    - enemyT.width / 2f;
+                + world.tileWidth / 2f
+                - enemyT.width / 2f;
             float targetY = nextTile.y * world.tileHeight
-                    + world.tileHeight / 2f
-                    - enemyT.height / 2f;
+                + world.tileHeight / 2f
+                - enemyT.height / 2f;
 
             float dx = targetX - enemyT.pos.x;
             float dy = targetY - enemyT.pos.y;
@@ -154,7 +216,25 @@ public class EnemySystem extends IteratingSystem {
                 enemyT.pos.set(targetX, targetY);
                 enemy.path.poll();
             } else {
-                // Move toward waypoint at configured speed
+                // --- INCREASE ENEMY SPEED PER BEEP CARD ---
+                float baseSpeed = 80f;      // Starting speed with 0 cards
+                float maxEnemySpeed = 160f; // Speed cap so it doesn't become impossible
+                int heldCards = 0;
+
+                InventoryComponent playerInv = cachedPlayer.getComponent(InventoryComponent.class);
+                if (playerInv != null) {
+                    // Count how many "beep_card" items are currently in the player's inventory
+                    heldCards = java.util.Collections.frequency(playerInv.items, "beep_card");
+                }
+
+                // Add 10 speed for every card held
+                // 0 cards = 80, 5 cards = 130, etc.
+                float calculatedSpeed = baseSpeed + (heldCards * 10f);
+
+                // Ensure the enemy doesn't exceed the max speed cap
+                enemy.speed = Math.min(calculatedSpeed, maxEnemySpeed);
+
+                // Move toward the current BFS waypoint at the adjusted speed
                 float step = enemy.speed * deltaTime;
                 enemyT.pos.x += (dx / dist) * step;
                 enemyT.pos.y += (dy / dist) * step;
@@ -188,8 +268,8 @@ public class EnemySystem extends IteratingSystem {
      *         goal (inclusive), or null if no path exists.
      */
     private Queue<GridPoint2> findPath(TileWorldComponent world,
-            int startX, int startY,
-            int goalX, int goalY) {
+                                       int startX, int startY,
+                                       int goalX, int goalY) {
 
         // Edge case: already at goal
         if (startX == goalX && startY == goalY) {
@@ -280,7 +360,7 @@ public class EnemySystem extends IteratingSystem {
         debugRenderer.setColor(Color.YELLOW);
 
         ImmutableArray<Entity> enemies = getEngine()
-                .getEntitiesFor(Family.all(EnemyComponent.class, TransformComponent.class).get());
+            .getEntitiesFor(Family.all(EnemyComponent.class, TransformComponent.class).get());
 
         for (Entity entity : enemies) {
             EnemyComponent enemy = enemyMapper.get(entity);
@@ -317,7 +397,7 @@ public class EnemySystem extends IteratingSystem {
      */
     private TileWorldComponent getWorldComponent() {
         ImmutableArray<Entity> worldEntities = getEngine()
-                .getEntitiesFor(Family.all(TileWorldComponent.class).get());
+            .getEntitiesFor(Family.all(TileWorldComponent.class).get());
         if (worldEntities.size() == 0)
             return null;
         return worldEntities.first().getComponent(TileWorldComponent.class);
@@ -333,6 +413,14 @@ public class EnemySystem extends IteratingSystem {
         if (debugRenderer != null) {
             debugRenderer.dispose();
             debugRenderer = null;
+        }
+        if (heartbeatSound != null) {
+            if (heartbeatSoundId != -1) {
+                heartbeatSound.stop(heartbeatSoundId);
+                heartbeatSoundId = -1;
+            }
+            heartbeatSound.dispose();
+            heartbeatSound = null;
         }
     }
 }
