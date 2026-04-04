@@ -38,6 +38,7 @@ public class MenuScreen {
     private Stage uiStage;
     private Stage settingsStage;
     private Stage inventoryStage;
+    private Stage confrontationStage;
     private Texture settingsTexture, backTexture, whitePixel, invTexture;
     private Texture restartTexture;
     private Texture jumpscareTexture;
@@ -93,6 +94,7 @@ public class MenuScreen {
         uiStage = new Stage(new ExtendViewport(w, h), batch);
         settingsStage = new Stage(new ExtendViewport(w, h), batch);
         inventoryStage = new Stage(new ExtendViewport(w, h), batch);
+        confrontationStage = new Stage(new ExtendViewport(w, h), batch);
 
         font = loadUIFont("fonts/Abaddon Light.ttf", 28);
         bodyFont = loadUIFont("fonts/Abaddon Light.ttf", 34);
@@ -153,6 +155,7 @@ public class MenuScreen {
             uiStage.removeListener(globalListener);
             settingsStage.removeListener(globalListener);
             inventoryStage.removeListener(globalListener);
+            confrontationStage.removeListener(globalListener);
         }
 
         globalListener = new InputListener() {
@@ -199,6 +202,7 @@ public class MenuScreen {
         uiStage.addListener(globalListener);
         settingsStage.addListener(globalListener);
         inventoryStage.addListener(globalListener);
+        confrontationStage.addListener(globalListener);
     }
 
     private void usePotionFromInventory() {
@@ -306,7 +310,12 @@ public class MenuScreen {
             return;
         }
 
-        if (isSettingsVisible) {
+        if (isConfrontationVisible) {
+            InputMultiplexer multiplexer = new InputMultiplexer();
+            multiplexer.addProcessor(confrontationStage);
+            multiplexer.addProcessor(uiStage);
+            Gdx.input.setInputProcessor(multiplexer);
+        } else if (isSettingsVisible) {
             InputMultiplexer multiplexer = new InputMultiplexer();
             multiplexer.addProcessor(settingsStage);
             multiplexer.addProcessor(uiStage);
@@ -334,9 +343,9 @@ public class MenuScreen {
         uiStage.draw();
 
         if (isConfrontationVisible) {
-            drawDim(settingsStage);
-            settingsStage.act(delta);
-            settingsStage.draw();
+            drawDim(confrontationStage);
+            confrontationStage.act(delta);
+            confrontationStage.draw();
         } else if (isSettingsVisible) {
             drawDim(settingsStage);
             settingsStage.act(delta);
@@ -482,13 +491,12 @@ public class MenuScreen {
         isSettingsVisible = false;
         isInventoryVisible = false;
 
-        // Clear the settings stage and re-use it for the confrontation overlay
-        settingsStage.clear();
+        confrontationStage.clear();
 
         Table root = new Table();
         root.setFillParent(true);
         root.center();
-        settingsStage.addActor(root);
+        confrontationStage.addActor(root);
 
         // Panel background
         TextureRegionDrawable panelBg = new TextureRegionDrawable(new TextureRegion(whitePixel));
@@ -553,7 +561,7 @@ public class MenuScreen {
 
         // Set input to the confrontation stage
         InputMultiplexer multiplexer = new InputMultiplexer();
-        multiplexer.addProcessor(settingsStage);
+        multiplexer.addProcessor(confrontationStage);
         multiplexer.addProcessor(uiStage);
         Gdx.input.setInputProcessor(multiplexer);
     }
@@ -691,6 +699,7 @@ public class MenuScreen {
         uiStage.getViewport().update(width, height, true);
         settingsStage.getViewport().update(width, height, true);
         inventoryStage.getViewport().update(width, height, true);
+        confrontationStage.getViewport().update(width, height, true);
         if (narrativePanel != null && narrativeLabel != null) {
             float vw = uiStage.getViewport().getWorldWidth();
             float vh = uiStage.getViewport().getWorldHeight();
