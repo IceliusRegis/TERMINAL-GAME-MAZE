@@ -49,6 +49,7 @@ public class Main extends ApplicationAdapter {
     private Music tutorialMusic;
     private Music triBgmMusic;
     private float titleMusicDelayTimer;
+    private float monsterSpawnTimer = -1f;
     private boolean titleMusicStarted;
 
     private static final float CURSOR_HIDE_DELAY_SECONDS = 5f;
@@ -63,6 +64,7 @@ public class Main extends ApplicationAdapter {
     private boolean timeSignalPlayedForRun = false;
     private boolean tutorialMovementAllowed = true;
     private boolean lilyTriggered = false;
+    private int currentLevel = 1;
 
     private Sound timeSignalSound;
     private Sound lilyTriggerSound;
@@ -203,6 +205,10 @@ public class Main extends ApplicationAdapter {
         return tutorialMovementAllowed;
     }
 
+    public int getCurrentLevel() {
+        return currentLevel;
+    }
+
     public boolean isLilyTriggered() {
         return lilyTriggered;
     }
@@ -279,6 +285,8 @@ public class Main extends ApplicationAdapter {
                 spawnPostLilyEntities();
             }
         }, 4.3f);
+
+        monsterSpawnTimer = 45.0f;
     }
 
     private void spawnPostLilyEntities() {
@@ -291,10 +299,6 @@ public class Main extends ApplicationAdapter {
             int pTileY = (int) (t.pos.y / 32f);
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
                     pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
-
-            if (enemyRegion != null) {
-                EntitySpawner.spawnEnemy(engine, enemyRegion);
-            }
         }
     }
 
@@ -459,6 +463,8 @@ public class Main extends ApplicationAdapter {
         GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
         GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
 
+        currentLevel = 1;
+
         mapManager = new MapManager(engine);
         mapManager.loadMap("maps/mapTest.tmx");
 
@@ -505,6 +511,9 @@ public class Main extends ApplicationAdapter {
     }
 
     public void resetGame() {
+        monsterSpawnTimer = -1f;
+        if (menuScreen != null) menuScreen.hideMonsterTimer();
+
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls != null)
             wls.reset();
@@ -580,6 +589,8 @@ public class Main extends ApplicationAdapter {
             }
         }
 
+        currentLevel = 2;
+
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls != null)
             wls.reset();
@@ -629,7 +640,7 @@ public class Main extends ApplicationAdapter {
                     pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
             // Garc's Level 2 Enemy Spawn approach
-            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyRegion);
+            monsterSpawnTimer = 30.0f;
         }
 
         if (players.size() > 0 && lightingSystem != null) {
@@ -688,6 +699,23 @@ public class Main extends ApplicationAdapter {
         batch.begin();
         if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
             engine.update(delta);
+            
+            if (monsterSpawnTimer > 0) {
+                monsterSpawnTimer -= delta;
+                if (monsterSpawnTimer <= 0) {
+                    if (enemyRegion != null) {
+                        if (currentLevel == 2) {
+                            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyRegion);
+                        } else {
+                            EntitySpawner.spawnEnemy(engine, enemyRegion);
+                        }
+                    }
+                    monsterSpawnTimer = -1f;
+                    if (menuScreen != null) menuScreen.hideMonsterTimer();
+                } else {
+                    if (menuScreen != null) menuScreen.updateMonsterTimer((int)Math.ceil(monsterSpawnTimer));
+                }
+            }
         } else {
             engine.update(0);
         }

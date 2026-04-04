@@ -134,13 +134,17 @@ public class TileWorldComponent implements Component {
      * visual walls, even if there is no collision tile there.
      */
     public boolean isSolidForSpawning(int tileX, int tileY) {
+        return isSolidForSpawning(tileX, tileY, false);
+    }
+
+    public boolean isSolidForSpawning(int tileX, int tileY, boolean ignoreNoSpawn) {
         if (isSolid(tileX, tileY)) {
             return true;
         }
         if (wallsLayer != null && wallsLayer.getCell(tileX, tileY) != null) {
             return true;
         }
-        if (noSpawnLayer != null && noSpawnLayer.getCell(tileX, tileY) != null) {
+        if (!ignoreNoSpawn && noSpawnLayer != null && noSpawnLayer.getCell(tileX, tileY) != null) {
             return true;
         }
         return false;

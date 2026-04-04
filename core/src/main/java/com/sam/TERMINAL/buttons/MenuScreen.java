@@ -490,6 +490,8 @@ public class MenuScreen {
 
         if (beepCardLabel != null) {
             beepCardLabel.setText("Beep Cards: " + heldCards + " / " + totalExpected);
+            boolean showCards = mainGame.getCurrentLevel() != 1 || mainGame.isLilyTriggered();
+            beepCardLabel.setVisible(showCards);
         }
 
         if (bat != null && inv != null && inv.hasItem("flashlight")) {
@@ -568,7 +570,7 @@ public class MenuScreen {
         uiStage.addActor(bottomCenterTable);
 
         monsterWarningLabel = new Label("", new Label.LabelStyle(font, Color.YELLOW));
-        monsterWarningLabel.setFontScale(2f);
+        monsterWarningLabel.setFontScale(1.1f);
         monsterWarningLabel.setVisible(false);
         bottomCenterTable.add(monsterWarningLabel).padBottom(20).row();
 
@@ -697,7 +699,7 @@ public class MenuScreen {
     public void updateMonsterTimer(int seconds) {
         if (monsterWarningLabel != null) {
             monsterWarningLabel.setVisible(true);
-            monsterWarningLabel.setText("A monster will enter the station in " + seconds + "s");
+            monsterWarningLabel.setText("Something's Coming " + seconds + "s");
         }
     }
 

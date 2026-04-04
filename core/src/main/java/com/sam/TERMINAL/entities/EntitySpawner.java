@@ -86,8 +86,10 @@ public class EntitySpawner {
 
         EntityFactory.createPlayer(engine, PLAYER_X, PLAYER_Y, 24f, 15f, walkAnimation, idleAnimation);
 
-        // Lily near the player.
-        int[] lilySafe = findSafeTileRandom(world, pTileX, pTileY, 5, 3, mapWidth, mapHeight);
+        // Lily to the left side of the player spawn point.
+        int targetX = pTileX - 3;
+        int targetY = pTileY;
+        int[] lilySafe = findSafeTile(world, targetX, targetY, 4, pTileX, pTileY, 1, true);
         EntityFactory.createLily(engine, lilySafe[0] * TILE_SIZE, lilySafe[1] * TILE_SIZE, lilyRegion, "LILY_TRIGGER");
     }
 
@@ -228,6 +230,14 @@ public class EntitySpawner {
             int centerX, int centerY,
             int radius, int minDistFromCenter,
             int mapWidth, int mapHeight) {
+        return findSafeTileRandom(world, centerX, centerY, radius, minDistFromCenter, mapWidth, mapHeight, false);
+    }
+
+    private static int[] findSafeTileRandom(TileWorldComponent world,
+            int centerX, int centerY,
+            int radius, int minDistFromCenter,
+            int mapWidth, int mapHeight,
+            boolean ignoreNoSpawn) {
         for (int attempt = 0; attempt < MAX_RANDOM_ATTEMPTS; attempt++) {
             int offX = (int) (Math.random() * (radius * 2 + 1)) - radius;
             int offY = (int) (Math.random() * (radius * 2 + 1)) - radius;
@@ -237,11 +247,11 @@ public class EntitySpawner {
                 continue;
             if (Math.abs(offX) + Math.abs(offY) < minDistFromCenter)
                 continue;
-            if (world.isSolidForSpawning(cX, cY))
+            if (world.isSolidForSpawning(cX, cY, ignoreNoSpawn))
                 continue;
             return new int[] { cX, cY };
         }
-        return findSafeTile(world, centerX, centerY, Math.max(radius, 20), centerX, centerY, minDistFromCenter);
+        return findSafeTile(world, centerX, centerY, Math.max(radius, 20), centerX, centerY, minDistFromCenter, ignoreNoSpawn);
     }
 
     /**
@@ -257,8 +267,15 @@ public class EntitySpawner {
     private static int[] findSafeTile(TileWorldComponent world,
             int originX, int originY, int searchRadius,
             int avoidX, int avoidY, int minAvoidDist) {
+        return findSafeTile(world, originX, originY, searchRadius, avoidX, avoidY, minAvoidDist, false);
+    }
+
+    private static int[] findSafeTile(TileWorldComponent world,
+            int originX, int originY, int searchRadius,
+            int avoidX, int avoidY, int minAvoidDist,
+            boolean ignoreNoSpawn) {
         // Try the origin first
-        if (!world.isSolidForSpawning(originX, originY)) {
+        if (!world.isSolidForSpawning(originX, originY, ignoreNoSpawn)) {
             if (Math.abs(originX - avoidX) + Math.abs(originY - avoidY) >= minAvoidDist)
                 return new int[] { originX, originY };
         }
@@ -269,7 +286,7 @@ public class EntitySpawner {
                         continue;
                     int cX = originX + dx;
                     int cY = originY + dy;
-                    if (world.isSolidForSpawning(cX, cY))
+                    if (world.isSolidForSpawning(cX, cY, ignoreNoSpawn))
                         continue;
                     if (Math.abs(cX - avoidX) + Math.abs(cY - avoidY) < minAvoidDist)
                         continue;
