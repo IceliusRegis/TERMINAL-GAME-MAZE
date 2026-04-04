@@ -13,7 +13,8 @@ import com.sam.TERMINAL.persistence.SaveManager;
 import java.util.UUID;
 
 /**
- * SaveSystem - The bridge between the active Game World (ECS) and the File System.
+ * SaveSystem - The bridge between the active Game World (ECS) and the File
+ * System.
  *
  * Responsibilities:
  * 1. Input Listener: Monitors F5 to Save and F9 to Load.
@@ -26,39 +27,41 @@ import java.util.UUID;
  * - Retrieves the save file from disk via SaveManager.
  * - Matches loaded data to active entities using their unique 'saveId'.
  * - Overwrites entity Component data (Position X/Y) with saved values.
- * - CRITICAL: Updates derived data (like collision bounds) to prevent "ghost" bugs.
+ * - CRITICAL: Updates derived data (like collision bounds) to prevent "ghost"
+ * bugs.
  */
 
 public class SaveSystem extends IteratingSystem {
 
-    //Declaration of Mapper,basically bookmarking the position and save state
+    // Declaration of Mapper,basically bookmarking the position and save state
     private ComponentMapper<PersistenceComponent> persistenceMapper;
     private ComponentMapper<TransformComponent> transformMapper;
     private ComponentMapper<InventoryComponent> inventoryMapper;
-    private  ComponentMapper<InteractableComponent> interactMapper;
-    private  ComponentMapper<SpriteComponent> spriteMapper;
+    private ComponentMapper<InteractableComponent> interactMapper;
+    private ComponentMapper<SpriteComponent> spriteMapper;
     private ComponentMapper<CollisionComponent> collisionMapper;
 
-    //Save State
+    // Save State
     private GameData pendingSaveData;
     private boolean saving = false;
     private String currentSaveFile = "saveFile.json";
 
-    //Load State
+    // Load State
     private GameData loadedData; // reads data from disk
-    private boolean loading = false; //tells the game we are loading data
+    private boolean loading = false; // tells the game we are loading data
 
-    //IDs
+    // IDs
     private String currentRunId = "";
 
-    //Sprites
+    // Sprites
     private final TextureRegion keySprite;
     private final TextureRegion flashlightSprite;
     private final TextureRegion enemySprite;
     private final TextureRegion batterySprite;
     private final TextureRegion potionSprite;
 
-    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite, TextureRegion batterySprite, TextureRegion potionSprite) {
+    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite,
+            TextureRegion batterySprite, TextureRegion potionSprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
@@ -68,7 +71,7 @@ public class SaveSystem extends IteratingSystem {
         this.batterySprite = batterySprite;
         this.potionSprite = potionSprite;
 
-        //Initialize Mappers
+        // Initialize Mappers
         persistenceMapper = ComponentMapper.getFor(PersistenceComponent.class);
         transformMapper = ComponentMapper.getFor(TransformComponent.class);
         inventoryMapper = ComponentMapper.getFor(InventoryComponent.class);
@@ -77,7 +80,7 @@ public class SaveSystem extends IteratingSystem {
         collisionMapper = ComponentMapper.getFor(CollisionComponent.class);
     }
 
-    public void  generateNewRunId() {
+    public void generateNewRunId() {
         this.currentRunId = UUID.randomUUID().toString();
     }
 
@@ -88,12 +91,12 @@ public class SaveSystem extends IteratingSystem {
     @Override
     public void update(float deltaTime) {
 
-        //Save Button Trigger
+        // Save Button Trigger
         if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
             triggerManualSave("saveFile.json");
         }
 
-        //Load Button Trigger
+        // Load Button Trigger
         if (Gdx.input.isKeyJustPressed(Input.Keys.F9)) {
             triggerManualLoad("saveFile.json");
         }
@@ -104,11 +107,11 @@ public class SaveSystem extends IteratingSystem {
             super.update(deltaTime);
 
             if (saving) {
-                //Finished collecting data, now write it to disk.
+                // Finished collecting data, now write it to disk.
                 SaveManager.save(pendingSaveData, currentSaveFile);
                 System.out.println("Saved to: " + currentSaveFile);
 
-                //Reset the system so it stops saving
+                // Reset the system so it stops saving
                 saving = false;
                 pendingSaveData = null;
 
@@ -121,7 +124,6 @@ public class SaveSystem extends IteratingSystem {
                 loading = false;
                 loadedData = null;
             }
-
 
         }
     }
@@ -143,20 +145,29 @@ public class SaveSystem extends IteratingSystem {
         if (loadedData != null) {
             if (loadedData.enemies != null && !loadedData.enemies.isEmpty()) {
                 for (GameData.EnemySaveData eData : loadedData.enemies) {
-                    com.sam.TERMINAL.entities.EntityFactory.createEnemy((com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
+                    com.sam.TERMINAL.entities.EntityFactory.createEnemy(
+                            (com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
                 }
             }
 
             if (loadedData.items != null && !loadedData.items.isEmpty()) {
                 for (GameData.ItemSaveData iData : loadedData.items) {
                     if (iData.type.equals("beep")) {
-                        com.sam.TERMINAL.entities.EntityFactory.createKey((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, keySprite, iData.saveId);
+                        com.sam.TERMINAL.entities.EntityFactory.createKey(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, keySprite,
+                                iData.saveId);
                     } else if (iData.type.equals("flashlight")) {
-                        com.sam.TERMINAL.entities.EntityFactory.createFlashlight((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite, iData.saveId);
+                        com.sam.TERMINAL.entities.EntityFactory.createFlashlight(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, flashlightSprite,
+                                iData.saveId);
                     } else if (iData.type.equals("battery")) {
-                        com.sam.TERMINAL.entities.EntityFactory.createBattery((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite, iData.saveId);
+                        com.sam.TERMINAL.entities.EntityFactory.createBattery(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, batterySprite,
+                                iData.saveId);
                     } else if (iData.type.equals("potion")) {
-                        com.sam.TERMINAL.entities.EntityFactory.createPotion((com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite, iData.saveId);
+                        com.sam.TERMINAL.entities.EntityFactory.createPotion(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite,
+                                iData.saveId);
                     }
                 }
             }
@@ -174,15 +185,16 @@ public class SaveSystem extends IteratingSystem {
     }
 
     public void triggerManualLoad(String fileName) {
-        if(!loading) {
-            //Check if file exist first to avoid crashes
+        if (!loading) {
+            // Check if file exist first to avoid crashes
             GameData data = SaveManager.load(fileName);
             if (data != null) {
                 this.currentSaveFile = fileName;
                 this.loadedData = data;
                 this.loading = true;
                 this.saving = false;
-                if (data.runId !=null) this.currentRunId = data.runId;
+                if (data.runId != null)
+                    this.currentRunId = data.runId;
             } else {
                 System.out.println("Cannot load: " + fileName + " does not exist");
             }
@@ -193,16 +205,15 @@ public class SaveSystem extends IteratingSystem {
         triggerManualLoad(fileName);
         if (loading) {
             super.update(0f); // Processes entities synchronously right now
-            
+
             // Execute the dynamic spawning logic immediately
             spawnLoadedEntities();
-            
+
             System.out.println("Force loaded from: " + currentSaveFile);
             loading = false;
             loadedData = null;
         }
     }
-
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
@@ -211,7 +222,6 @@ public class SaveSystem extends IteratingSystem {
         // Get the actual data components from the entity
         PersistenceComponent persistence = persistenceMapper.get(entity);
         TransformComponent transform = transformMapper.get(entity);
-
 
         // Saving (Entity to Data)
         if (saving) {
@@ -230,22 +240,23 @@ public class SaveSystem extends IteratingSystem {
                     // Save total beep cards spawned from global context
                     pendingSaveData.totalBeepCardsSpawned = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
 
-                        InventoryComponent pInventory = inventoryMapper.get(entity);
-                        if (pInventory !=null) {
-                            pendingSaveData.inventoryItems.clear();
-                            pendingSaveData.inventoryItems.addAll(pInventory.items);
-                        }
+                    InventoryComponent pInventory = inventoryMapper.get(entity);
+                    if (pInventory != null) {
+                        pendingSaveData.inventoryItems.clear();
+                        pendingSaveData.inventoryItems.addAll(pInventory.items);
+                    }
                     break;
 
                 case "INTERACTABLE":
                     InteractableComponent interact = interactMapper.get(entity);
                     TransformComponent iTrans = transformMapper.get(entity);
-                    if (interact !=null && iTrans != null) {
+                    if (interact != null && iTrans != null) {
                         pendingSaveData.interactableStates.put(persistence.saveId, interact.isActive);
-                        pendingSaveData.items.add(new GameData.ItemSaveData(iTrans.pos.x, iTrans.pos.y, interact.type, persistence.saveId, interact.isActive));
+                        pendingSaveData.items.add(new GameData.ItemSaveData(iTrans.pos.x, iTrans.pos.y, interact.type,
+                                persistence.saveId, interact.isActive));
                     }
                     break;
-                    
+
                 case "ENEMY":
                     TransformComponent eTrans = transformMapper.get(entity);
                     if (eTrans != null) {
@@ -277,9 +288,8 @@ public class SaveSystem extends IteratingSystem {
 
                     com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned = loadedData.totalBeepCardsSpawned;
 
-
                     InventoryComponent pInventoryLoad = inventoryMapper.get(entity);
-                    if (pInventoryLoad != null && loadedData.inventoryItems !=null) {
+                    if (pInventoryLoad != null && loadedData.inventoryItems != null) {
                         pInventoryLoad.items.clear();
                         pInventoryLoad.items.addAll(loadedData.inventoryItems);
                         System.out.println("Inventory Loaded: " + pInventoryLoad.items.size() + " item/s.");
@@ -287,21 +297,20 @@ public class SaveSystem extends IteratingSystem {
 
                     break;
 
-
                 case "INTERACTABLE":
                     if (loadedData.interactableStates.containsKey(persistence.saveId)) {
                         boolean shouldBeActive = loadedData.interactableStates.get(persistence.saveId);
 
                         InteractableComponent interactLoad = interactMapper.get(entity);
-                        if (interactLoad !=null) {
+                        if (interactLoad != null) {
                             interactLoad.isActive = shouldBeActive;
 
-                            //If Item was taken
+                            // If Item was taken
                             if (!shouldBeActive) {
                                 entity.remove((SpriteComponent.class));
                             }
 
-                            //If item was not picked, restore its sprite
+                            // If item was not picked, restore its sprite
                             else {
                                 if (spriteMapper.get(entity) == null) {
                                     // createComponent() returns a pooled instance that may carry
@@ -317,14 +326,14 @@ public class SaveSystem extends IteratingSystem {
                                     if (interactLoad.type.equals("beep")) {
                                         // Canonical beep card dimensions from EntityFactory.createKey()
                                         restoredSprite.staticSprite = keySprite;
-                                        restoredSprite.drawWidth  = 40;
+                                        restoredSprite.drawWidth = 40;
                                         restoredSprite.drawHeight = 30;
 
                                         // Also reset the TransformComponent so collision bounds
                                         // reflect the correct world-unit size, not pooled leftovers.
                                         TransformComponent beepTransform = transformMapper.get(entity);
                                         if (beepTransform != null) {
-                                            beepTransform.width  = 40;
+                                            beepTransform.width = 40;
                                             beepTransform.height = 30;
                                             beepTransform.updateBounds();
                                         }
@@ -332,35 +341,35 @@ public class SaveSystem extends IteratingSystem {
                                     } else if (interactLoad.type.equals("flashlight")) {
                                         // Canonical flashlight dimensions from EntityFactory.createFlashlight()
                                         restoredSprite.staticSprite = flashlightSprite;
-                                        restoredSprite.drawWidth  = 50;
+                                        restoredSprite.drawWidth = 50;
                                         restoredSprite.drawHeight = 50;
 
                                         // Same guard on the TransformComponent.
                                         TransformComponent flTransform = transformMapper.get(entity);
                                         if (flTransform != null) {
-                                            flTransform.width  = 50;
+                                            flTransform.width = 50;
                                             flTransform.height = 50;
                                             flTransform.updateBounds();
                                         }
                                     } else if (interactLoad.type.equals("battery")) {
                                         restoredSprite.staticSprite = batterySprite;
-                                        restoredSprite.drawWidth  = 70;
+                                        restoredSprite.drawWidth = 70;
                                         restoredSprite.drawHeight = 70;
 
                                         TransformComponent batTransform = transformMapper.get(entity);
                                         if (batTransform != null) {
-                                            batTransform.width  = 70;
+                                            batTransform.width = 70;
                                             batTransform.height = 70;
                                             batTransform.updateBounds();
                                         }
                                     } else if (interactLoad.type.equals("potion")) {
                                         restoredSprite.staticSprite = potionSprite;
-                                        restoredSprite.drawWidth  = 50;
+                                        restoredSprite.drawWidth = 50;
                                         restoredSprite.drawHeight = 50;
 
                                         TransformComponent potTransform = transformMapper.get(entity);
                                         if (potTransform != null) {
-                                            potTransform.width  = 50;
+                                            potTransform.width = 50;
                                             potTransform.height = 50;
                                             potTransform.updateBounds();
                                         }
@@ -380,4 +389,3 @@ public class SaveSystem extends IteratingSystem {
         }
     }
 }
-

@@ -73,8 +73,10 @@ public class RenderSystem extends SortedIteratingSystem {
             boolean e1IsNearItem = (ic1 != null && ic1.nearPlayer);
             boolean e2IsNearItem = (ic2 != null && ic2.nearPlayer);
 
-            if (e1IsNearItem && !e2IsNearItem) return 1;
-            if (e2IsNearItem && !e1IsNearItem) return -1;
+            if (e1IsNearItem && !e2IsNearItem)
+                return 1;
+            if (e2IsNearItem && !e1IsNearItem)
+                return -1;
 
             int yCompare = Float.compare(y2, y1);
             if (yCompare != 0) {

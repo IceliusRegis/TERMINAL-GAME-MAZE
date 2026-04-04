@@ -18,9 +18,9 @@ import com.sam.TERMINAL.buttons.MenuScreen;
  * WinLossSystem — Checks win and lose conditions each frame.
  *
  * Win condition: Player must:
- *   1. Be adjacent to a non-zero tile on the "Winning" map layer, AND
- *   2. Have "beep_card" in their InventoryComponent.
- *   Then pressing E triggers the win.
+ * 1. Be adjacent to a non-zero tile on the "Winning" map layer, AND
+ * 2. Have "beep_card" in their InventoryComponent.
+ * Then pressing E triggers the win.
  *
  * The 'E' prompt is shown whenever the player is near the win tile, regardless
  * of whether they hold the Beep Card. If E is pressed without the card, a
@@ -205,10 +205,10 @@ public class WinLossSystem extends EntitySystem {
      * indicators are always visible above the darkness overlay.
      *
      * Behavior:
-     *   - Player near win tile → always draws the Press-E icon to the side of
-     *     the player bounding box.
-     *   - E pressed without Beep Card → also draws the timed warning text until
-     *     missingCardWarningTimer reaches zero.
+     * - Player near win tile → always draws the Press-E icon to the side of
+     * the player bounding box.
+     * - E pressed without Beep Card → also draws the timed warning text until
+     * missingCardWarningTimer reaches zero.
      */
     public void renderPrompt() {
         // Draw the warning message whenever its timer is still active,

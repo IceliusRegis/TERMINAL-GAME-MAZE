@@ -51,10 +51,11 @@ public class LightingSystem extends IteratingSystem {
 
     // --- Component Mappers ---
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
-        .getFor(TransformComponent.class);
+            .getFor(TransformComponent.class);
     private final ComponentMapper<SpriteComponent> spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
     private final ComponentMapper<LightComponent> lightMapper = ComponentMapper.getFor(LightComponent.class);
-    private final ComponentMapper<StaticLightComponent> staticLightMapper = ComponentMapper.getFor(StaticLightComponent.class);
+    private final ComponentMapper<StaticLightComponent> staticLightMapper = ComponentMapper
+            .getFor(StaticLightComponent.class);
 
     public boolean lightingEnabled = true;
     private com.sam.TERMINAL.buttons.MenuScreen menuScreen;
@@ -87,47 +88,49 @@ public class LightingSystem extends IteratingSystem {
         TransformComponent transform = transformMapper.get(playerEntity);
 
         // --- LIGHT CONFIGURATION ---
-        // If no flashlight, the cone is tiny/invisible. If hasFlashlight, it's your 90+80 degree beam.
+        // If no flashlight, the cone is tiny/invisible. If hasFlashlight, it's your
+        // 90+80 degree beam.
         float finalDistance = hasFlashlight ? (CONE_DISTANCE + 100f) : 0f;
         float finalDegrees = hasFlashlight ? (CONE_DEGREES + 100f) : 0f;
 
         // The "Small Circle" around the player
-        // We make it slightly larger if they don't have a flashlight so they can at least see their feet.
+        // We make it slightly larger if they don't have a flashlight so they can at
+        // least see their feet.
         float finalPointRadius = hasFlashlight ? 150f : 180f;
         float brightness = hasFlashlight ? 0.7f : 0.5f;
 
         // Cleanup old light
         if (lightMapper.has(playerEntity)) {
             LightComponent oldLight = lightMapper.get(playerEntity);
-            if (oldLight.cone != null) oldLight.cone.remove();
-            if (oldLight.pointLight != null) oldLight.pointLight.remove();
+            if (oldLight.cone != null)
+                oldLight.cone.remove();
+            if (oldLight.pointLight != null)
+                oldLight.pointLight.remove();
             playerEntity.remove(LightComponent.class);
         }
 
         // Create the Cone (Flashlight Beam)
         ConeLight cone = new ConeLight(
-            rayHandler,
-            RAY_COUNT,
-            CONE_COLOR,
-            finalDistance,
-            transform.pos.x + transform.width / 2f,
-            transform.pos.y + transform.height / 2f,
-            0f,
-            finalDegrees / 2f
-        );
+                rayHandler,
+                RAY_COUNT,
+                CONE_COLOR,
+                finalDistance,
+                transform.pos.x + transform.width / 2f,
+                transform.pos.y + transform.height / 2f,
+                0f,
+                finalDegrees / 2f);
         cone.setSoft(false);
         // If no flashlight, make the cone effectively inactive
         cone.setActive(hasFlashlight);
 
         // Create the PointLight (The "Small Circle" around player)
         PointLight point = new PointLight(
-            rayHandler,
-            30,
-            new Color(1f, 1f, 1f, brightness), // Very dim white
-            finalPointRadius,
-            transform.pos.x + transform.width / 2f,
-            transform.pos.y + transform.height / 2f
-        );
+                rayHandler,
+                30,
+                new Color(1f, 1f, 1f, brightness), // Very dim white
+                finalPointRadius,
+                transform.pos.x + transform.width / 2f,
+                transform.pos.y + transform.height / 2f);
 
         point.setXray(true);
         point.setSoft(true);
@@ -154,13 +157,12 @@ public class LightingSystem extends IteratingSystem {
                 float centerX = transform.pos.x + transform.width / 2f;
                 float centerY = transform.pos.y + transform.height / 2f;
                 staticLight.pointLight = new PointLight(
-                    rayHandler,
-                    50,
-                    new Color(1f, 0.95f, 0.85f, 0.8f), 
-                    250f,
-                    centerX,
-                    centerY
-                );
+                        rayHandler,
+                        50,
+                        new Color(1f, 0.95f, 0.85f, 0.8f),
+                        250f,
+                        centerX,
+                        centerY);
                 staticLight.pointLight.setXray(true);
                 staticLight.pointLight.setSoft(true);
                 staticLight.pointLight.setSoftnessLength(60f);
@@ -171,7 +173,8 @@ public class LightingSystem extends IteratingSystem {
         SpriteComponent sprite = spriteMapper.get(entity);
         LightComponent light = lightMapper.get(entity);
 
-        if (light == null || light.cone == null || sprite == null) return;
+        if (light == null || light.cone == null || sprite == null)
+            return;
 
         // 2. Update Position to Player Center
         float centerX = transform.pos.x + transform.width / 2f;

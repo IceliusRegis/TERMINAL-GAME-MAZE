@@ -374,11 +374,11 @@ public class TitleScreen {
         SubmenuPanel panel = new SubmenuPanel(24f);
         String creditsText = "Credits\n\n" +
             "Assets:\n\n" +
-            "Fonts: Nimble Beats on itch.io, Caffinate on itch.io\n\n" +
-            "UI: Gameboy dialogue/text frame pack by 2bitcrook on itch.io\n\n" +
-            "Music: Moonlight by Josh James Lim on itch.io\n\n" +
-            "SFX: Survival Horror UI SFX by bedsideseraphim on itch.io\n\n" +
-            "Special thanks blahblahblah. Sana pumasa tayo. Godbless.";
+            "Fonts: Nimble Beats, Caffinate on itch.io\n\n" +
+            "UI: 2bitcrook Pavel Sevryukov, Chris Perich, JennPixel, ELV Games on itch.io\n" +
+            "Music: Josh James Lim, raudokyubu on itch.io\n\n" +
+            "SFX: Survival Horror UI SFX by bedsideseraphim on itch.io";
+
         Label creditsLabel = new Label(creditsText, new Label.LabelStyle(bodyFont, WHITE));
         creditsLabel.setWrap(true);
         creditsLabel.setAlignment(Align.center);

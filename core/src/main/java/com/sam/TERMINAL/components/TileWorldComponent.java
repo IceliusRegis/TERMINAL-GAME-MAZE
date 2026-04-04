@@ -49,7 +49,7 @@ public class TileWorldComponent implements Component {
 
         Object winningRaw = tiledMap.getLayers().get("Winning");
         this.winningLayer = (winningRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) winningRaw : null;
-        
+
         Object noSpawnRaw = tiledMap.getLayers().get("No Spawn");
         if (noSpawnRaw == null) {
             noSpawnRaw = tiledMap.getLayers().get("NoSpawn");
@@ -65,13 +65,14 @@ public class TileWorldComponent implements Component {
                 }
             }
         }
-        
+
         cacheValidSpawnPoints();
     }
 
     private void cacheValidSpawnPoints() {
-        if (groundLayer == null) return;
-        
+        if (groundLayer == null)
+            return;
+
         for (int x = 0; x < mapWidthTiles; x++) {
             for (int y = 0; y < mapHeightTiles; y++) {
                 // Must have a tile on the ground/floor layer
@@ -86,15 +87,16 @@ public class TileWorldComponent implements Component {
     }
 
     public com.badlogic.gdx.math.GridPoint2 getRandomSpawnPoint(com.badlogic.gdx.math.GridPoint2... avoidPoints) {
-        if (validSpawnPoints.isEmpty()) return null;
-        
+        if (validSpawnPoints.isEmpty())
+            return null;
+
         com.badlogic.gdx.math.GridPoint2 pt;
         int maxAttempts = 50;
         int attempts = 0;
         do {
             int index = com.badlogic.gdx.math.MathUtils.random(validSpawnPoints.size() - 1);
             pt = validSpawnPoints.get(index);
-            
+
             boolean conflict = false;
             for (com.badlogic.gdx.math.GridPoint2 avoid : avoidPoints) {
                 if (avoid != null && avoid.x == pt.x && avoid.y == pt.y) {
@@ -102,10 +104,11 @@ public class TileWorldComponent implements Component {
                     break;
                 }
             }
-            if (!conflict) return pt;
+            if (!conflict)
+                return pt;
             attempts++;
         } while (attempts < maxAttempts);
-        
+
         return pt;
     }
 
