@@ -59,6 +59,9 @@ public class EnemySystem extends IteratingSystem {
     /** Guard flag — true once the callback has fired, preventing repeat triggers. */
     private boolean triggered;
 
+    /** Debug flag to pause AI. */
+    public boolean aiPaused = false;
+
     // --- Audio Fields ---
     private Sound heartbeatSound;
     private long heartbeatSoundId = -1;
@@ -136,6 +139,7 @@ public class EnemySystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        if (aiPaused) return;
 
         // 1. Find player entity (cached after first frame)
         if (cachedPlayer == null) {

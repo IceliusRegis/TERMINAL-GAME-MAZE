@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.TimeUtils;
+import com.sam.TERMINAL.Main;
 import com.sam.TERMINAL.components.TransformComponent;
 import com.sam.TERMINAL.components.TileWorldComponent;
 import com.sam.TERMINAL.components.WallComponent;
@@ -24,6 +25,8 @@ import com.sam.TERMINAL.components.RoofComponent;
 public class DebugManager {
     private long lastLTapTime = 0;
     private long lastBTapTime = 0;
+    private long last2TapTime = 0;
+    private long lastMTapTime = 0;
     private static final long DOUBLE_TAP_MAX_DELAY = 400; // milliseconds
 
     public boolean showHitboxes = false;
@@ -36,9 +39,38 @@ public class DebugManager {
     /**
      * Polls debug inputs. Call this from Main.render() outside the ECS update loop.
      */
-    public void update(LightingSystem lightingSystem) {
+    public void update(Main main, PooledEngine engine, LightingSystem lightingSystem) {
         if (lightingSystem == null)
             return;
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) {
+            long currentTime = TimeUtils.millis();
+            if (currentTime - last2TapTime < DOUBLE_TAP_MAX_DELAY) {
+                if (main != null) {
+                    main.loadLevelTwo();
+                    Gdx.app.log("TERMINAL_DEBUG", "Skipping to Level 2");
+                }
+                last2TapTime = 0;
+            } else {
+                last2TapTime = currentTime;
+            }
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
+            long currentTime = TimeUtils.millis();
+            if (currentTime - lastMTapTime < DOUBLE_TAP_MAX_DELAY) {
+                if (engine != null) {
+                    EnemySystem enemySys = engine.getSystem(EnemySystem.class);
+                    if (enemySys != null) {
+                        enemySys.aiPaused = !enemySys.aiPaused;
+                        Gdx.app.log("TERMINAL_DEBUG", "Enemy AI Paused: " + enemySys.aiPaused);
+                    }
+                }
+                lastMTapTime = 0;
+            } else {
+                lastMTapTime = currentTime;
+            }
+        }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.L)) {
             long currentTime = TimeUtils.millis();

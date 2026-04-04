@@ -699,7 +699,7 @@ public class Main extends ApplicationAdapter {
         renderInteractionPrompts();
 
         if (debugManager != null) {
-            debugManager.update(lightingSystem);
+            debugManager.update(this, engine, lightingSystem);
             debugManager.renderHitboxes(engine, camera);
             if (debugManager.showHitboxes) {
                 EnemySystem enemySys = engine.getSystem(EnemySystem.class);
