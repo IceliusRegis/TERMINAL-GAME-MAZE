@@ -30,6 +30,9 @@ public class EntitySpawner {
     public static final String FLASHLIGHT_SAVE_ID = "ITEM_FLASHLIGHT";
     public static final String BATTERY_SAVE_ID = "ITEM_BATTERY";
     public static final String POTION_SAVE_ID = "ITEM_POTION";
+    public static final String STUD_ID_SAVE_ID = "ITEM_STUD_ID";
+    public static final String PAPERS_SAVE_ID = "ITEM_PAPERS";
+    public static final String CONFRONTATION_SAVE_ID = "TRIGGER_CONFRONTATION";
 
     public static int totalBeepCardsSpawned = 0;
     public static final int REQUIRED_BEEP_CARDS = 3;
@@ -179,6 +182,67 @@ public class EntitySpawner {
             batTileY = batSafe[1];
         }
         EntityFactory.createBattery(engine, batTileX * TILE_SIZE, batTileY * TILE_SIZE, batteryRegion, BATTERY_SAVE_ID);
+    }
+
+    // =========================================================================
+    // Level 2 Ending Key Items
+    // =========================================================================
+
+    /**
+     * Spawns Level 2 specific key items: studID and the invisible confrontation trigger.
+     * Called from Main.loadLevelTwo().
+     */
+    public static void spawnLevel2KeyItems(PooledEngine engine, com.badlogic.gdx.graphics.g2d.TextureRegion studIDRegion) {
+        TileWorldComponent world = getWorldComponent(engine);
+        int mapWidth = (world != null) ? world.mapWidthTiles : 50;
+        int mapHeight = (world != null) ? world.mapHeightTiles : 50;
+
+        // StudID — randomized spawn in Level 2
+        int studTileX = 25;
+        int studTileY = 25;
+        com.badlogic.gdx.math.GridPoint2 studSpawn = (world != null) ? world.getRandomSpawnPoint() : null;
+        if (studSpawn != null) {
+            studTileX = studSpawn.x;
+            studTileY = studSpawn.y;
+        } else if (world != null) {
+            int[] safe = findSafeTileRandom(world, 25, 25, 15, 5, mapWidth, mapHeight);
+            studTileX = safe[0];
+            studTileY = safe[1];
+        }
+        EntityFactory.createStudID(engine, studTileX * TILE_SIZE, studTileY * TILE_SIZE, studIDRegion, STUD_ID_SAVE_ID);
+
+        // Confrontation trigger — invisible spot at a fixed location
+        int confTileX = 20;
+        int confTileY = 30;
+        if (world != null) {
+            int[] confSafe = findSafeTile(world, confTileX, confTileY, 8, 0, 0, 0);
+            confTileX = confSafe[0];
+            confTileY = confSafe[1];
+        }
+        EntityFactory.createConfrontationSpot(engine, confTileX * TILE_SIZE, confTileY * TILE_SIZE, CONFRONTATION_SAVE_ID);
+    }
+
+    /**
+     * Spawns the papers item in Level 1 (called from spawnPostLilyEntities in Main).
+     * Papers only appear after the lily has been triggered.
+     */
+    public static void spawnPapers(PooledEngine engine, com.badlogic.gdx.graphics.g2d.TextureRegion papersRegion,
+            TileWorldComponent world, int pTileX, int pTileY) {
+        int mapWidth = (world != null) ? world.mapWidthTiles : 50;
+        int mapHeight = (world != null) ? world.mapHeightTiles : 50;
+
+        int papersTileX = pTileX + 10;
+        int papersTileY = pTileY + 10;
+        com.badlogic.gdx.math.GridPoint2 papersSpawn = (world != null) ? world.getRandomSpawnPoint() : null;
+        if (papersSpawn != null) {
+            papersTileX = papersSpawn.x;
+            papersTileY = papersSpawn.y;
+        } else if (world != null) {
+            int[] safe = findSafeTileRandom(world, pTileX, pTileY, 20, 8, mapWidth, mapHeight);
+            papersTileX = safe[0];
+            papersTileY = safe[1];
+        }
+        EntityFactory.createPapers(engine, papersTileX * TILE_SIZE, papersTileY * TILE_SIZE, papersRegion, PAPERS_SAVE_ID);
     }
 
     // Rest of class remains unchanged (spawnForLoad, helper methods)...

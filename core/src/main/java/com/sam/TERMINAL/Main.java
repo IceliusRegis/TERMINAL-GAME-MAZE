@@ -72,9 +72,11 @@ public class Main extends ApplicationAdapter {
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
     private Texture beepTexture, flashlightTexture, batteryTexture, potionTexture, lilyTexture;
+    private Texture studIDTexture, papersTexture;
 
     // Regions and Animation
     private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion, potionRegion, lilyRegion;
+    private TextureRegion studIDRegion, papersRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
 
     // Save Files
@@ -199,6 +201,16 @@ public class Main extends ApplicationAdapter {
             lilyTexture = new Texture(Gdx.files.internal("ui/LilyOUTLINED.png"));
             lilyRegion = new TextureRegion(lilyTexture);
         }
+
+        if (Gdx.files.internal("ui/studID.png").exists()) {
+            studIDTexture = new Texture(Gdx.files.internal("ui/studID.png"));
+            studIDRegion = new TextureRegion(studIDTexture);
+        }
+
+        if (Gdx.files.internal("ui/papers.png").exists()) {
+            papersTexture = new Texture(Gdx.files.internal("ui/papers.png"));
+            papersRegion = new TextureRegion(papersTexture);
+        }
     }
 
     public boolean isTutorialMovementAllowed() {
@@ -303,6 +315,11 @@ public class Main extends ApplicationAdapter {
             int pTileY = (int) (t.pos.y / 32f);
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
                     pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
+
+            // Spawn papers in Level 1 after lily trigger
+            if (papersRegion != null) {
+                EntitySpawner.spawnPapers(engine, papersRegion, world, pTileX, pTileY);
+            }
         }
     }
 
@@ -569,6 +586,12 @@ public class Main extends ApplicationAdapter {
             }
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
                     pTileY, world.mapWidthTiles, world.mapHeightTiles);
+
+            // Re-spawn Level 2 key items on reset if we're in Level 2
+            if (currentLevel == 2 && studIDRegion != null) {
+                EntitySpawner.spawnLevel2KeyItems(engine, studIDRegion);
+            }
+
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
@@ -645,6 +668,11 @@ public class Main extends ApplicationAdapter {
             }
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
                     pTileY, world.mapWidthTiles, world.mapHeightTiles);
+
+            // Spawn Level 2 key items (studID + confrontation trigger)
+            if (studIDRegion != null) {
+                EntitySpawner.spawnLevel2KeyItems(engine, studIDRegion);
+            }
 
             // Garc's Level 2 Enemy Spawn approach
             monsterSpawnTimer = 30.0f;
@@ -751,7 +779,9 @@ public class Main extends ApplicationAdapter {
 
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (!menuScreen.isJumpscaring()) {
-            if (wls.win && !menuScreen.isGameOver()) {
+            if (wls.neutralEnd && !menuScreen.isGameOver()) {
+                // Neutral end already handled by WinLossSystem -> menuScreen.showEndScreen
+            } else if (wls.win && !menuScreen.isGameOver()) {
                 menuScreen.showGameOver(true);
             } else if (wls.gameOver && !menuScreen.isGameOver()) {
                 menuScreen.showGameOver(false);
@@ -853,6 +883,10 @@ public class Main extends ApplicationAdapter {
             potionTexture.dispose();
         if (lilyTexture != null)
             lilyTexture.dispose();
+        if (studIDTexture != null)
+            studIDTexture.dispose();
+        if (papersTexture != null)
+            papersTexture.dispose();
         if (lilyTriggerSound != null)
             lilyTriggerSound.dispose();
         WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
@@ -882,5 +916,13 @@ public class Main extends ApplicationAdapter {
 
     public MenuScreen getMenuScreen() {
         return menuScreen;
+    }
+
+    public TextureRegion getStudIDRegion() {
+        return studIDRegion;
+    }
+
+    public TextureRegion getPapersRegion() {
+        return papersRegion;
     }
 }

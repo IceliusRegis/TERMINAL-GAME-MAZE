@@ -19,6 +19,7 @@ public class TileWorldComponent implements Component {
     public TiledMapTileLayer collisionLayer;
     public TiledMapTileLayer wallsLayer;
     public TiledMapTileLayer winningLayer;
+    public TiledMapTileLayer endingLayer;
     public TiledMapTileLayer groundLayer;
     public TiledMapTileLayer noSpawnLayer;
     public java.util.List<com.badlogic.gdx.math.GridPoint2> validSpawnPoints = new java.util.ArrayList<>();
@@ -49,6 +50,9 @@ public class TileWorldComponent implements Component {
 
         Object winningRaw = tiledMap.getLayers().get("Winning");
         this.winningLayer = (winningRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) winningRaw : null;
+
+        Object endingRaw = tiledMap.getLayers().get("Ending");
+        this.endingLayer = (endingRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) endingRaw : null;
 
         Object noSpawnRaw = tiledMap.getLayers().get("No Spawn");
         if (noSpawnRaw == null) {

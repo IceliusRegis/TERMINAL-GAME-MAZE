@@ -37,6 +37,7 @@ public class WinLossSystem extends EntitySystem {
     private MenuScreen menuScreen;
     public boolean gameOver = false;
     public boolean win = false;
+    public boolean neutralEnd = false;
 
     private final SpriteBatch batch;
     private Texture promptTexture;
@@ -58,9 +59,12 @@ public class WinLossSystem extends EntitySystem {
 
     // Set each frame in update(); read by renderPrompt() in Main after lighting.
     private boolean nearWinTile = false;
+    private boolean nearEndingTile = false;
     private boolean playerHasBeepCard = false;
     private float promptWorldX = 0f;
     private float promptWorldY = 0f;
+    private float endingPromptWorldX = 0f;
+    private float endingPromptWorldY = 0f;
 
     /**
      * Counts down from MISSING_CARD_DISPLAY_DURATION to 0.
@@ -94,6 +98,7 @@ public class WinLossSystem extends EntitySystem {
     public void update(float deltaTime) {
         // Reset per-frame state flags at the top of every frame.
         nearWinTile = false;
+        nearEndingTile = false;
         playerHasBeepCard = false;
 
         // Tick down the warning timer independently of the win/loss state so
@@ -105,7 +110,7 @@ public class WinLossSystem extends EntitySystem {
             }
         }
 
-        if (gameOver || win)
+        if (gameOver || win || neutralEnd)
             return;
 
         // --- LOSE: Enemy touches player ---
@@ -198,6 +203,29 @@ public class WinLossSystem extends EntitySystem {
                 Gdx.app.log("TERMINAL", "Win attempt blocked — Beep Card not found.");
             }
         }
+
+        // --- NEUTRAL END: Proximity to Ending layer tiles ---
+        if (world.endingLayer != null) {
+            nearEndingTile = isEndingTile(world, playerTileX, playerTileY)
+                    || isEndingTile(world, playerTileX + 1, playerTileY)
+                    || isEndingTile(world, playerTileX - 1, playerTileY)
+                    || isEndingTile(world, playerTileX, playerTileY + 1)
+                    || isEndingTile(world, playerTileX, playerTileY - 1);
+
+            if (nearEndingTile) {
+                float endingPromptGap = 4f;
+                endingPromptWorldX = playerTransform.pos.x + playerTransform.width + endingPromptGap;
+                endingPromptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
+
+                if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+                    Gdx.app.log("TERMINAL", "NEUTRAL END triggered via Ending layer.");
+                    neutralEnd = true;
+                    if (menuScreen != null) {
+                        menuScreen.showEndScreen("neutral");
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -225,6 +253,11 @@ public class WinLossSystem extends EntitySystem {
         // Always draw the Press-E icon when the player is adjacent to the win tile.
         if (promptRegion != null) {
             batch.draw(promptRegion, promptWorldX, promptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
+        }
+
+        // Also draw prompt for Ending tile if near
+        if (nearEndingTile && promptRegion != null) {
+            batch.draw(promptRegion, endingPromptWorldX, endingPromptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
         }
     }
 
@@ -281,9 +314,23 @@ public class WinLossSystem extends EntitySystem {
         return world.winningLayer.getCell(tileX, tileY) != null;
     }
 
+    /**
+     * Checks if a tile on the Ending layer is non-zero.
+     */
+    private boolean isEndingTile(TileWorldComponent world, int tileX, int tileY) {
+        if (tileX < 0 || tileX >= world.mapWidthTiles || tileY < 0 || tileY >= world.mapHeightTiles) {
+            return false;
+        }
+        if (world.endingLayer == null) {
+            return false;
+        }
+        return world.endingLayer.getCell(tileX, tileY) != null;
+    }
+
     public void reset() {
         gameOver = false;
         win = false;
+        neutralEnd = false;
         missingCardWarningTimer = 0f;
     }
 

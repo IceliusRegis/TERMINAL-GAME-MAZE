@@ -213,4 +213,76 @@ public class EntityFactory {
      * - createConductor(engine, x, y)
      * - createTurnstile(engine, x, y)
      */
+
+    // =========================================================================
+    // Level 2 Ending Key Items
+    // =========================================================================
+
+    /** Creates a Student ID pickup for the Good Ending path. */
+    public static void createStudID(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
+        Entity studID = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 40;
+        transform.height = 30;
+        transform.updateBounds();
+        studID.add(transform);
+
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = texture;
+        sprite.isStatic = true;
+        sprite.drawWidth = 40;
+        sprite.drawHeight = 30;
+        studID.add(sprite);
+
+        studID.add(new InteractableComponent("studID", 40f));
+        studID.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(studID);
+    }
+
+    /** Creates a Papers pickup for the Good Ending path. */
+    public static void createPapers(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
+        Entity papers = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 40;
+        transform.height = 40;
+        transform.updateBounds();
+        papers.add(transform);
+
+        SpriteComponent sprite = engine.createComponent(SpriteComponent.class);
+        sprite.staticSprite = texture;
+        sprite.isStatic = true;
+        sprite.drawWidth = 40;
+        sprite.drawHeight = 40;
+        papers.add(sprite);
+
+        papers.add(new InteractableComponent("papers", 40f));
+        papers.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(papers);
+    }
+
+    /**
+     * Creates an invisible confrontation trigger spot.
+     * No sprite — only an InteractableComponent so the player can interact with it.
+     */
+    public static void createConfrontationSpot(PooledEngine engine, float x, float y, String saveId) {
+        Entity spot = engine.createEntity();
+
+        TransformComponent transform = engine.createComponent(TransformComponent.class);
+        transform.pos.set(x, y);
+        transform.width = 32;
+        transform.height = 32;
+        transform.updateBounds();
+        spot.add(transform);
+
+        spot.add(new InteractableComponent("confrontation", 60f));
+        spot.add(new PersistenceComponent("INTERACTABLE", saveId));
+
+        engine.addEntity(spot);
+    }
 }

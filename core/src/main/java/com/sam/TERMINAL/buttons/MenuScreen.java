@@ -46,6 +46,7 @@ public class MenuScreen {
     private boolean isInventoryVisible = false;
     private boolean isGameOver = false;
     private boolean isJumpscaring = false;
+    private boolean isConfrontationVisible = false;
 
     private BitmapFont font;
     private Table inventoryWindow;
@@ -332,6 +333,10 @@ public class MenuScreen {
         uiStage.act(delta);
         uiStage.draw();
 
+        if (isConfrontationVisible) {
+            drawDim(settingsStage);
+        }
+
         if (isSettingsVisible) {
             drawDim(settingsStage);
             settingsStage.act(delta);
@@ -403,6 +408,152 @@ public class MenuScreen {
         uiStage.setKeyboardFocus(actionBtn);
     }
 
+    /**
+     * Shows one of the three ending screens: "neutral", "bad", or "good".
+     * Each displays a full-screen overlay with the ending label and a restart button.
+     */
+    public void showEndScreen(String endingType) {
+        if (isGameOver)
+            return;
+        isGameOver = true;
+        isSettingsVisible = false;
+        isInventoryVisible = false;
+        isConfrontationVisible = false;
+        uiStage.clear();
+
+        Image dimmer = new Image(whitePixel);
+        dimmer.setColor(Color.BLACK);
+        dimmer.getColor().a = 1f;
+        dimmer.setFillParent(true);
+        uiStage.addActor(dimmer);
+
+        Table table = new Table();
+        table.setFillParent(true);
+        table.center();
+        uiStage.addActor(table);
+
+        String text;
+        Color color;
+        switch (endingType) {
+            case "bad":
+                text = "BAD END";
+                color = Color.RED;
+                break;
+            case "good":
+                text = "GOOD END";
+                color = Color.GREEN;
+                break;
+            default:
+                text = "NEUTRAL END";
+                color = Color.WHITE;
+                break;
+        }
+
+        Label.LabelStyle style = new Label.LabelStyle(font, color);
+        Label label = new Label(text, style);
+        label.setFontScale(2f);
+
+        ImageButton restartBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(restartTexture)));
+        restartBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                mainGame.resetGame();
+            }
+        });
+
+        table.add(label).padBottom(30).row();
+        table.add(restartBtn).size(64, 64);
+
+        updateInputProcessor();
+        uiStage.setKeyboardFocus(restartBtn);
+    }
+
+    /**
+     * Shows the Confrontation UI with two options:
+     * - Kill Ghost (always clickable → Bad End)
+     * - Show Mercy (locked unless player has studID AND papers → Good End)
+     */
+    public void showConfrontation() {
+        isConfrontationVisible = true;
+        isSettingsVisible = false;
+        isInventoryVisible = false;
+
+        // Clear the settings stage and re-use it for the confrontation overlay
+        settingsStage.clear();
+
+        Table root = new Table();
+        root.setFillParent(true);
+        root.center();
+        settingsStage.addActor(root);
+
+        // Panel background
+        TextureRegionDrawable panelBg = new TextureRegionDrawable(new TextureRegion(whitePixel));
+        Table panel = new Table();
+        panel.setBackground(panelBg.tint(new Color(0.1f, 0.1f, 0.1f, 0.9f)));
+        root.add(panel).width(420).height(280);
+
+        // Title
+        Label.LabelStyle titleStyle = new Label.LabelStyle(font, Color.YELLOW);
+        Label titleLabel = new Label("CONFRONTATION", titleStyle);
+        titleLabel.setFontScale(1.5f);
+        panel.add(titleLabel).padTop(20).padBottom(20).colspan(1).center().row();
+
+        // Kill Ghost button — always available
+        Label.LabelStyle killStyle = new Label.LabelStyle(font, Color.RED);
+        Label killLabel = new Label("[ Kill Ghost ]", killStyle);
+        killLabel.setFontScale(1.2f);
+        killLabel.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                isConfrontationVisible = false;
+                showEndScreen("bad");
+            }
+        });
+        panel.add(killLabel).padBottom(15).center().row();
+
+        // Show Mercy button — conditional on studID + papers
+        boolean hasStudID = false;
+        boolean hasPapers = false;
+        Entity player = getPlayerEntity();
+        if (player != null) {
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            if (inv != null) {
+                hasStudID = inv.hasItem("studID");
+                hasPapers = inv.hasItem("papers");
+            }
+        }
+
+        boolean mercyUnlocked = hasStudID && hasPapers;
+        Color mercyColor = mercyUnlocked ? Color.GREEN : Color.GRAY;
+        Label.LabelStyle mercyStyle = new Label.LabelStyle(font, mercyColor);
+        Label mercyLabel = new Label("[ Show Mercy ]", mercyStyle);
+        mercyLabel.setFontScale(1.2f);
+
+        if (mercyUnlocked) {
+            mercyLabel.addListener(new ClickListener() {
+                @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    isConfrontationVisible = false;
+                    showEndScreen("good");
+                }
+            });
+        }
+        panel.add(mercyLabel).padBottom(10).center().row();
+
+        if (!mercyUnlocked) {
+            Label.LabelStyle hintStyle = new Label.LabelStyle(font, Color.DARK_GRAY);
+            Label hintLabel = new Label("Requires Student ID and Papers", hintStyle);
+            hintLabel.setFontScale(0.8f);
+            panel.add(hintLabel).padBottom(10).center().row();
+        }
+
+        // Set input to the confrontation stage
+        InputMultiplexer multiplexer = new InputMultiplexer();
+        multiplexer.addProcessor(settingsStage);
+        multiplexer.addProcessor(uiStage);
+        Gdx.input.setInputProcessor(multiplexer);
+    }
+
     public void showJumpscare() {
         isJumpscaring = true;
         if (jumpscareTexture != null)
@@ -445,6 +596,7 @@ public class MenuScreen {
         isSettingsVisible = false;
         isInventoryVisible = false;
         isJumpscaring = false;
+        isConfrontationVisible = false;
         uiStage.clear();
 
         setupHUD();
@@ -684,6 +836,20 @@ public class MenuScreen {
 
         if (inv.hasItem("lily")) {
             addItemToTable("Lily", mainGame.getLilyRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0)
+                itemTable.row();
+        }
+
+        if (inv.hasItem("studID")) {
+            addItemToTable("Student ID", mainGame.getStudIDRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0)
+                itemTable.row();
+        }
+
+        if (inv.hasItem("papers")) {
+            addItemToTable("Papers", mainGame.getPapersRegion(), itemLabelStyle);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();

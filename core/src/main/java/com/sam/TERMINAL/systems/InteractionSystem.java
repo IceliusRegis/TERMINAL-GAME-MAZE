@@ -273,6 +273,58 @@ public class InteractionSystem extends EntitySystem {
                 }
                 break;
 
+            case "studID":
+                System.out.println("Picked up STUDENT ID!");
+                if (inventory != null) {
+                    inventory.addItem("studID");
+                }
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
+                break;
+
+            case "papers":
+                System.out.println("Picked up PAPERS!");
+                if (inventory != null) {
+                    inventory.addItem("papers");
+                }
+                target.remove(SpriteComponent.class);
+                typeData.isActive = false;
+                break;
+
+            case "confrontation":
+                if (inventory != null && inventory.hasItem("lily")) {
+                    System.out.println("Confrontation triggered! Lily consumed.");
+                    inventory.removeItem("lily");
+                    typeData.isActive = false;
+
+                    // Summon the ghost entity using existing enemy factory
+                    try {
+                        com.sam.TERMINAL.Main game2 = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                        if (game2 != null) {
+                            TransformComponent targetPos2 = transformMapper.get(target);
+                            float ghostX = targetPos2.pos.x;
+                            float ghostY = targetPos2.pos.y;
+                            com.sam.TERMINAL.entities.EntityFactory.createEnemy(
+                                    (com.badlogic.ashley.core.PooledEngine) getEngine(),
+                                    ghostX, ghostY, game2.getEnemyRegion());
+
+                            if (game2.getMenuScreen() != null) {
+                                game2.getMenuScreen().showConfrontation();
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                } else {
+                    try {
+                        com.sam.TERMINAL.Main game3 = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                        if (game3 != null && game3.getMenuScreen() != null) {
+                            game3.getMenuScreen().showNarrativeDialog("You need something to offer...", 3f);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                break;
+
             default:
                 System.out.println("Interacted with " + typeData.type);
         }
