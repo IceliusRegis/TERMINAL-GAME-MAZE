@@ -682,6 +682,13 @@ public class MenuScreen {
                 itemTable.row();
         }
 
+        if (inv.hasItem("lily")) {
+            addItemToTable("Lily", mainGame.getLilyRegion(), itemLabelStyle);
+            itemsInRow++;
+            if (itemsInRow % maxColumns == 0)
+                itemTable.row();
+        }
+
         itemTable.invalidateHierarchy();
     }
 

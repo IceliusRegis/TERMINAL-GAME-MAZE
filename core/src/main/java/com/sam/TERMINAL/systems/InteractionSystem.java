@@ -257,6 +257,9 @@ public class InteractionSystem extends EntitySystem {
 
             case "lily":
                 System.out.println("Interacted with LILY trigger!");
+                if (inventory != null) {
+                    inventory.addItem("lily");
+                }
                 // Remove lily from world + trigger tutorial event
                 target.remove(SpriteComponent.class);
                 typeData.isActive = false;

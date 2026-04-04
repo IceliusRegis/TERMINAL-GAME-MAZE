@@ -205,6 +205,10 @@ public class Main extends ApplicationAdapter {
         return tutorialMovementAllowed;
     }
 
+    public TextureRegion getLilyRegion() {
+        return lilyRegion;
+    }
+
     public int getCurrentLevel() {
         return currentLevel;
     }
@@ -609,8 +613,11 @@ public class Main extends ApplicationAdapter {
             playerTransform.updateBounds();
 
             InventoryComponent inv = player.getComponent(InventoryComponent.class);
-            if (inv != null)
+            if (inv != null) {
+                boolean hasLily = inv.hasItem("lily");
                 inv.items.clear();
+                if (hasLily) inv.addItem("lily");
+            }
 
             BatteryComponent bat = player.getComponent(BatteryComponent.class);
             if (bat != null) {
