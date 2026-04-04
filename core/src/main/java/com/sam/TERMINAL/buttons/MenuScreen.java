@@ -335,9 +335,9 @@ public class MenuScreen {
 
         if (isConfrontationVisible) {
             drawDim(settingsStage);
-        }
-
-        if (isSettingsVisible) {
+            settingsStage.act(delta);
+            settingsStage.draw();
+        } else if (isSettingsVisible) {
             drawDim(settingsStage);
             settingsStage.act(delta);
             settingsStage.draw();
@@ -436,21 +436,25 @@ public class MenuScreen {
         Color color;
         switch (endingType) {
             case "bad":
-                text = "BAD END";
+                text = "BAD END\nThe Curse Continues";
                 color = Color.RED;
+                Gdx.app.log("TERMINAL", "[BAD END] You destroyed the spirit. Another will take its place.");
                 break;
             case "good":
-                text = "GOOD END";
+                text = "GOOD END\nSouls At Rest";
                 color = Color.GREEN;
+                Gdx.app.log("TERMINAL", "[GOOD END] You showed mercy. The ghost is finally at peace.");
                 break;
             default:
-                text = "NEUTRAL END";
+                text = "NEUTRAL END\nYou Left Them Behind";
                 color = Color.WHITE;
+                Gdx.app.log("TERMINAL", "[NEUTRAL END] You escaped, but the ghost remains trapped forever.");
                 break;
         }
 
         Label.LabelStyle style = new Label.LabelStyle(font, color);
         Label label = new Label(text, style);
+        label.setAlignment(Align.center);
         label.setFontScale(2f);
 
         ImageButton restartBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(restartTexture)));

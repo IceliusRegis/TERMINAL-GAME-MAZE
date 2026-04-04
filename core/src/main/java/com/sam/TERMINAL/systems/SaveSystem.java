@@ -168,6 +168,20 @@ public class SaveSystem extends IteratingSystem {
                         com.sam.TERMINAL.entities.EntityFactory.createPotion(
                                 (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, potionSprite,
                                 iData.saveId);
+                    } else if (iData.type.equals("studID")) {
+                        com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                        com.sam.TERMINAL.entities.EntityFactory.createStudID(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, game.getStudIDRegion(),
+                                iData.saveId);
+                    } else if (iData.type.equals("papers")) {
+                        com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                        com.sam.TERMINAL.entities.EntityFactory.createPapers(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, game.getPapersRegion(),
+                                iData.saveId);
+                    } else if (iData.type.equals("confrontation")) {
+                        com.sam.TERMINAL.entities.EntityFactory.createConfrontationSpot(
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y,
+                                iData.saveId);
                     }
                 }
             }
@@ -372,6 +386,30 @@ public class SaveSystem extends IteratingSystem {
                                             potTransform.width = 50;
                                             potTransform.height = 50;
                                             potTransform.updateBounds();
+                                        }
+                                    } else if (interactLoad.type.equals("studID")) {
+                                        com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                                        restoredSprite.staticSprite = game.getStudIDRegion();
+                                        restoredSprite.drawWidth = 40;
+                                        restoredSprite.drawHeight = 30;
+
+                                        TransformComponent sidTransform = transformMapper.get(entity);
+                                        if (sidTransform != null) {
+                                            sidTransform.width = 40;
+                                            sidTransform.height = 30;
+                                            sidTransform.updateBounds();
+                                        }
+                                    } else if (interactLoad.type.equals("papers")) {
+                                        com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                                        restoredSprite.staticSprite = game.getPapersRegion();
+                                        restoredSprite.drawWidth = 40;
+                                        restoredSprite.drawHeight = 40;
+
+                                        TransformComponent papTransform = transformMapper.get(entity);
+                                        if (papTransform != null) {
+                                            papTransform.width = 40;
+                                            papTransform.height = 40;
+                                            papTransform.updateBounds();
                                         }
                                     }
 

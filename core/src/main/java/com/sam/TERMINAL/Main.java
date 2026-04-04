@@ -638,8 +638,10 @@ public class Main extends ApplicationAdapter {
             InventoryComponent inv = player.getComponent(InventoryComponent.class);
             if (inv != null) {
                 boolean hasLily = inv.hasItem("lily");
+                boolean hasPapers = inv.hasItem("papers");
                 inv.items.clear();
                 if (hasLily) inv.addItem("lily");
+                if (hasPapers) inv.addItem("papers");
             }
 
             BatteryComponent bat = player.getComponent(BatteryComponent.class);

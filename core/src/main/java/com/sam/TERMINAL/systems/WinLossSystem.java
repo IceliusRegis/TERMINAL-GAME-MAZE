@@ -162,49 +162,52 @@ public class WinLossSystem extends EntitySystem {
                 || isWinningTile(world, playerTileX, playerTileY + 1)
                 || isWinningTile(world, playerTileX, playerTileY - 1);
 
-        if (!nearWinTile)
-            return;
+        if (nearWinTile) {
+            // --- Dynamic prompt position ---
+            // Place the icon to the right of the player bounding box so it never
+            // overlaps the sprite itself. A small horizontal gap of 4 pixels is
+            // added between the right edge and the icon's left edge.
+            float promptGap = 4f;
+            promptWorldX = playerTransform.pos.x + playerTransform.width + promptGap;
+            // Vertically centered on the player bounding box.
+            promptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
 
-        // --- Dynamic prompt position ---
-        // Place the icon to the right of the player bounding box so it never
-        // overlaps the sprite itself. A small horizontal gap of 4 pixels is
-        // added between the right edge and the icon's left edge.
-        float promptGap = 4f;
-        promptWorldX = playerTransform.pos.x + playerTransform.width + promptGap;
-        // Vertically centered on the player bounding box.
-        promptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
+            // --- Beep Card prerequisite check ---
+            int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+            int heldCards = 0;
+            InventoryComponent inventory = player.getComponent(InventoryComponent.class);
+            if (inventory != null) {
+                heldCards = java.util.Collections.frequency(inventory.items, BEEP_CARD_ITEM_ID);
+            }
+            playerHasBeepCard = (heldCards >= totalExpected && totalExpected > 0);
 
-        // --- Beep Card prerequisite check ---
-        int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
-        int heldCards = 0;
-        InventoryComponent inventory = player.getComponent(InventoryComponent.class);
-        if (inventory != null) {
-            heldCards = java.util.Collections.frequency(inventory.items, BEEP_CARD_ITEM_ID);
-        }
-        playerHasBeepCard = (heldCards >= totalExpected && totalExpected > 0);
+            // Update dynamic missing message
+            currentMissingMessage = "Find all Beep Cards! (" + heldCards + "/" + totalExpected + ")";
 
-        // Update dynamic missing message
-        currentMissingMessage = "Find all Beep Cards! (" + heldCards + "/" + totalExpected + ")";
+            // The 'E' prompt is always shown from here on (nearWinTile == true).
+            // If E is pressed, attempt the win or start the warning timer.
+            if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+                if (playerHasBeepCard) {
+                    Gdx.app.log("TERMINAL", "WIN CONDITION MET — Escaping...");
 
-        // The 'E' prompt is always shown from here on (nearWinTile == true).
-        // If E is pressed, attempt the win or start the warning timer.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            if (playerHasBeepCard) {
-                Gdx.app.log("TERMINAL", "WIN CONDITION MET — Showing Escape Screen");
+                    win = true; // Set the local flag to stop system updates
 
-                win = true; // Set the local flag to stop system updates
-
-                if (menuScreen != null) {
-                    menuScreen.showGameOver(true); // This shows your "YOU ESCAPED" window
+                    if (menuScreen != null) {
+                        if (mainGame.getCurrentLevel() == 1) {
+                            menuScreen.showGameOver(true); // This shows your "YOU ESCAPED" window
+                        } else {
+                            menuScreen.showEndScreen("neutral");
+                        }
+                    }
+                } else {
+                    // Restart (or extend) the warning display timer.
+                    missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;
+                    Gdx.app.log("TERMINAL", "Win attempt blocked — Beep Card not found.");
                 }
-            } else {
-                // Restart (or extend) the warning display timer.
-                missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;
-                Gdx.app.log("TERMINAL", "Win attempt blocked — Beep Card not found.");
             }
         }
 
-        // --- NEUTRAL END: Proximity to Ending layer tiles ---
+        // --- BAD/GOOD END TRIGGER: Proximity to Ending layer tiles ---
         if (world.endingLayer != null) {
             nearEndingTile = isEndingTile(world, playerTileX, playerTileY)
                     || isEndingTile(world, playerTileX + 1, playerTileY)
@@ -218,10 +221,16 @@ public class WinLossSystem extends EntitySystem {
                 endingPromptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
 
                 if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-                    Gdx.app.log("TERMINAL", "NEUTRAL END triggered via Ending layer.");
-                    neutralEnd = true;
-                    if (menuScreen != null) {
-                        menuScreen.showEndScreen("neutral");
+                    InventoryComponent inventory = player.getComponent(InventoryComponent.class);
+                    if (inventory != null && inventory.hasItem("lily")) {
+                        Gdx.app.log("TERMINAL", "Ending tile activated. Presenting Lily.");
+                        if (menuScreen != null) {
+                            menuScreen.showConfrontation();
+                        }
+                    } else {
+                        if (menuScreen != null) {
+                            menuScreen.showNarrativeDialog("You need a flower to calm the spirit...", 3f);
+                        }
                     }
                 }
             }
@@ -246,12 +255,8 @@ public class WinLossSystem extends EntitySystem {
             renderMissingCardWarning();
         }
 
-        if (!nearWinTile) {
-            return;
-        }
-
         // Always draw the Press-E icon when the player is adjacent to the win tile.
-        if (promptRegion != null) {
+        if (nearWinTile && promptRegion != null) {
             batch.draw(promptRegion, promptWorldX, promptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
         }
 
