@@ -155,20 +155,23 @@ public class EntitySpawner {
         }
 
         // --- SAFE FLASHLIGHT POSITION ---
-        int flTileX = pTileX + 6;
-        int flTileY = pTileY + 6;
-        com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
-        if (randomFlSpawn != null) {
-            flTileX = randomFlSpawn.x;
-            flTileY = randomFlSpawn.y;
-            usedPoint = randomFlSpawn;
-        } else if (world != null) {
-            int[] flSafe = findSafeTileRandom(world, pTileX, pTileY, 12, 4, mapWidth, mapHeight);
-            flTileX = flSafe[0];
-            flTileY = flSafe[1];
-        }
-        EntityFactory.createFlashlight(engine, flTileX * TILE_SIZE, flTileY * TILE_SIZE, flashlightRegion,
+        // Only spawn if a region is provided (null = player already has it from Level 1)
+        if (flashlightRegion != null) {
+            int flTileX = pTileX + 6;
+            int flTileY = pTileY + 6;
+            com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+            if (randomFlSpawn != null) {
+                flTileX = randomFlSpawn.x;
+                flTileY = randomFlSpawn.y;
+                usedPoint = randomFlSpawn;
+            } else if (world != null) {
+                int[] flSafe = findSafeTileRandom(world, pTileX, pTileY, 12, 4, mapWidth, mapHeight);
+                flTileX = flSafe[0];
+                flTileY = flSafe[1];
+            }
+            EntityFactory.createFlashlight(engine, flTileX * TILE_SIZE, flTileY * TILE_SIZE, flashlightRegion,
                 FLASHLIGHT_SAVE_ID);
+        }
 
         // --- SAFE BATTERY POSITION ---
         int batTileX = pTileX + 8;

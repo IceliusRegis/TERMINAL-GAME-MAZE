@@ -39,6 +39,8 @@ import com.sam.TERMINAL.screen.Endings;
 import com.sam.TERMINAL.screen.PapersNotebookPanel;
 import com.sam.TERMINAL.screen.PapersReportReader;
 import com.sam.TERMINAL.screen.SubmenuPanel;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 
 public class MenuScreen {
     private Stage uiStage;
@@ -70,9 +72,14 @@ public class MenuScreen {
         public boolean keyDown(int keycode) {
             if (!isConfrontationVisible)
                 return false;
-            if (keycode == Input.Keys.ESCAPE || keycode == Input.Keys.TAB || keycode == Input.Keys.F1
-                    || keycode == Input.Keys.F5 || keycode == Input.Keys.U || keycode == Input.Keys.P)
+            if (keycode == Input.Keys.TAB || keycode == Input.Keys.F1
+                || keycode == Input.Keys.F5 || keycode == Input.Keys.U || keycode == Input.Keys.P)
                 return true;
+            if (keycode == Input.Keys.ESCAPE) {
+                isConfrontationVisible = false;
+                updateInputProcessor();
+                return true;
+            }
             if (keycode == Input.Keys.NUM_1 || keycode == Input.Keys.K) {
                 isConfrontationVisible = false;
                 mainGame.pauseGameplayMusicForEnding();
@@ -538,8 +545,11 @@ public class MenuScreen {
         Endings.Kind endingKind = Endings.fromMenuKey(endingType);
         Endings.logEnding(endingKind);
 
+        // UPDATE THIS LINE: Change () -> mainGame.resetGame()
+        // to () -> Gdx.app.postRunnable(mainGame::returnToTitleScreen)
         endingCutscene = new EndingCutsceneRoot(mainGame, font, bodyFont, whitePixel, restartTexture, endingKind,
-                () -> mainGame.resetGame());
+            () -> Gdx.app.postRunnable(mainGame::returnToTitleScreen));
+
         endingCutscene.setFillParent(true);
         uiStage.addActor(endingCutscene);
 
@@ -556,37 +566,52 @@ public class MenuScreen {
         isSettingsVisible = false;
         isInventoryVisible = false;
 
-        // Replace uiStage so a prior game-over overlay (YOU DIED + restart) cannot sit under this modal.
         uiStage.clear();
         setupHUD();
         setupGlobalListener();
 
         confrontationStage.clear();
 
+        // Load exit texture as a field-level reference so it stays alive while rendering
+        if (backTexture != null) backTexture.dispose();
+        backTexture = new Texture(Gdx.files.internal("ui/exit.png"));
+
+        // Opaque backdrop
         Image opaqueBackdrop = new Image(whitePixel);
         opaqueBackdrop.setColor(Color.BLACK);
         opaqueBackdrop.setFillParent(true);
         opaqueBackdrop.setTouchable(Touchable.enabled);
         confrontationStage.addActor(opaqueBackdrop);
 
+        // Centered panel
         Table root = new Table();
         root.setFillParent(true);
         root.center();
         confrontationStage.addActor(root);
 
-        // Panel background
         TextureRegionDrawable panelBg = new TextureRegionDrawable(new TextureRegion(whitePixel));
         Table panel = new Table();
         panel.setBackground(panelBg.tint(new Color(0.1f, 0.1f, 0.1f, 0.9f)));
-        root.add(panel).width(420).height(280);
+        root.add(panel).width(420).height(320);
+
+        // Back button at top-left inside the panel
+        ImageButton backBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(backTexture)));
+        backBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                isConfrontationVisible = false;
+                updateInputProcessor();
+            }
+        });
+        panel.add(backBtn).size(30, 30).padTop(10).padBottom(15).center().row();
 
         // Title
         Label.LabelStyle titleStyle = new Label.LabelStyle(font, Color.YELLOW);
         Label titleLabel = new Label("CONFRONTATION", titleStyle);
         titleLabel.setFontScale(1.5f);
-        panel.add(titleLabel).padTop(20).padBottom(20).colspan(1).center().row();
+        panel.add(titleLabel).padBottom(20).center().row();
 
-        // Kill Ghost button — always available
+        // Kill Ghost
         Label.LabelStyle killStyle = new Label.LabelStyle(font, Color.RED);
         Label killLabel = new Label("[ Kill Ghost ]", killStyle);
         killLabel.setFontScale(1.2f);
@@ -601,7 +626,7 @@ public class MenuScreen {
         });
         panel.add(killLabel).padBottom(15).center().row();
 
-        // Show Mercy button — conditional on studID + papers
+        // Show Mercy
         boolean hasStudID = false;
         boolean hasPapers = false;
         Entity player = getPlayerEntity();
@@ -618,10 +643,8 @@ public class MenuScreen {
         Label.LabelStyle mercyStyle = new Label.LabelStyle(font, mercyColor);
         Label mercyLabel = new Label("[ Show Mercy ]", mercyStyle);
         mercyLabel.setFontScale(1.2f);
-        if (mercyUnlocked)
-            mercyLabel.setTouchable(Touchable.enabled);
-
         if (mercyUnlocked) {
+            mercyLabel.setTouchable(Touchable.enabled);
             mercyLabel.addListener(new ClickListener() {
                 @Override
                 public void clicked(InputEvent event, float x, float y) {
@@ -1034,6 +1057,10 @@ public class MenuScreen {
             jumpscareSound.dispose();
         if (inventoryButtonWidget != null)
             inventoryButtonWidget.dispose();
+        if (backTexture != null) {
+            backTexture.dispose();
+            backTexture = null;
+        }
     }
 
     public boolean isSettingsVisible() {

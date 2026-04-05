@@ -260,6 +260,11 @@ public class TutorialScene {
                 tutorialIndex++;
                 if (tutorialIndex >= tutorialLines.length) {
                     phase = Phase.DONE;
+                    loginArrowPanel.setVisible(false);
+                    darkOverlay.setColor(0, 0, 0, 0f);
+                    vignetteOverlay.setColor(0, 0, 0, 0f);
+                    blinkOverlay.setColor(0, 0, 0, 0f);
+                    complaintPanel.setVisible(false);
                     if (!completeTriggered) {
                         completeTriggered = true;
                         listener.onTutorialComplete();
@@ -269,8 +274,6 @@ public class TutorialScene {
                 }
                 break;
             }
-            default:
-                break;
         }
     }
 
@@ -282,6 +285,11 @@ public class TutorialScene {
         }
 
         if (phase == Phase.DONE) {
+            loginArrowPanel.setVisible(false);
+            darkOverlay.setColor(0, 0, 0, 0f);
+            vignetteOverlay.setColor(0, 0, 0, 0f);
+            blinkOverlay.setColor(0, 0, 0, 0f);
+            complaintPanel.setVisible(false);
             stage.act(delta);
             stage.draw();
             return;
@@ -292,6 +300,9 @@ public class TutorialScene {
             introBlackTimer -= delta;
             float alpha = MathUtils.clamp(introBlackTimer / 0.9f, 0f, 1f);
             darkOverlay.setColor(0, 0, 0, alpha);
+        } else if (phase != Phase.BLINK && phase != Phase.POST_SPAWN && phase != Phase.TUTORIAL) {
+            // Ensure overlay doesn't accidentally stay pitch black if not in a transition
+            if (phase != Phase.LOGINSAM) darkOverlay.setColor(0, 0, 0, 0f);
         }
 
         // Update typewriters (bottom dialogue + optional loginsam overlay).
@@ -313,11 +324,11 @@ public class TutorialScene {
         float vw = stage.getViewport().getWorldWidth();
         float vh = stage.getViewport().getWorldHeight();
 
-        if (phase == Phase.COMPLAINT || phase == Phase.FILLER || phase == Phase.LOGINSAM) {
-            drawBackgroundCover(batch, stationBg, vw, vh);
-        } else if (phase == Phase.GLITCH || phase == Phase.BLINK || phase == Phase.POST_SPAWN || phase == Phase.TUTORIAL) {
-            // Keep StationTrip behind the overlays during glitch/blink.
-            if (showPreGameBackground()) {
+        // Fix: Explicitly draw backgrounds as long as we haven't reached the maze spawn
+        if (!spawnTriggered) {
+            if (phase == Phase.COMPLAINT || phase == Phase.FILLER || phase == Phase.LOGINSAM) {
+                drawBackgroundCover(batch, stationBg, vw, vh);
+            } else if (phase == Phase.GLITCH || phase == Phase.BLINK) {
                 if (phase == Phase.GLITCH) {
                     drawGlitchedBackground(batch, stationTripBg, stationBg, vw, vh);
                 } else {
@@ -499,7 +510,7 @@ public class TutorialScene {
             typingSfx = null;
         }
         dialogueFont.dispose();
-        LoginArrowPanel.disposeShared();
+        loginArrowPanel.disposePanel();
     }
 
     private static class Typewriter {

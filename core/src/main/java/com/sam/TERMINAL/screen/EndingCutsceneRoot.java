@@ -134,7 +134,7 @@ public final class EndingCutsceneRoot extends WidgetGroup implements Disposable 
         chizoImage.setVisible(false);
         addActor(chizoImage);
 
-        creditsLabel = new Label(Endings.rollingCreditsText(), new Label.LabelStyle(creditsFont, Color.WHITE));
+        creditsLabel = new Label(Endings.rollingCreditsText(), new Label.LabelStyle(creditsFont, kind == Endings.Kind.GOOD ? Color.BLACK : Color.WHITE));
         creditsLabel.setAlignment(Align.center);
         creditsLabel.setWrap(true);
         creditsLabel.setFontScale(0.82f);
@@ -434,10 +434,25 @@ public final class EndingCutsceneRoot extends WidgetGroup implements Disposable 
 
     private void showRestart() {
         restartVisible = true;
-        restartBtn.setVisible(true);
-        restartBtn.setPosition((layoutW - 64f) / 2f, 24f);
-        restartBtn.getColor().a = 0f;
-        restartBtn.addAction(Actions.fadeIn(0.6f));
+
+        // Ensure the button is hidden and disabled
+        restartBtn.setVisible(false);
+        restartBtn.setTouchable(Touchable.disabled);
+
+        // Move black base to front to cover the credits
+        blackBase.toFront();
+        blackBase.getColor().a = 0f;
+
+        // Sequence: Fade to black -> Wait 5 seconds -> Return to Title
+        blackBase.addAction(Actions.sequence(
+            Actions.fadeIn(1.5f),      // Smooth fade to black
+            Actions.delay(5.0f),       // Hold for 5 seconds
+            Actions.run(() -> {
+                if (onRestart != null) {
+                    onRestart.run();   // Triggers the Title Screen via Main
+                }
+            })
+        ));
     }
 
     private float stopScrollTopY() {
@@ -521,8 +536,10 @@ public final class EndingCutsceneRoot extends WidgetGroup implements Disposable 
             float speed = 42f;
             creditsScrollY += speed * delta;
             creditsLabel.setY(creditsScrollY);
-            float top = creditsScrollY + creditsBlockHeight;
-            if (top >= stopScrollTopY()) {
+
+            // Stop when the BOTTOM of the credits block (last line) reaches 70% from top
+            float lastLineY = creditsScrollY;
+            if (lastLineY >= layoutH * 0.10f) {
                 creditsFinished = true;
                 creditsRolling = false;
                 showRestart();

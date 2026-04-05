@@ -734,9 +734,11 @@ public class Main extends ApplicationAdapter {
             if (inv != null) {
                 boolean hasLily = inv.hasItem("lily");
                 boolean hasPapers = inv.hasItem("papers");
+                boolean hasFlashlight = inv.hasItem("flashlight");
                 inv.items.clear();
                 if (hasLily) inv.addItem("lily");
                 if (hasPapers) inv.addItem("papers");
+                if (hasFlashlight) inv.addItem("flashlight");
             }
 
             BatteryComponent bat = player.getComponent(BatteryComponent.class);
@@ -763,8 +765,16 @@ public class Main extends ApplicationAdapter {
                     pTileY = (int) (t.pos.y / 32f);
                 }
             }
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
+            boolean playerHasFlashlight = false;
+            if (players.size() > 0) {
+                InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
+                if (inv != null) playerHasFlashlight = inv.hasItem("flashlight");
+            }
+
+            EntitySpawner.spawnItems(engine, beepRegion,
+                playerHasFlashlight ? null : flashlightRegion,
+                batteryRegion, potionRegion, world, pTileX,
+                pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
             // Spawn Level 2 key items (studID + confrontation trigger)
             if (studIDRegion != null) {
@@ -776,7 +786,10 @@ public class Main extends ApplicationAdapter {
         }
 
         if (players.size() > 0 && lightingSystem != null) {
-            lightingSystem.createPlayerLight(players.first(), false);
+            Entity player = players.first();
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            boolean hasFlashlight = inv != null && inv.hasItem("flashlight");
+            lightingSystem.createPlayerLight(player, hasFlashlight);
         }
 
         if (triBgmVolumeSavedBeforeLevelLoadDuck >= 0f && triBgmMusic != null) {
@@ -815,6 +828,52 @@ public class Main extends ApplicationAdapter {
             onMonsterSpawnTimerElapsed();
             Gdx.app.log("TERMINAL_DEBUG", "Skipped monster spawn timer");
         }
+    }
+
+    public void returnToTitleScreen() {
+        // Stop all active ending/gameplay music
+        stopAndDisposeEndingMusic();
+        stopTutorialMusic(); // disposes tutorialMusic + triBgmMusic
+
+        // Clear the engine and UI
+        engine.removeAllEntities();
+        if (menuScreen != null) {
+            menuScreen.dispose();
+            menuScreen = null;
+        }
+
+        // Dispose any leftover tutorial scene
+        if (tutorialScene != null) {
+            tutorialScene.dispose();
+            tutorialScene = null;
+        }
+
+        // ----------------------------------------------------------------
+        // Reset ALL per-run narrative / tutorial state so that "New Game"
+        // after watching an ending plays the tutorials exactly like the
+        // very first launch of the game.
+        // ----------------------------------------------------------------
+        startedGameProperFromTutorial = false;
+        disableLightingDuringTutorial = false;
+        tutorialMovementAllowed = true;
+        lilyTriggered = false;
+        lilyPlacedAtAccidentSite = false;
+        currentLevel = 1;
+        monsterSpawnTimer = -1f;
+        triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
+
+        // Delete save files so "New Game" starts completely fresh
+        SaveManager.delete(MAIN_SAVE_FILE);
+        SaveManager.delete(TEMP_SAVE_FILE);
+
+        // Return to Title state (hasSave will now be false — no continue slot)
+        boolean hasSave = SaveManager.load(MAIN_SAVE_FILE) != null;
+        titleScreen = new TitleScreen(batch, hasSave, this::onTitleScreenChoice);
+        flowState = FlowState.TITLE;
+
+        // Reset title music so it fades back in naturally
+        titleMusicStarted = false;
+        titleMusicDelayTimer = 0f;
     }
 
     @Override
@@ -857,7 +916,7 @@ public class Main extends ApplicationAdapter {
         if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()
                 && !menuScreen.isPapersReportReaderVisible() && !menuScreen.isConfrontationVisible()) {
             engine.update(delta);
-            
+
             if (monsterSpawnTimer > 0) {
                 monsterSpawnTimer -= delta;
                 if (monsterSpawnTimer <= 0) {

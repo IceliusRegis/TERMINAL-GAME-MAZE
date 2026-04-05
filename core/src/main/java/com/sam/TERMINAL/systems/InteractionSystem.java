@@ -355,9 +355,8 @@ public class InteractionSystem extends EntitySystem {
                 if (inventory != null && inventory.hasItem("lily")) {
                     System.out.println("Confrontation triggered! Lily consumed.");
                     inventory.removeItem("lily");
-                    typeData.isActive = false;
+                    // REMOVED: typeData.isActive = false;  ← delete this line
 
-                    // Summon the ghost entity using existing enemy factory
                     try {
                         com.sam.TERMINAL.Main game2 = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
                         if (game2 != null) {
@@ -365,9 +364,9 @@ public class InteractionSystem extends EntitySystem {
                             float ghostX = targetPos2.pos.x;
                             float ghostY = targetPos2.pos.y;
                             com.sam.TERMINAL.entities.EntityFactory.createEnemy(
-                                    (com.badlogic.ashley.core.PooledEngine) getEngine(),
-                                    ghostX, ghostY, game2.getEnemyAnimation(),
-                                    com.sam.TERMINAL.Main.ENEMY_DRAW_W, com.sam.TERMINAL.Main.ENEMY_DRAW_H);
+                                (com.badlogic.ashley.core.PooledEngine) getEngine(),
+                                ghostX, ghostY, game2.getEnemyAnimation(),
+                                com.sam.TERMINAL.Main.ENEMY_DRAW_W, com.sam.TERMINAL.Main.ENEMY_DRAW_H);
 
                             if (game2.getMenuScreen() != null) {
                                 game2.getMenuScreen().showConfrontation();
