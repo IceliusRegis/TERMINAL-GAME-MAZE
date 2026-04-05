@@ -19,7 +19,7 @@ A [libGDX](https://libgdx.com/) project generated with [gdx-liftoff](https://git
 | **F5** | **Quick Save** (stores current state, position, and inventory) |
 | **F9** | **Quick Load** (restores the last save) |
 | **ESC** | Open/Close in-game Settings |
-| **X / SPACE** | Continue/Skip dialogues and UI screens |
+| **X / SPACE/ Left Click** | Continue/Skip dialogues and UI screens |
 
 ---
 
