@@ -5,6 +5,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.core.PooledEngine;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
@@ -17,6 +18,7 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
@@ -32,6 +34,10 @@ import com.sam.TERMINAL.components.PlayerComponent;
 import com.sam.TERMINAL.systems.LightingSystem;
 import com.sam.TERMINAL.systems.SaveSystem;
 import com.sam.TERMINAL.Main;
+import com.sam.TERMINAL.screen.EndingCutsceneRoot;
+import com.sam.TERMINAL.screen.Endings;
+import com.sam.TERMINAL.screen.PapersNotebookPanel;
+import com.sam.TERMINAL.screen.PapersReportReader;
 import com.sam.TERMINAL.screen.SubmenuPanel;
 
 public class MenuScreen {
@@ -39,6 +45,7 @@ public class MenuScreen {
     private Stage settingsStage;
     private Stage inventoryStage;
     private Stage confrontationStage;
+    private Stage papersReaderStage;
     private Texture settingsTexture, backTexture, whitePixel, invTexture;
     private Texture restartTexture;
     private Texture jumpscareTexture;
@@ -48,6 +55,40 @@ public class MenuScreen {
     private boolean isGameOver = false;
     private boolean isJumpscaring = false;
     private boolean isConfrontationVisible = false;
+    private boolean isPapersReaderVisible = false;
+
+    private PapersReportReader papersReportReader;
+
+    private EndingCutsceneRoot endingCutscene;
+
+    /** Set while confrontation is open — used by key shortcuts (1/K, 2/M). */
+    private boolean confrontationMercyUnlockedForKeys;
+
+    /** Prepended to the input multiplexer whenever the confrontation modal is open. */
+    private final InputAdapter confrontationKeyShortcuts = new InputAdapter() {
+        @Override
+        public boolean keyDown(int keycode) {
+            if (!isConfrontationVisible)
+                return false;
+            if (keycode == Input.Keys.ESCAPE || keycode == Input.Keys.TAB || keycode == Input.Keys.F1
+                    || keycode == Input.Keys.F5 || keycode == Input.Keys.U || keycode == Input.Keys.P)
+                return true;
+            if (keycode == Input.Keys.NUM_1 || keycode == Input.Keys.K) {
+                isConfrontationVisible = false;
+                mainGame.pauseGameplayMusicForEnding();
+                showEndScreen("bad");
+                return true;
+            }
+            if (confrontationMercyUnlockedForKeys
+                    && (keycode == Input.Keys.NUM_2 || keycode == Input.Keys.M)) {
+                isConfrontationVisible = false;
+                mainGame.playGoodEndingMusic();
+                showEndScreen("good");
+                return true;
+            }
+            return false;
+        }
+    };
 
     private BitmapFont font;
     private Table inventoryWindow;
@@ -95,6 +136,7 @@ public class MenuScreen {
         settingsStage = new Stage(new ExtendViewport(w, h), batch);
         inventoryStage = new Stage(new ExtendViewport(w, h), batch);
         confrontationStage = new Stage(new ExtendViewport(w, h), batch);
+        papersReaderStage = new Stage(new ExtendViewport(w, h), batch);
 
         font = loadUIFont("fonts/Abaddon Light.ttf", 28);
         bodyFont = loadUIFont("fonts/Abaddon Light.ttf", 34);
@@ -161,6 +203,8 @@ public class MenuScreen {
         globalListener = new InputListener() {
             @Override
             public boolean keyDown(InputEvent event, int keycode) {
+                if (isPapersReaderVisible)
+                    return false;
                 if (keycode == Input.Keys.TAB) {
                     isInventoryVisible = !isInventoryVisible;
                     if (isInventoryVisible)
@@ -282,6 +326,45 @@ public class MenuScreen {
         narrativeTimer = 0f;
     }
 
+    public void showPapersReport() {
+        if (papersReportReader == null) {
+            BitmapFont readerFont = bodyFont != null ? bodyFont : font;
+            papersReportReader = new PapersReportReader(readerFont, this::hidePapersReport);
+            papersReaderStage.clear();
+            papersReaderStage.addActor(papersReportReader);
+        }
+        papersReportReader.resetToFirstPage();
+        isPapersReaderVisible = true;
+        papersReaderStage.setKeyboardFocus(papersReportReader);
+        updateInputProcessor();
+    }
+
+    public void hidePapersReport() {
+        isPapersReaderVisible = false;
+        if (papersReaderStage != null)
+            papersReaderStage.setKeyboardFocus(null);
+        showNarrativeDialog("That report... argh.\n\nNo wonder this place feels spooky.", 12f);
+        updateInputProcessor();
+    }
+
+    public boolean isPapersReportReaderVisible() {
+        return isPapersReaderVisible;
+    }
+
+    public boolean isConfrontationVisible() {
+        return isConfrontationVisible;
+    }
+
+    /**
+     * While any of these are open, {@link com.sam.TERMINAL.systems.WinLossSystem} must not run
+     * lose/win/ending logic — the ECS may still be stepped with delta 0, but overlap would
+     * otherwise trigger death every frame (e.g. during confrontation).
+     */
+    public boolean blocksWinLossChecks() {
+        return isConfrontationVisible || isPapersReaderVisible || isSettingsVisible || isInventoryVisible
+                || isJumpscaring;
+    }
+
     private Entity getPlayerEntity() {
         if (engine.getEntitiesFor(Family.all(PlayerComponent.class).get()).size() == 0)
             return null;
@@ -305,17 +388,29 @@ public class MenuScreen {
     }
 
     private void updateInputProcessor() {
+        if (isConfrontationVisible) {
+            InputMultiplexer multiplexer = new InputMultiplexer();
+            multiplexer.addProcessor(confrontationKeyShortcuts);
+            multiplexer.addProcessor(confrontationStage);
+            multiplexer.addProcessor(uiStage);
+            Gdx.input.setInputProcessor(multiplexer);
+            return;
+        }
+
         if (isGameOver) {
             Gdx.input.setInputProcessor(uiStage);
             return;
         }
 
-        if (isConfrontationVisible) {
+        if (isPapersReaderVisible) {
             InputMultiplexer multiplexer = new InputMultiplexer();
-            multiplexer.addProcessor(confrontationStage);
+            multiplexer.addProcessor(papersReaderStage);
             multiplexer.addProcessor(uiStage);
             Gdx.input.setInputProcessor(multiplexer);
-        } else if (isSettingsVisible) {
+            return;
+        }
+
+        if (isSettingsVisible) {
             InputMultiplexer multiplexer = new InputMultiplexer();
             multiplexer.addProcessor(settingsStage);
             multiplexer.addProcessor(uiStage);
@@ -342,7 +437,11 @@ public class MenuScreen {
         uiStage.act(delta);
         uiStage.draw();
 
-        if (isConfrontationVisible) {
+        if (isPapersReaderVisible) {
+            drawDim(papersReaderStage);
+            papersReaderStage.act(delta);
+            papersReaderStage.draw();
+        } else if (isConfrontationVisible) {
             drawDim(confrontationStage);
             confrontationStage.act(delta);
             confrontationStage.draw();
@@ -364,6 +463,10 @@ public class MenuScreen {
         isGameOver = true;
         isSettingsVisible = false;
         isInventoryVisible = false;
+        isPapersReaderVisible = false;
+        if (papersReaderStage != null)
+            papersReaderStage.clear();
+        papersReportReader = null;
         uiStage.clear();
 
         final Image dimmer = new Image(whitePixel);
@@ -388,6 +491,7 @@ public class MenuScreen {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 if (win) {
+                    mainGame.onLevel1ExitLoadingStarted();
                     table.clearChildren();
                     Label.LabelStyle loadingStyle = new Label.LabelStyle(bodyFont, Color.WHITE);
                     Label loadingLabel = new Label("Loading...", loadingStyle);
@@ -424,61 +528,22 @@ public class MenuScreen {
     public void showEndScreen(String endingType) {
         if (isGameOver)
             return;
+        disposeEndingCutscene();
         isGameOver = true;
         isSettingsVisible = false;
         isInventoryVisible = false;
         isConfrontationVisible = false;
         uiStage.clear();
 
-        Image dimmer = new Image(whitePixel);
-        dimmer.setColor(Color.BLACK);
-        dimmer.getColor().a = 1f;
-        dimmer.setFillParent(true);
-        uiStage.addActor(dimmer);
+        Endings.Kind endingKind = Endings.fromMenuKey(endingType);
+        Endings.logEnding(endingKind);
 
-        Table table = new Table();
-        table.setFillParent(true);
-        table.center();
-        uiStage.addActor(table);
-
-        String text;
-        Color color;
-        switch (endingType) {
-            case "bad":
-                text = "BAD END\nThe Curse Continues";
-                color = Color.RED;
-                Gdx.app.log("TERMINAL", "[BAD END] You destroyed the spirit. Another will take its place.");
-                break;
-            case "good":
-                text = "GOOD END\nSouls At Rest";
-                color = Color.GREEN;
-                Gdx.app.log("TERMINAL", "[GOOD END] You showed mercy. The ghost is finally at peace.");
-                break;
-            default:
-                text = "NEUTRAL END\nYou Left Them Behind";
-                color = Color.WHITE;
-                Gdx.app.log("TERMINAL", "[NEUTRAL END] You escaped, but the ghost remains trapped forever.");
-                break;
-        }
-
-        Label.LabelStyle style = new Label.LabelStyle(font, color);
-        Label label = new Label(text, style);
-        label.setAlignment(Align.center);
-        label.setFontScale(2f);
-
-        ImageButton restartBtn = new ImageButton(new TextureRegionDrawable(new TextureRegion(restartTexture)));
-        restartBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                mainGame.resetGame();
-            }
-        });
-
-        table.add(label).padBottom(30).row();
-        table.add(restartBtn).size(64, 64);
+        endingCutscene = new EndingCutsceneRoot(mainGame, font, bodyFont, whitePixel, restartTexture, endingKind,
+                () -> mainGame.resetGame());
+        endingCutscene.setFillParent(true);
+        uiStage.addActor(endingCutscene);
 
         updateInputProcessor();
-        uiStage.setKeyboardFocus(restartBtn);
     }
 
     /**
@@ -491,7 +556,18 @@ public class MenuScreen {
         isSettingsVisible = false;
         isInventoryVisible = false;
 
+        // Replace uiStage so a prior game-over overlay (YOU DIED + restart) cannot sit under this modal.
+        uiStage.clear();
+        setupHUD();
+        setupGlobalListener();
+
         confrontationStage.clear();
+
+        Image opaqueBackdrop = new Image(whitePixel);
+        opaqueBackdrop.setColor(Color.BLACK);
+        opaqueBackdrop.setFillParent(true);
+        opaqueBackdrop.setTouchable(Touchable.enabled);
+        confrontationStage.addActor(opaqueBackdrop);
 
         Table root = new Table();
         root.setFillParent(true);
@@ -514,10 +590,12 @@ public class MenuScreen {
         Label.LabelStyle killStyle = new Label.LabelStyle(font, Color.RED);
         Label killLabel = new Label("[ Kill Ghost ]", killStyle);
         killLabel.setFontScale(1.2f);
+        killLabel.setTouchable(Touchable.enabled);
         killLabel.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 isConfrontationVisible = false;
+                mainGame.pauseGameplayMusicForEnding();
                 showEndScreen("bad");
             }
         });
@@ -535,17 +613,20 @@ public class MenuScreen {
             }
         }
 
-        boolean mercyUnlocked = hasStudID && hasPapers;
+        final boolean mercyUnlocked = hasStudID && hasPapers;
         Color mercyColor = mercyUnlocked ? Color.GREEN : Color.GRAY;
         Label.LabelStyle mercyStyle = new Label.LabelStyle(font, mercyColor);
         Label mercyLabel = new Label("[ Show Mercy ]", mercyStyle);
         mercyLabel.setFontScale(1.2f);
+        if (mercyUnlocked)
+            mercyLabel.setTouchable(Touchable.enabled);
 
         if (mercyUnlocked) {
             mercyLabel.addListener(new ClickListener() {
                 @Override
                 public void clicked(InputEvent event, float x, float y) {
                     isConfrontationVisible = false;
+                    mainGame.playGoodEndingMusic();
                     showEndScreen("good");
                 }
             });
@@ -559,11 +640,8 @@ public class MenuScreen {
             panel.add(hintLabel).padBottom(10).center().row();
         }
 
-        // Set input to the confrontation stage
-        InputMultiplexer multiplexer = new InputMultiplexer();
-        multiplexer.addProcessor(confrontationStage);
-        multiplexer.addProcessor(uiStage);
-        Gdx.input.setInputProcessor(multiplexer);
+        confrontationMercyUnlockedForKeys = mercyUnlocked;
+        updateInputProcessor();
     }
 
     public void showJumpscare() {
@@ -604,11 +682,16 @@ public class MenuScreen {
     }
 
     public void resetUI() {
+        disposeEndingCutscene();
         isGameOver = false;
         isSettingsVisible = false;
         isInventoryVisible = false;
         isJumpscaring = false;
         isConfrontationVisible = false;
+        isPapersReaderVisible = false;
+        if (papersReaderStage != null)
+            papersReaderStage.clear();
+        papersReportReader = null;
         uiStage.clear();
 
         setupHUD();
@@ -700,6 +783,10 @@ public class MenuScreen {
         settingsStage.getViewport().update(width, height, true);
         inventoryStage.getViewport().update(width, height, true);
         confrontationStage.getViewport().update(width, height, true);
+        papersReaderStage.getViewport().update(width, height, true);
+        if (endingCutscene != null) {
+            endingCutscene.onResize(uiStage.getViewport().getWorldWidth(), uiStage.getViewport().getWorldHeight());
+        }
         if (narrativePanel != null && narrativeLabel != null) {
             float vw = uiStage.getViewport().getWorldWidth();
             float vh = uiStage.getViewport().getWorldHeight();
@@ -803,6 +890,11 @@ public class MenuScreen {
         return fallback;
     }
 
+    /** Refreshes inventory grid (e.g. after picking up the lily). Safe to call anytime. */
+    public void refreshInventoryDisplay() {
+        refreshInventory();
+    }
+
     private void refreshInventory() {
         itemTable.clearChildren();
 
@@ -820,49 +912,53 @@ public class MenuScreen {
         int maxColumns = 2;
 
         if (inv.hasItem("beep_card")) {
-            addItemToTable("Beep Card", mainGame.getBeepRegion(), itemLabelStyle);
+            addItemToTable("Beep Card", mainGame.getBeepRegion(), itemLabelStyle, null);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
         }
 
         if (inv.hasItem("flashlight")) {
-            addItemToTable("Flashlight", mainGame.getFlashlightRegion(), itemLabelStyle);
+            addItemToTable("Flashlight", mainGame.getFlashlightRegion(), itemLabelStyle, null);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
         }
 
         if (inv.hasItem("battery")) {
-            addItemToTable("Battery", mainGame.getBatteryRegion(), itemLabelStyle);
+            addItemToTable("Battery", mainGame.getBatteryRegion(), itemLabelStyle, null);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
         }
 
         if (inv.hasItem("potion")) {
-            addItemToTable("Sting", mainGame.getPotionRegion(), itemLabelStyle);
+            addItemToTable("Sting", mainGame.getPotionRegion(), itemLabelStyle, null);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
         }
 
-        if (inv.hasItem("lily")) {
-            addItemToTable("Lily", mainGame.getLilyRegion(), itemLabelStyle);
+        if (inv.hasItem("lily") && mainGame.getLilyRegion() != null) {
+            addItemToTable("Lily", mainGame.getLilyRegion(), itemLabelStyle, null);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
         }
 
         if (inv.hasItem("studID")) {
-            addItemToTable("Student ID", mainGame.getStudIDRegion(), itemLabelStyle);
+            addItemToTable("Student ID", mainGame.getStudIDRegion(), itemLabelStyle, null);
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
         }
 
         if (inv.hasItem("papers")) {
-            addItemToTable("Papers", mainGame.getPapersRegion(), itemLabelStyle);
+            addItemToTable("Papers", mainGame.getPapersRegion(), itemLabelStyle, () -> {
+                isInventoryVisible = false;
+                updateInputProcessor();
+                showPapersReport();
+            });
             itemsInRow++;
             if (itemsInRow % maxColumns == 0)
                 itemTable.row();
@@ -871,8 +967,17 @@ public class MenuScreen {
         itemTable.invalidateHierarchy();
     }
 
-    private void addItemToTable(String name, TextureRegion region, Label.LabelStyle style) {
+    private void addItemToTable(String name, TextureRegion region, Label.LabelStyle style, Runnable onActivate) {
         Table slot = new Table();
+        if (onActivate != null) {
+            slot.setTouchable(Touchable.enabled);
+            slot.addListener(new ClickListener() {
+                @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    onActivate.run();
+                }
+            });
+        }
         Image icon = new Image(region);
         icon.setScaling(com.badlogic.gdx.utils.Scaling.fit);
 
@@ -895,10 +1000,23 @@ public class MenuScreen {
         }
     }
 
+    private void disposeEndingCutscene() {
+        if (endingCutscene != null) {
+            endingCutscene.dispose();
+            endingCutscene.remove();
+            endingCutscene = null;
+        }
+    }
+
     public void dispose() {
+        disposeEndingCutscene();
         uiStage.dispose();
         settingsStage.dispose();
         inventoryStage.dispose();
+        confrontationStage.dispose();
+        papersReaderStage.dispose();
+        PapersNotebookPanel.disposeShared();
+        PapersReportReader.disposeScrollStyle();
         settingsTexture.dispose();
         whitePixel.dispose();
         invTexture.dispose();

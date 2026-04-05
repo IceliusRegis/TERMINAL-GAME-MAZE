@@ -18,6 +18,7 @@ import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.*;
+import com.sam.TERMINAL.entities.EntityFactory;
 import com.sam.TERMINAL.entities.EntitySpawner;
 import com.sam.TERMINAL.entities.MapManager;
 import com.sam.TERMINAL.persistence.GameData;
@@ -61,10 +62,15 @@ public class Main extends ApplicationAdapter {
     // Garc's Tutorial & Narrative Flags
     private boolean startedGameProperFromTutorial = false;
     private boolean disableLightingDuringTutorial = false;
-    private boolean timeSignalPlayedForRun = false;
     private boolean tutorialMovementAllowed = true;
     private boolean lilyTriggered = false;
+    /** Level 2: lily left on Ending-layer accident site; E then opens confrontation. */
+    private boolean lilyPlacedAtAccidentSite = false;
+    private float triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
     private int currentLevel = 1;
+
+    /** Ending cutscene BGM (neutral / bad / good). Tri BGM is paused while this plays. */
+    private Music endingMusic;
 
     private Sound timeSignalSound;
     private Sound lilyTriggerSound;
@@ -123,7 +129,6 @@ public class Main extends ApplicationAdapter {
     private void startTutorial() {
         fadeOutTitleMusic(1.0f);
         playTutorialMusic();
-        timeSignalPlayedForRun = false;
         disableLightingDuringTutorial = true;
         tutorialMovementAllowed = false;
         lilyTriggered = false;
@@ -223,6 +228,97 @@ public class Main extends ApplicationAdapter {
 
     public int getCurrentLevel() {
         return currentLevel;
+    }
+
+    public boolean isLilyPlacedAtAccidentSite() {
+        return lilyPlacedAtAccidentSite;
+    }
+
+    /** Spawns LilyOUTLINED memorial at map tile center (Level 2 accident / Ending layer). */
+    public void placeLilyAtAccidentSite(int tileX, int tileY) {
+        if (lilyRegion == null)
+            return;
+        lilyPlacedAtAccidentSite = true;
+        float tilePx = 32f;
+        float cx = tileX * tilePx + tilePx * 0.5f;
+        float cy = tileY * tilePx + tilePx * 0.5f;
+        float dw = 48f;
+        EntityFactory.createLilyMemorial(engine, cx - dw * 0.5f, cy - dw * 0.5f, lilyRegion);
+    }
+
+    /**
+     * Called when the player leaves Level 1 via the win screen loading sequence: plays time-signal
+     * and ducks triBGM volume by 30% until {@link #loadLevelTwo()} finishes.
+     */
+    /** Pause level BGM when an ending starts (bad: call from kill; neutral/good start their own tracks). */
+    public void pauseGameplayMusicForEnding() {
+        if (triBgmMusic != null && triBgmMusic.isPlaying())
+            triBgmMusic.pause();
+    }
+
+    private void stopAndDisposeEndingMusic() {
+        if (endingMusic != null) {
+            endingMusic.stop();
+            endingMusic.dispose();
+            endingMusic = null;
+        }
+    }
+
+    private void playEndingMusicFromFile(String internalPath, float volume) {
+        stopAndDisposeEndingMusic();
+        if (!Gdx.files.internal(internalPath).exists())
+            return;
+        try {
+            endingMusic = Gdx.audio.newMusic(Gdx.files.internal(internalPath));
+            endingMusic.setLooping(true);
+            endingMusic.setVolume(volume);
+            endingMusic.play();
+        } catch (Exception e) {
+            Gdx.app.log("Main", "Ending music failed: " + internalPath + " — " + e.getMessage());
+        }
+    }
+
+    /** Neutral ending: stop tri, play neutral.wav. */
+    public void startEndingMusicNeutral() {
+        pauseGameplayMusicForEnding();
+        playEndingMusicFromFile("music/neutral.wav", 0.7f);
+    }
+
+    /** Bad ending: chizo phase — play bad.wav (tri already paused). */
+    public void startEndingMusicBad() {
+        playEndingMusicFromFile("music/bad.wav", 0.7f);
+    }
+
+    /** Good ending: after mercy — tri paused, play good.wav. */
+    public void playGoodEndingMusic() {
+        pauseGameplayMusicForEnding();
+        playEndingMusicFromFile("music/good.wav", 0.7f);
+    }
+
+    /** After ending cutscene / reset: stop ending track and restore tri BGM if present. */
+    public void stopEndingMusicAndResumeGameplay() {
+        stopAndDisposeEndingMusic();
+        if (triBgmMusic != null) {
+            triBgmMusic.setVolume(0.65f);
+            if (!triBgmMusic.isPlaying())
+                triBgmMusic.play();
+        }
+    }
+
+    public void onLevel1ExitLoadingStarted() {
+        if (Gdx.files.internal("sfx/time-signal.ogg").exists()) {
+            if (timeSignalSound == null) {
+                timeSignalSound = Gdx.audio.newSound(Gdx.files.internal("sfx/time-signal.ogg"));
+            }
+            try {
+                timeSignalSound.play(0.7f);
+            } catch (Exception ignored) {
+            }
+        }
+        if (triBgmMusic != null && triBgmMusic.isPlaying() && triBgmVolumeSavedBeforeLevelLoadDuck < 0f) {
+            triBgmVolumeSavedBeforeLevelLoadDuck = triBgmMusic.getVolume();
+            triBgmMusic.setVolume(triBgmVolumeSavedBeforeLevelLoadDuck * 0.7f);
+        }
     }
 
     public boolean isLilyTriggered() {
@@ -599,24 +695,14 @@ public class Main extends ApplicationAdapter {
             lightingSystem.createPlayerLight(players.first(), false);
         }
 
+        lilyPlacedAtAccidentSite = false;
+        stopEndingMusicAndResumeGameplay();
         menuScreen.resetUI();
     }
 
     public void loadLevelTwo() {
-        if (!timeSignalPlayedForRun) {
-            timeSignalPlayedForRun = true;
-            if (Gdx.files.internal("sfx/time-signal.ogg").exists()) {
-                if (timeSignalSound == null) {
-                    timeSignalSound = Gdx.audio.newSound(Gdx.files.internal("sfx/time-signal.ogg"));
-                }
-                try {
-                    timeSignalSound.play(0.7f);
-                } catch (Exception ignored) {
-                }
-            }
-        }
-
         currentLevel = 2;
+        lilyPlacedAtAccidentSite = false;
 
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls != null)
@@ -684,6 +770,11 @@ public class Main extends ApplicationAdapter {
             lightingSystem.createPlayerLight(players.first(), false);
         }
 
+        if (triBgmVolumeSavedBeforeLevelLoadDuck >= 0f && triBgmMusic != null) {
+            triBgmMusic.setVolume(triBgmVolumeSavedBeforeLevelLoadDuck);
+            triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
+        }
+
         if (menuScreen != null)
             menuScreen.resetUI();
     }
@@ -734,7 +825,8 @@ public class Main extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
-        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
+        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()
+                && !menuScreen.isPapersReportReaderVisible() && !menuScreen.isConfrontationVisible()) {
             engine.update(delta);
             
             if (monsterSpawnTimer > 0) {
@@ -793,7 +885,8 @@ public class Main extends ApplicationAdapter {
     }
 
     private void renderInteractionPrompts() {
-        if (menuScreen == null || menuScreen.isGameOver())
+        if (menuScreen == null || menuScreen.isGameOver() || menuScreen.isPapersReportReaderVisible()
+                || menuScreen.isConfrontationVisible())
             return;
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
@@ -866,6 +959,7 @@ public class Main extends ApplicationAdapter {
             tutorialScene.dispose();
         if (menuScreen != null)
             menuScreen.dispose();
+        stopAndDisposeEndingMusic();
         if (titleMusic != null)
             titleMusic.dispose();
         stopTutorialMusic();

@@ -26,7 +26,9 @@ import com.sam.TERMINAL.buttons.MenuScreen;
  * of whether they hold the Beep Card. If E is pressed without the card, a
  * timed "Find the Beep Card first!" warning appears for a few seconds.
  *
- * Lose condition: Enemy entity overlaps the player.
+ * Enemy death is handled by {@link com.sam.TERMINAL.systems.EnemySystem} (catch → jumpscare →
+ * game over), not by this system — overlap here used to race with deferred jumpscare and caused
+ * both YOU DIED and jumpscare.
  */
 public class WinLossSystem extends EntitySystem {
 
@@ -65,6 +67,9 @@ public class WinLossSystem extends EntitySystem {
     private float promptWorldY = 0f;
     private float endingPromptWorldX = 0f;
     private float endingPromptWorldY = 0f;
+    private int endingSiteTileX = 0;
+    private int endingSiteTileY = 0;
+    private boolean accidentLilyPromptShown = false;
 
     /**
      * Counts down from MISSING_CARD_DISPLAY_DURATION to 0.
@@ -113,28 +118,12 @@ public class WinLossSystem extends EntitySystem {
         if (gameOver || win || neutralEnd)
             return;
 
-        // --- LOSE: Enemy touches player ---
-        ImmutableArray<Entity> players = getEngine()
-                .getEntitiesFor(Family.all(PlayerComponent.class).get());
-        ImmutableArray<Entity> enemies = getEngine()
-                .getEntitiesFor(Family.all(EnemyComponent.class).get());
-
-        if (players.size() > 0 && enemies.size() > 0) {
-            TransformComponent pT = players.first().getComponent(TransformComponent.class);
-            for (Entity e : enemies) {
-                TransformComponent eT = e.getComponent(TransformComponent.class);
-                if (eT != null && eT.bounds.overlaps(pT.bounds)) {
-                    if (menuScreen != null && menuScreen.isJumpscaring()) {
-                        return;
-                    }
-                    Gdx.app.log("TERMINAL", "YOU DIED - GAME OVER");
-                    gameOver = true;
-                    return;
-                }
-            }
-        }
+        if (menuScreen != null && menuScreen.blocksWinLossChecks())
+            return;
 
         // --- WIN: Proximity to Winning layer tiles + Beep Card check ---
+        ImmutableArray<Entity> players = getEngine()
+                .getEntitiesFor(Family.all(PlayerComponent.class).get());
         if (players.size() == 0)
             return;
 
@@ -207,33 +196,54 @@ public class WinLossSystem extends EntitySystem {
             }
         }
 
-        // --- BAD/GOOD END TRIGGER: Proximity to Ending layer tiles ---
+        // --- Level 2 accident / Ending layer: place lily, then confrontation ---
         if (world.endingLayer != null) {
-            nearEndingTile = isEndingTile(world, playerTileX, playerTileY)
-                    || isEndingTile(world, playerTileX + 1, playerTileY)
-                    || isEndingTile(world, playerTileX - 1, playerTileY)
-                    || isEndingTile(world, playerTileX, playerTileY + 1)
-                    || isEndingTile(world, playerTileX, playerTileY - 1);
+            int[] endingXY = new int[2];
+            nearEndingTile = resolveEndingNeighborTile(world, playerTileX, playerTileY, endingXY);
 
             if (nearEndingTile) {
+                endingSiteTileX = endingXY[0];
+                endingSiteTileY = endingXY[1];
                 float endingPromptGap = 4f;
                 endingPromptWorldX = playerTransform.pos.x + playerTransform.width + endingPromptGap;
                 endingPromptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
 
-                if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-                    InventoryComponent inventory = player.getComponent(InventoryComponent.class);
-                    if (inventory != null && inventory.hasItem("lily")) {
-                        Gdx.app.log("TERMINAL", "Ending tile activated. Presenting Lily.");
-                        if (menuScreen != null) {
-                            menuScreen.showConfrontation();
-                        }
-                    } else {
-                        if (menuScreen != null) {
-                            menuScreen.showNarrativeDialog("You need a flower to calm the spirit...", 3f);
+                if (mainGame.getCurrentLevel() == 2) {
+                    InventoryComponent inv = player.getComponent(InventoryComponent.class);
+                    boolean hasLily = inv != null && inv.hasItem("lily");
+                    boolean placed = mainGame.isLilyPlacedAtAccidentSite();
+
+                    if (hasLily && !placed && !accidentLilyPromptShown && menuScreen != null) {
+                        menuScreen.showNarrativeDialog("So this is where...");
+                        accidentLilyPromptShown = true;
+                    }
+
+                    if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+                        if (mainGame.isLilyPlacedAtAccidentSite()) {
+                            Gdx.app.log("TERMINAL", "Ending site: confrontation.");
+                            if (menuScreen != null)
+                                menuScreen.showConfrontation();
+                        } else if (inv != null && inv.hasItem("lily")) {
+                            mainGame.placeLilyAtAccidentSite(endingSiteTileX, endingSiteTileY);
+                            inv.removeItem("lily");
+                            if (menuScreen != null) {
+                                menuScreen.hideNarrativeDialog();
+                                menuScreen.refreshInventoryDisplay();
+                                menuScreen.showNarrativeDialog(
+                                        "You set the lily down. The air feels heavier...", 2.8f);
+                            }
+                        } else {
+                            if (menuScreen != null) {
+                                menuScreen.showNarrativeDialog("You need a flower to calm the spirit...", 3f);
+                            }
                         }
                     }
                 }
             }
+        }
+
+        if (!nearEndingTile) {
+            accidentLilyPromptShown = false;
         }
     }
 
@@ -332,11 +342,27 @@ public class WinLossSystem extends EntitySystem {
         return world.endingLayer.getCell(tileX, tileY) != null;
     }
 
+    /** Picks the first Ending-layer tile adjacent to the player (or on their tile). */
+    private boolean resolveEndingNeighborTile(TileWorldComponent world, int px, int py, int[] outTileXY) {
+        int[][] offs = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        for (int[] o : offs) {
+            int tx = px + o[0];
+            int ty = py + o[1];
+            if (isEndingTile(world, tx, ty)) {
+                outTileXY[0] = tx;
+                outTileXY[1] = ty;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void reset() {
         gameOver = false;
         win = false;
         neutralEnd = false;
         missingCardWarningTimer = 0f;
+        accidentLilyPromptShown = false;
     }
 
     public void dispose() {

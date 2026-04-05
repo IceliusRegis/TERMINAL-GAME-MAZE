@@ -10,6 +10,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.sam.TERMINAL.Main;
 import com.sam.TERMINAL.components.*;
 
 /**
@@ -48,6 +49,8 @@ public class InteractionSystem extends EntitySystem {
     private static final float PROMPT_OFFSET_Y = 8f; // pixels above the entity top
     private static final float TILE_SIZE = 32f;
     private boolean lilyPromptShown = false;
+    private boolean papersPromptShown = false;
+    private boolean studIDPromptShown = false;
 
     public InteractionSystem(SpriteBatch batch) {
         this.batch = batch;
@@ -97,6 +100,8 @@ public class InteractionSystem extends EntitySystem {
 
         // 3.) Check distance and line-of-sight for each item
         boolean nearLilyThisFrame = false;
+        boolean nearPapersThisFrame = false;
+        boolean nearStudIDThisFrame = false;
         for (Entity target : interactables) {
             InteractableComponent interact = interactMapper.get(target);
             if (!interact.isActive)
@@ -129,11 +134,38 @@ public class InteractionSystem extends EntitySystem {
                     if ("lily".equals(interact.type)) {
                         nearLilyThisFrame = true;
                         if (!lilyPromptShown) {
-                            com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                            Main game = (Main) Gdx.app.getApplicationListener();
                             if (game != null && game.getMenuScreen() != null) {
                                 game.getMenuScreen().showNarrativeDialog("A lily..? What's it doing here?");
                             }
                             lilyPromptShown = true;
+                        }
+                    }
+                    if ("papers".equals(interact.type)) {
+                        nearPapersThisFrame = true;
+                        if (!papersPromptShown) {
+                            Main game = (Main) Gdx.app.getApplicationListener();
+                            if (game != null && game.getMenuScreen() != null) {
+                                game.getMenuScreen().showNarrativeDialog(
+                                        "Ugh.. maintenance reports... who trashed this place up?");
+                            }
+                            papersPromptShown = true;
+                        }
+                    }
+                    if ("studID".equals(interact.type)) {
+                        nearStudIDThisFrame = true;
+                        if (!studIDPromptShown) {
+                            Main game = (Main) Gdx.app.getApplicationListener();
+                            if (game != null && game.getMenuScreen() != null) {
+                                InventoryComponent inv = inventoryMapper.get(player);
+                                boolean hasPapers = inv != null && inv.hasItem("papers");
+                                String msg = "Another id.\n\nThis time it's... Chizo Kashima. Hah.";
+                                if (hasPapers) {
+                                    msg += "\n\nWait... isn't this the same girl...?\n\nThis is making my head hurt..";
+                                }
+                                game.getMenuScreen().showNarrativeDialog(msg, 18f);
+                            }
+                            studIDPromptShown = true;
                         }
                     }
 
@@ -150,6 +182,12 @@ public class InteractionSystem extends EntitySystem {
 
         if (!nearLilyThisFrame) {
             lilyPromptShown = false;
+        }
+        if (!nearPapersThisFrame) {
+            papersPromptShown = false;
+        }
+        if (!nearStudIDThisFrame) {
+            studIDPromptShown = false;
         }
     }
 
@@ -257,18 +295,23 @@ public class InteractionSystem extends EntitySystem {
 
             case "lily":
                 System.out.println("Interacted with LILY trigger!");
-                if (inventory != null) {
+                // Collect LilyOUTLINED into inventory (item id "lily"); shown in inventory UI via getLilyRegion().
+                if (inventory != null && !inventory.hasItem("lily")) {
                     inventory.addItem("lily");
                 }
-                // Remove lily from world + trigger tutorial event
                 target.remove(SpriteComponent.class);
                 typeData.isActive = false;
                 try {
-                    com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                    Main game = (Main) Gdx.app.getApplicationListener();
                     if (game != null && game.getMenuScreen() != null) {
                         game.getMenuScreen().hideNarrativeDialog();
                     }
-                    game.onLilyTriggered();
+                    if (game != null) {
+                        game.onLilyTriggered();
+                        if (game.getMenuScreen() != null) {
+                            game.getMenuScreen().refreshInventoryDisplay();
+                        }
+                    }
                 } catch (Exception ignored) {
                 }
                 break;
@@ -280,6 +323,14 @@ public class InteractionSystem extends EntitySystem {
                 }
                 target.remove(SpriteComponent.class);
                 typeData.isActive = false;
+                try {
+                    Main game = (Main) Gdx.app.getApplicationListener();
+                    if (game != null && game.getMenuScreen() != null) {
+                        game.getMenuScreen().hideNarrativeDialog();
+                        game.getMenuScreen().refreshInventoryDisplay();
+                    }
+                } catch (Exception ignored) {
+                }
                 break;
 
             case "papers":
@@ -289,6 +340,15 @@ public class InteractionSystem extends EntitySystem {
                 }
                 target.remove(SpriteComponent.class);
                 typeData.isActive = false;
+                try {
+                    Main game = (Main) Gdx.app.getApplicationListener();
+                    if (game != null && game.getMenuScreen() != null) {
+                        game.getMenuScreen().hideNarrativeDialog();
+                        game.getMenuScreen().refreshInventoryDisplay();
+                        game.getMenuScreen().showPapersReport();
+                    }
+                } catch (Exception ignored) {
+                }
                 break;
 
             case "confrontation":

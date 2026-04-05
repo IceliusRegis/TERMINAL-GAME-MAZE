@@ -125,6 +125,28 @@ public class EntityFactory {
         engine.addEntity(lily);
     }
 
+    /** Decorative lily left at the Level 2 accident / ending site (not interactable). */
+    public static void createLilyMemorial(PooledEngine engine, float x, float y, TextureRegion lilyRegion) {
+        Entity e = engine.createEntity();
+
+        TransformComponent t = engine.createComponent(TransformComponent.class);
+        t.pos.set(x, y);
+        t.width = 48f;
+        t.height = 48f;
+        t.updateBounds();
+        e.add(t);
+
+        SpriteComponent s = engine.createComponent(SpriteComponent.class);
+        s.staticSprite = lilyRegion;
+        s.isStatic = true;
+        s.drawWidth = 48f;
+        s.drawHeight = 48f;
+        s.name = "lily_memorial";
+        e.add(s);
+
+        engine.addEntity(e);
+    }
+
     public static void createFlashlight(PooledEngine engine, float x, float y, TextureRegion texture, String saveId) {
         Entity flashlight = engine.createEntity();
 
@@ -260,7 +282,7 @@ public class EntityFactory {
         sprite.drawHeight = 40;
         papers.add(sprite);
 
-        papers.add(new InteractableComponent("papers", 40f));
+        papers.add(new InteractableComponent("papers", 72f));
         papers.add(new PersistenceComponent("INTERACTABLE", saveId));
 
         engine.addEntity(papers);

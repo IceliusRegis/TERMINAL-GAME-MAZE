@@ -47,6 +47,7 @@ public class DebugManager {
             long currentTime = TimeUtils.millis();
             if (currentTime - last2TapTime < DOUBLE_TAP_MAX_DELAY) {
                 if (main != null) {
+                    main.onLevel1ExitLoadingStarted();
                     main.loadLevelTwo();
                     Gdx.app.log("TERMINAL_DEBUG", "Skipping to Level 2");
                 }
