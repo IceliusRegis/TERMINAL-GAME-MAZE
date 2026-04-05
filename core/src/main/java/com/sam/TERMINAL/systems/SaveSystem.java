@@ -8,6 +8,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.sam.TERMINAL.components.*;
 import com.sam.TERMINAL.persistence.GameData;
+import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.sam.TERMINAL.persistence.SaveManager;
 import java.util.UUID;
@@ -56,18 +57,18 @@ public class SaveSystem extends IteratingSystem {
     // Sprites
     private final TextureRegion keySprite;
     private final TextureRegion flashlightSprite;
-    private final TextureRegion enemySprite;
+    private final Animation<TextureRegion> enemyAnimation;
     private final TextureRegion batterySprite;
     private final TextureRegion potionSprite;
 
-    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, TextureRegion enemySprite,
+    public SaveSystem(TextureRegion keySprite, TextureRegion flashlightSprite, Animation<TextureRegion> enemyAnimation,
             TextureRegion batterySprite, TextureRegion potionSprite) {
 
         super(Family.all(PersistenceComponent.class).get());
 
         this.keySprite = keySprite;
         this.flashlightSprite = flashlightSprite;
-        this.enemySprite = enemySprite;
+        this.enemyAnimation = enemyAnimation;
         this.batterySprite = batterySprite;
         this.potionSprite = potionSprite;
 
@@ -146,7 +147,8 @@ public class SaveSystem extends IteratingSystem {
             if (loadedData.enemies != null && !loadedData.enemies.isEmpty()) {
                 for (GameData.EnemySaveData eData : loadedData.enemies) {
                     com.sam.TERMINAL.entities.EntityFactory.createEnemy(
-                            (com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemySprite);
+                            (com.badlogic.ashley.core.PooledEngine) getEngine(), eData.x, eData.y, enemyAnimation,
+                            com.sam.TERMINAL.Main.ENEMY_DRAW_W, com.sam.TERMINAL.Main.ENEMY_DRAW_H);
                 }
             }
 

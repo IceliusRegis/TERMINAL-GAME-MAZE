@@ -59,7 +59,7 @@ public class EntitySpawner {
     public static void spawnInitialEntities(PooledEngine engine,
             TextureRegion beepRegion,
             Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
-            TextureRegion enemyRegion, TextureRegion flashlightRegion,
+            Animation<TextureRegion> enemyAnimation, TextureRegion flashlightRegion,
             TextureRegion batteryRegion, TextureRegion potionRegion) {
 
         TileWorldComponent world = getWorldComponent(engine);
@@ -96,8 +96,9 @@ public class EntitySpawner {
         EntityFactory.createLily(engine, lilySafe[0] * TILE_SIZE, lilySafe[1] * TILE_SIZE, lilyRegion, "LILY_TRIGGER");
     }
 
-    public static void spawnEnemy(PooledEngine engine, TextureRegion enemyRegion) {
-        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyRegion);
+    public static void spawnEnemy(PooledEngine engine, Animation<TextureRegion> enemyAnimation,
+            float frameDrawWidth, float frameDrawHeight) {
+        EntityFactory.createEnemy(engine, ENEMY_X, ENEMY_Y, enemyAnimation, frameDrawWidth, frameDrawHeight);
         Gdx.app.log("SPAWNER", "The hunter has entered the maze...");
     }
 
@@ -249,7 +250,7 @@ public class EntitySpawner {
     public static void spawnForLoad(PooledEngine engine, GameData saveData,
             TextureRegion beepRegion,
             Animation<TextureRegion> walkAnimation, Animation<TextureRegion> idleAnimation,
-            TextureRegion enemyRegion, TextureRegion flashlightRegion,
+            Animation<TextureRegion> enemyAnimation, TextureRegion flashlightRegion,
             TextureRegion batteryRegion, TextureRegion potionRegion) {
 
         TileWorldComponent world = getWorldComponent(engine);

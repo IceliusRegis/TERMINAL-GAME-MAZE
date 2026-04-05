@@ -79,7 +79,8 @@ public class EntityFactory {
         engine.addEntity(beep);
     }
 
-    public static void createEnemy(PooledEngine engine, float x, float y, TextureRegion texture) {
+    public static void createEnemy(PooledEngine engine, float x, float y, Animation<TextureRegion> animation,
+            float frameDrawWidth, float frameDrawHeight) {
         Entity enemy = engine.createEntity();
         TransformComponent t = engine.createComponent(TransformComponent.class);
         t.pos.set(x, y);
@@ -89,10 +90,12 @@ public class EntityFactory {
         enemy.add(t);
 
         SpriteComponent s = engine.createComponent(SpriteComponent.class);
-        s.staticSprite = texture;
-        s.isStatic = true;
-        s.drawWidth = 32;
-        s.drawHeight = 32;
+        s.isStatic = false;
+        s.walkAnimation = animation;
+        s.currentAnimation = animation;
+        s.looping = true;
+        s.drawWidth = frameDrawWidth;
+        s.drawHeight = frameDrawHeight;
         enemy.add(s);
 
         enemy.add(new EnemyComponent());

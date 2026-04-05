@@ -366,7 +366,8 @@ public class InteractionSystem extends EntitySystem {
                             float ghostY = targetPos2.pos.y;
                             com.sam.TERMINAL.entities.EntityFactory.createEnemy(
                                     (com.badlogic.ashley.core.PooledEngine) getEngine(),
-                                    ghostX, ghostY, game2.getEnemyRegion());
+                                    ghostX, ghostY, game2.getEnemyAnimation(),
+                                    com.sam.TERMINAL.Main.ENEMY_DRAW_W, com.sam.TERMINAL.Main.ENEMY_DRAW_H);
 
                             if (game2.getMenuScreen() != null) {
                                 game2.getMenuScreen().showConfrontation();

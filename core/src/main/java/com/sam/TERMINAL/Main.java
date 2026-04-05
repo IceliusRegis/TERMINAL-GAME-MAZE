@@ -81,9 +81,17 @@ public class Main extends ApplicationAdapter {
     private Texture studIDTexture, papersTexture;
 
     // Regions and Animation
-    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion, potionRegion, lilyRegion;
+    private TextureRegion beepRegion, flashlightRegion, batteryRegion, potionRegion, lilyRegion;
     private TextureRegion studIDRegion, papersRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
+    private Animation<TextureRegion> enemyAnimation;
+
+    /** Single-frame size for `sprites/enemy_sheet.png` (1 row × 5 columns). */
+    public static final int ENEMY_FRAME_W = 125;
+    public static final int ENEMY_FRAME_H = 245;
+    /** On-screen draw size — larger than player (128×250). */
+    public static final float ENEMY_DRAW_W = 160f;
+    public static final float ENEMY_DRAW_H = 310f;
 
     // Save Files
     private static final String TEMP_SAVE_FILE = "temp_initial_state.json";
@@ -199,8 +207,9 @@ public class Main extends ApplicationAdapter {
         TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 128, 250);
         idleAnimation = new Animation<>(0.3f, idleFrames[0]);
 
-        enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
-        enemyRegion = new TextureRegion(enemyTexture);
+        enemyTexture = new Texture(Gdx.files.internal("sprites/enemy_sheet.png"));
+        TextureRegion[][] enemyFrames = TextureRegion.split(enemyTexture, ENEMY_FRAME_W, ENEMY_FRAME_H);
+        enemyAnimation = new Animation<>(0.2f, enemyFrames[0]);
 
         if (Gdx.files.internal("ui/LilyOUTLINED.png").exists()) {
             lilyTexture = new Texture(Gdx.files.internal("ui/LilyOUTLINED.png"));
@@ -557,7 +566,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion, potionRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyAnimation, batteryRegion, potionRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(batch));
 
@@ -594,7 +603,7 @@ public class Main extends ApplicationAdapter {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
 
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
+                    enemyAnimation, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -609,7 +618,7 @@ public class Main extends ApplicationAdapter {
                 EntitySpawner.spawnTutorialStart(engine, walkAnimation, idleAnimation, lilyRegion);
             } else {
                 EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                        enemyRegion, flashlightRegion, batteryRegion, potionRegion);
+                        enemyAnimation, flashlightRegion, batteryRegion, potionRegion);
             }
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
@@ -788,6 +797,26 @@ public class Main extends ApplicationAdapter {
             engine.removeEntity(e);
     }
 
+    private void onMonsterSpawnTimerElapsed() {
+        if (enemyAnimation != null) {
+            if (currentLevel == 2) {
+                EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyAnimation, ENEMY_DRAW_W, ENEMY_DRAW_H);
+            } else {
+                EntitySpawner.spawnEnemy(engine, enemyAnimation, ENEMY_DRAW_W, ENEMY_DRAW_H);
+            }
+        }
+        monsterSpawnTimer = -1f;
+        if (menuScreen != null)
+            menuScreen.hideMonsterTimer();
+    }
+
+    public void skipMonsterSpawnTimerDebug() {
+        if (monsterSpawnTimer > 0) {
+            onMonsterSpawnTimerElapsed();
+            Gdx.app.log("TERMINAL_DEBUG", "Skipped monster spawn timer");
+        }
+    }
+
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
@@ -832,15 +861,7 @@ public class Main extends ApplicationAdapter {
             if (monsterSpawnTimer > 0) {
                 monsterSpawnTimer -= delta;
                 if (monsterSpawnTimer <= 0) {
-                    if (enemyRegion != null) {
-                        if (currentLevel == 2) {
-                            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyRegion);
-                        } else {
-                            EntitySpawner.spawnEnemy(engine, enemyRegion);
-                        }
-                    }
-                    monsterSpawnTimer = -1f;
-                    if (menuScreen != null) menuScreen.hideMonsterTimer();
+                    onMonsterSpawnTimerElapsed();
                 } else {
                     if (menuScreen != null) menuScreen.updateMonsterTimer((int)Math.ceil(monsterSpawnTimer));
                 }
@@ -1006,8 +1027,8 @@ public class Main extends ApplicationAdapter {
         return potionRegion;
     }
 
-    public TextureRegion getEnemyRegion() {
-        return enemyRegion;
+    public Animation<TextureRegion> getEnemyAnimation() {
+        return enemyAnimation;
     }
 
     public MenuScreen getMenuScreen() {

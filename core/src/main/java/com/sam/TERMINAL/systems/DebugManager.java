@@ -27,6 +27,7 @@ public class DebugManager {
     private long lastBTapTime = 0;
     private long last2TapTime = 0;
     private long lastMTapTime = 0;
+    private long lastTTapTime = 0;
     private static final long DOUBLE_TAP_MAX_DELAY = 400; // milliseconds
 
     public boolean showHitboxes = false;
@@ -40,6 +41,17 @@ public class DebugManager {
      * Polls debug inputs. Call this from Main.render() outside the ECS update loop.
      */
     public void update(Main main, PooledEngine engine, LightingSystem lightingSystem) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
+            long currentTime = TimeUtils.millis();
+            if (currentTime - lastTTapTime < DOUBLE_TAP_MAX_DELAY) {
+                if (main != null)
+                    main.skipMonsterSpawnTimerDebug();
+                lastTTapTime = 0;
+            } else {
+                lastTTapTime = currentTime;
+            }
+        }
+
         if (lightingSystem == null)
             return;
 

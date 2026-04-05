@@ -46,6 +46,7 @@ public class EnemySystem extends IteratingSystem {
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
         .getFor(TransformComponent.class);
     private final ComponentMapper<EnemyComponent> enemyMapper = ComponentMapper.getFor(EnemyComponent.class);
+    private final ComponentMapper<SpriteComponent> spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
 
     /** Cached player entity — looked up once and reused until engine reset. */
     private Entity cachedPlayer;
@@ -214,6 +215,11 @@ public class EnemySystem extends IteratingSystem {
             float dx = targetX - enemyT.pos.x;
             float dy = targetY - enemyT.pos.y;
             float dist = (float) Math.sqrt(dx * dx + dy * dy);
+
+            SpriteComponent sprite = spriteMapper.get(entity);
+            if (sprite != null && Math.abs(dx) > 0.001f) {
+                sprite.facingRight = dx > 0f;
+            }
 
             if (dist <= ARRIVAL_THRESHOLD) {
                 // Snap to waypoint and pop it — move to the next one next frame
