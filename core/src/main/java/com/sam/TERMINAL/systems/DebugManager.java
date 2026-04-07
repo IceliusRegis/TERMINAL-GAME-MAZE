@@ -28,6 +28,7 @@ public class DebugManager {
     private long last2TapTime = 0;
     private long lastMTapTime = 0;
     private long lastTTapTime = 0;
+    private long last0TapTime = 0;
     private static final long DOUBLE_TAP_MAX_DELAY = 400; // milliseconds
 
     public boolean showHitboxes = false;
@@ -49,6 +50,34 @@ public class DebugManager {
                 lastTTapTime = 0;
             } else {
                 lastTTapTime = currentTime;
+            }
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0)) {
+            long currentTime = TimeUtils.millis();
+            if (currentTime - last0TapTime < DOUBLE_TAP_MAX_DELAY) {
+                if (engine != null && main != null) {
+                    ImmutableArray<Entity> players = engine.getEntitiesFor(
+                        Family.all(com.sam.TERMINAL.components.PlayerComponent.class, com.sam.TERMINAL.components.InventoryComponent.class).get()
+                    );
+                    if (players.size() > 0) {
+                        Entity player = players.first();
+                        com.sam.TERMINAL.components.InventoryComponent inv = player.getComponent(com.sam.TERMINAL.components.InventoryComponent.class);
+                        if (inv != null) {
+                            if (!inv.hasItem("papers")) inv.addItem("papers");
+                            if (!inv.hasItem("studID")) inv.addItem("studID");
+                            if (!inv.hasItem("lily")) inv.addItem("lily");
+                            
+                            if (main.getMenuScreen() != null) {
+                                main.getMenuScreen().refreshInventoryDisplay();
+                            }
+                            Gdx.app.log("TERMINAL_DEBUG", "Spawned Key Items (Papers, ID, Lily) in Inventory");
+                        }
+                    }
+                }
+                last0TapTime = 0;
+            } else {
+                last0TapTime = currentTime;
             }
         }
 
