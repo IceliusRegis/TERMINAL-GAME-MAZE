@@ -19,8 +19,10 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 
 /**
- * Three-page maintenance report reader: stacked notebook panels, A/D or click to turn pages,
- * ESC closes. Body text scrolls vertically with a visible scrollbar. Uses {@link PapersNotebookPanel}.
+ * Three-page maintenance report reader: stacked notebook panels, A/D or click
+ * to turn pages,
+ * ESC closes. Body text scrolls vertically with a visible scrollbar. Uses
+ * {@link PapersNotebookPanel}.
  */
 public class PapersReportReader extends Table {
 
@@ -48,7 +50,10 @@ public class PapersReportReader extends Table {
         return sharedScrollStyle;
     }
 
-    /** Call from game dispose (e.g. MenuScreen.dispose) after reader is no longer used. */
+    /**
+     * Call from game dispose (e.g. MenuScreen.dispose) after reader is no longer
+     * used.
+     */
     public static void disposeScrollStyle() {
         if (scrollKnobTexture != null) {
             scrollKnobTexture.dispose();
@@ -64,12 +69,13 @@ public class PapersReportReader extends Table {
     private static final String[] PAGE_TEXT = {
             "STATION MAINTENANCE — LOG #441-B\n\n"
                     + "Date: [ILLEGIBLE]\n\n"
-                    + "Incident: Platform auxiliary lights cycling offline during overtime block.\n"
-                    + "Contractor notes: \"Nothing unusual.\" (unsigned)",
-            "SAFETY COPY — DO NOT REMOVE\n\n"
-                    + "Breakroom inventory: two (2) first-aid kits.\n\n"
-                    + "Complaint filed: strange odor near east access. Follow-up: marked resolved — "
-                    + "no supporting photos on file.",
+                    + "Incident: Platform auxiliary lights cycling offline during overtime block. Rail barriers malfunction.\n\n"
+                    + "Contractor notes: No immediate changes (unsigned).",
+            "INCIDENT REPORT -  420\n\n"
+                    + "Date: [ILLEGIBLE]\n\n"
+                    + "Complaint filed: strange foul odor near northwest access. Follow-up: staff identified a dead body.\n\n"
+                    + "Resolution: Police identified the body of Chizo Kashima, rule as suicide.\n\n"
+                    + "Notes: Not enough evidence for suicide, body suffered heavy trauma and environmental factors are ambiguous,",
             "— PERSONAL NOTE — (CONTINUED / SCRATCH PAGES)\n\n"
                     + "Who keeps leaving these doors unlocked after midnight?\n\n"
                     + "This place is trashed. Maintenance reports everywhere. "
@@ -119,7 +125,8 @@ public class PapersReportReader extends Table {
         hintLabel.setFontScale(HINT_FONT_SCALE);
 
         float sheetW = 380f;
-        // Taller notebook area so the scroll viewport is obvious; final page text is long for scrollbar testing.
+        // Taller notebook area so the scroll viewport is obvious; final page text is
+        // long for scrollbar testing.
         float sheetH = 330f;
         float padL = 30f;
         float padR = 28f;

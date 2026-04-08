@@ -328,6 +328,11 @@ public class InteractionSystem extends EntitySystem {
                     if (game != null && game.getMenuScreen() != null) {
                         game.getMenuScreen().hideNarrativeDialog();
                         game.getMenuScreen().refreshInventoryDisplay();
+                        // If the player already has papers, show the connecting revelation
+                        if (inventory != null && inventory.hasItem("papers")) {
+                            game.getMenuScreen().showNarrativeDialog(
+                                "Chizo Kashima...\n\nWait... isn't this the same girl from those reports...?\n\nThis is making my head hurt..", 6f);
+                        }
                     }
                 } catch (Exception ignored) {
                 }
@@ -346,6 +351,12 @@ public class InteractionSystem extends EntitySystem {
                         game.getMenuScreen().hideNarrativeDialog();
                         game.getMenuScreen().refreshInventoryDisplay();
                         game.getMenuScreen().showPapersReport();
+                    }
+                    // If the player already picked up the studID, show the
+                    // connecting revelation after a short delay so it appears
+                    // after the papers reader is closed.
+                    if (inventory != null && inventory.hasItem("studID")) {
+                        System.out.println("[hasPapers] Papers picked up with studID already in inventory — queuing revelation.");
                     }
                 } catch (Exception ignored) {
                 }

@@ -4,8 +4,10 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 
 /**
- * Central place for ending titles, colors, and log lines. All three endings can share the same
- * rolling-credits UI by calling one credits screen and passing {@link Kind}; only the heading
+ * Central place for ending titles, colors, and log lines. All three endings can
+ * share the same
+ * rolling-credits UI by calling one credits screen and passing {@link Kind};
+ * only the heading
  * block needs to differ.
  */
 public final class Endings {
@@ -92,9 +94,9 @@ public final class Endings {
                 + "SOFTWARES\n\n"
                 + "Sora's Pixel Converter by Ameniwa (X/Twitter)\n"
                 + "Pixel it by giventofly (Github)\n\n\n"
-                + "Special thanks to all of our blockmates for being supportive of development.\n"
-                + "To our lovely furbabies for giving us the energy to push through this project.\n"
-                + "To Mobile Legends:Bang Bang for giving us enough leisure to balance with the work done.\n"
+                + "Special thanks to all of our blockmates for being supportive of development.\n\n"
+                + "To our lovely furbabies for giving us the energy to push through this project.\n\n"
+                + "To Mobile Legends:Bang Bang for giving us enough leisure to balance with the work done.\n\n"
                 + "And to you, player, for taking your time to complete this game.";
     }
 }

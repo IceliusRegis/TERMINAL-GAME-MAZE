@@ -33,7 +33,9 @@ public class TitleScreen {
         void onStart(boolean loadExisting);
     }
 
-    private enum Screen { MAIN, OPTIONS, CONTROLS, ABOUT, CREDITS }
+    private enum Screen {
+        MAIN, OPTIONS, CONTROLS, ABOUT, CREDITS
+    }
 
     private static final Color WHITE = new Color(1f, 1f, 1f, 1f);
     private static final Color BLACK = new Color(0f, 0f, 0f, 1f);
@@ -124,7 +126,8 @@ public class TitleScreen {
                 return true;
             }
             if (keycode == Input.Keys.X) {
-                if (soundReturn != null) soundReturn.play(0.6f);
+                if (soundReturn != null)
+                    soundReturn.play(0.6f);
                 showOptionsMenu();
                 return true;
             }
@@ -134,15 +137,19 @@ public class TitleScreen {
         int optionsCount = getOptionsCount();
         if (keycode == Input.Keys.W || keycode == Input.Keys.UP) {
             selectedIndex = (selectedIndex - 1 + optionsCount) % optionsCount;
-            if (!isOptionEnabled(selectedIndex)) selectedIndex = findNextEnabled(selectedIndex, -1);
-            if (soundSelect != null) soundSelect.play(0.6f);
+            if (!isOptionEnabled(selectedIndex))
+                selectedIndex = findNextEnabled(selectedIndex, -1);
+            if (soundSelect != null)
+                soundSelect.play(0.6f);
             refreshScreen();
             return true;
         }
         if (keycode == Input.Keys.S || keycode == Input.Keys.DOWN) {
             selectedIndex = (selectedIndex + 1) % optionsCount;
-            if (!isOptionEnabled(selectedIndex)) selectedIndex = findNextEnabled(selectedIndex, 1);
-            if (soundSelect != null) soundSelect.play(0.6f);
+            if (!isOptionEnabled(selectedIndex))
+                selectedIndex = findNextEnabled(selectedIndex, 1);
+            if (soundSelect != null)
+                soundSelect.play(0.6f);
             refreshScreen();
             return true;
         }
@@ -155,16 +162,23 @@ public class TitleScreen {
 
     private int getOptionsCount() {
         switch (currentScreen) {
-            case MAIN: return 3;
-            case OPTIONS: return 4;
-            case CONTROLS: case ABOUT: return 1;
-            case CREDITS: return 1;
-            default: return 1;
+            case MAIN:
+                return 3;
+            case OPTIONS:
+                return 4;
+            case CONTROLS:
+            case ABOUT:
+                return 1;
+            case CREDITS:
+                return 1;
+            default:
+                return 1;
         }
     }
 
     private boolean isOptionEnabled(int index) {
-        if (currentScreen == Screen.MAIN && index == 1 && !hasSaveFile) return false;
+        if (currentScreen == Screen.MAIN && index == 1 && !hasSaveFile)
+            return false;
         return true;
     }
 
@@ -172,7 +186,8 @@ public class TitleScreen {
         int n = getOptionsCount();
         for (int i = 1; i < n; i++) {
             int idx = (from + i * dir + n) % n;
-            if (isOptionEnabled(idx)) return idx;
+            if (isOptionEnabled(idx))
+                return idx;
         }
         return from;
     }
@@ -181,25 +196,36 @@ public class TitleScreen {
         switch (currentScreen) {
             case MAIN:
                 if (selectedIndex == 0) {
-                    if (soundConfirm != null) soundConfirm.play(0.6f);
+                    if (soundConfirm != null)
+                        soundConfirm.play(0.6f);
                     listener.onStart(false);
                 } else if (selectedIndex == 1 && hasSaveFile) {
-                    if (soundConfirm != null) soundConfirm.play(0.6f);
+                    if (soundConfirm != null)
+                        soundConfirm.play(0.6f);
                     listener.onStart(true);
                 } else if (selectedIndex == 1 || selectedIndex == 2) {
-                    if (soundConfirm != null) soundConfirm.play(0.6f);
+                    if (soundConfirm != null)
+                        soundConfirm.play(0.6f);
                     showOptionsMenu();
                 }
                 break;
             case OPTIONS:
-                if (soundConfirm != null) soundConfirm.play(0.6f);
-                if (selectedIndex == 0) showControls();
-                else if (selectedIndex == 1) showAbout();
-                else if (selectedIndex == 2) showCredits();
-                else showMainMenu();
+                if (soundConfirm != null)
+                    soundConfirm.play(0.6f);
+                if (selectedIndex == 0)
+                    showControls();
+                else if (selectedIndex == 1)
+                    showAbout();
+                else if (selectedIndex == 2)
+                    showCredits();
+                else
+                    showMainMenu();
                 break;
-            case CONTROLS: case ABOUT: case CREDITS:
-                if (soundReturn != null) soundReturn.play(0.6f);
+            case CONTROLS:
+            case ABOUT:
+            case CREDITS:
+                if (soundReturn != null)
+                    soundReturn.play(0.6f);
                 showOptionsMenu();
                 break;
         }
@@ -207,11 +233,21 @@ public class TitleScreen {
 
     private void refreshScreen() {
         switch (currentScreen) {
-            case MAIN: showMainMenu(); break;
-            case OPTIONS: showOptionsMenu(); break;
-            case CONTROLS: showControls(); break;
-            case ABOUT: showAbout(); break;
-            case CREDITS: showCredits(); break;
+            case MAIN:
+                showMainMenu();
+                break;
+            case OPTIONS:
+                showOptionsMenu();
+                break;
+            case CONTROLS:
+                showControls();
+                break;
+            case ABOUT:
+                showAbout();
+                break;
+            case CREDITS:
+                showCredits();
+                break;
         }
     }
 
@@ -227,16 +263,20 @@ public class TitleScreen {
     private void addHoverAndClickListeners(Group g, int idx, Runnable onRefresh) {
         g.addListener(new ClickListener() {
             @Override
-            public void enter(InputEvent event, float x, float y, int pointer, com.badlogic.gdx.scenes.scene2d.Actor fromActor) {
+            public void enter(InputEvent event, float x, float y, int pointer,
+                    com.badlogic.gdx.scenes.scene2d.Actor fromActor) {
                 if (selectedIndex != idx && isOptionEnabled(idx)) {
                     selectedIndex = idx;
-                    if (soundSelect != null) soundSelect.play(0.6f);
+                    if (soundSelect != null)
+                        soundSelect.play(0.6f);
                     onRefresh.run();
                 }
             }
+
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                if (!isOptionEnabled(idx)) return;
+                if (!isOptionEnabled(idx))
+                    return;
                 selectedIndex = idx;
                 triggerSelected();
             }
@@ -257,7 +297,8 @@ public class TitleScreen {
         return def;
     }
 
-    private Group createLabelWithShadow(String text, BitmapFont font, Color textColor, Color shadowColor, int alignment) {
+    private Group createLabelWithShadow(String text, BitmapFont font, Color textColor, Color shadowColor,
+            int alignment) {
         Label shadow = new Label(text, new Label.LabelStyle(font, shadowColor));
         Label main = new Label(text, new Label.LabelStyle(font, textColor));
         shadow.setAlignment(alignment);
@@ -266,7 +307,8 @@ public class TitleScreen {
         Group group = new Group();
         group.addActor(shadow);
         group.addActor(main);
-        group.setSize(main.getPrefWidth() + Math.abs(SHADOW_OFFSET_X) * 2, main.getPrefHeight() + Math.abs(SHADOW_OFFSET_Y) * 2);
+        group.setSize(main.getPrefWidth() + Math.abs(SHADOW_OFFSET_X) * 2,
+                main.getPrefHeight() + Math.abs(SHADOW_OFFSET_Y) * 2);
         return group;
     }
 
@@ -290,13 +332,14 @@ public class TitleScreen {
 
     private void showMainMenu() {
         currentScreen = Screen.MAIN;
-        if (selectedIndex >= getOptionsCount()) selectedIndex = 0;
+        if (selectedIndex >= getOptionsCount())
+            selectedIndex = 0;
         rootTable.clear();
 
         Group titleGroup = createLabelWithShadow("TERMINAL", titleFont, BLACK, WHITE, Align.center);
         rootTable.add(wrapForTable(titleGroup)).padBottom(60f).row();
 
-        String[] labels = {"NEW GAME", "CONTINUE", "OPTIONS"};
+        String[] labels = { "NEW GAME", "CONTINUE", "OPTIONS" };
         for (int i = 0; i < labels.length; i++) {
             boolean sel = (selectedIndex == i);
             Color c = (i == 1 && !hasSaveFile) ? DISABLED_COLOR : WHITE;
@@ -310,11 +353,12 @@ public class TitleScreen {
     private void showOptionsMenu() {
         currentScreen = Screen.OPTIONS;
         creditsScrollPane = null;
-        if (selectedIndex >= 4) selectedIndex = 0;
+        if (selectedIndex >= 4)
+            selectedIndex = 0;
         rootTable.clear();
 
         SubmenuPanel panel = new SubmenuPanel(24f);
-        String[] labels = {"CONTROLS", "ABOUT", "CREDITS", "BACK"};
+        String[] labels = { "CONTROLS", "ABOUT", "CREDITS", "BACK" };
         for (int i = 0; i < labels.length; i++) {
             Group g = createMenuOptionWithSelector(labels[i], selectedIndex == i, WHITE);
             final int idx = i;
@@ -331,13 +375,16 @@ public class TitleScreen {
         rootTable.clear();
 
         SubmenuPanel panel = new SubmenuPanel(24f);
-        Group controlsBody = createLabelWithShadow("WASD - Move\nE - Interact\nX - Continue\nTAB - Inventory\nF5 - Quick Save\nESC - (in-game) Settings", bodyFont, WHITE, BLACK, Align.center);
+        Group controlsBody = createLabelWithShadow(
+                "WASD - Move\nE - Interact\nX/Space - Continue\nTAB - Inventory\nF5 - Quick Save\nF9 - Quickload\nF - Flashlight toggle\nU - Consume string\nP  - Consume batteries\nESC - (in-game) Settings",
+                bodyFont, WHITE, BLACK, Align.center);
         panel.add(wrapForTable(controlsBody)).center().padBottom(24f).row();
         Group back = createMenuOptionWithSelector("BACK", true, WHITE);
         back.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                if (soundReturn != null) soundReturn.play(0.6f);
+                if (soundReturn != null)
+                    soundReturn.play(0.6f);
                 showOptionsMenu();
             }
         });
@@ -352,13 +399,15 @@ public class TitleScreen {
         rootTable.clear();
 
         SubmenuPanel panel = new SubmenuPanel(24f);
-        Group aboutBody = createLabelWithShadow("TERMINAL\nA 2D horror maze.\n\nDSA FINAL PROJECT.", bodyFont, WHITE, BLACK, Align.center);
+        Group aboutBody = createLabelWithShadow("TERMINAL\nA 2D horror maze.\n\nDSA FINAL PROJECT.", bodyFont, WHITE,
+                BLACK, Align.center);
         panel.add(wrapForTable(aboutBody)).center().padBottom(24f).row();
         Group back = createMenuOptionWithSelector("BACK", true, WHITE);
         back.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                if (soundReturn != null) soundReturn.play(0.6f);
+                if (soundReturn != null)
+                    soundReturn.play(0.6f);
                 showOptionsMenu();
             }
         });
@@ -373,11 +422,11 @@ public class TitleScreen {
 
         SubmenuPanel panel = new SubmenuPanel(24f);
         String creditsText = "Credits\n\n" +
-            "Assets:\n\n" +
-            "Fonts: Nimble Beats, Caffinate on itch.io\n\n" +
-            "UI: 2bitcrook Pavel Sevryukov, Chris Perich, JennPixel, ELV Games on itch.io\n" +
-            "Music: Josh James Lim, raudokyubu on itch.io\n\n" +
-            "SFX: Survival Horror UI SFX by bedsideseraphim on itch.io";
+                "Assets:\n\n" +
+                "Fonts: Nimble Beats, Caffinate on itch.io\n\n" +
+                "UI: 2bitcrook Pavel Sevryukov, Chris Perich, JennPixel, ELV Games on itch.io\n" +
+                "Music: Josh James Lim, raudokyubu on itch.io\n\n" +
+                "SFX:bedsideseraphim on itch.io";
 
         Label creditsLabel = new Label(creditsText, new Label.LabelStyle(bodyFont, WHITE));
         creditsLabel.setWrap(true);
@@ -393,7 +442,8 @@ public class TitleScreen {
         back.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                if (soundReturn != null) soundReturn.play(0.6f);
+                if (soundReturn != null)
+                    soundReturn.play(0.6f);
                 showOptionsMenu();
             }
         });
@@ -404,7 +454,8 @@ public class TitleScreen {
     private ScrollPane.ScrollPaneStyle scrollPaneStyle;
 
     private ScrollPane.ScrollPaneStyle createScrollPaneStyle() {
-        if (scrollPaneStyle != null) return scrollPaneStyle;
+        if (scrollPaneStyle != null)
+            return scrollPaneStyle;
         scrollPaneStyle = new ScrollPane.ScrollPaneStyle();
         Pixmap pm = new Pixmap(10, 20, Pixmap.Format.RGBA8888);
         pm.setColor(0.6f, 0.6f, 0.6f, 0.95f);
@@ -420,7 +471,6 @@ public class TitleScreen {
         scrollPaneStyle.vScroll = new TextureRegionDrawable(new TextureRegion(scrollBarBgTexture));
         return scrollPaneStyle;
     }
-
 
     public void render(float delta) {
         stateTime += delta;
@@ -463,11 +513,16 @@ public class TitleScreen {
     public void dispose() {
         stage.dispose();
         backgroundTexture.dispose();
-        if (scrollBarKnobTexture != null) scrollBarKnobTexture.dispose();
-        if (scrollBarBgTexture != null) scrollBarBgTexture.dispose();
-        if (soundSelect != null) soundSelect.dispose();
-        if (soundConfirm != null) soundConfirm.dispose();
-        if (soundReturn != null) soundReturn.dispose();
+        if (scrollBarKnobTexture != null)
+            scrollBarKnobTexture.dispose();
+        if (scrollBarBgTexture != null)
+            scrollBarBgTexture.dispose();
+        if (soundSelect != null)
+            soundSelect.dispose();
+        if (soundConfirm != null)
+            soundConfirm.dispose();
+        if (soundReturn != null)
+            soundReturn.dispose();
         SubmenuPanel.disposeShared();
         titleFont.dispose();
         menuFont.dispose();

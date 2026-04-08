@@ -26,8 +26,10 @@ import com.sam.TERMINAL.buttons.MenuScreen;
  * of whether they hold the Beep Card. If E is pressed without the card, a
  * timed "Find the Beep Card first!" warning appears for a few seconds.
  *
- * Enemy death is handled by {@link com.sam.TERMINAL.systems.EnemySystem} (catch → jumpscare →
- * game over), not by this system — overlap here used to race with deferred jumpscare and caused
+ * Enemy death is handled by {@link com.sam.TERMINAL.systems.EnemySystem} (catch
+ * → jumpscare →
+ * game over), not by this system — overlap here used to race with deferred
+ * jumpscare and caused
  * both YOU DIED and jumpscare.
  */
 public class WinLossSystem extends EntitySystem {
@@ -230,11 +232,12 @@ public class WinLossSystem extends EntitySystem {
                                 menuScreen.hideNarrativeDialog();
                                 menuScreen.refreshInventoryDisplay();
                                 menuScreen.showNarrativeDialog(
-                                        "You set the lily down. The air feels heavier...", 2.8f);
+                                        "Rest in peace to the departed. You set the lily down. The air feels solemn...",
+                                        2.8f);
                             }
                         } else {
                             if (menuScreen != null) {
-                                menuScreen.showNarrativeDialog("You need a flower to calm the spirit...", 3f);
+                                menuScreen.showNarrativeDialog("You need a flower to pay respects...", 3f);
                             }
                         }
                     }
@@ -342,7 +345,9 @@ public class WinLossSystem extends EntitySystem {
         return world.endingLayer.getCell(tileX, tileY) != null;
     }
 
-    /** Picks the first Ending-layer tile adjacent to the player (or on their tile). */
+    /**
+     * Picks the first Ending-layer tile adjacent to the player (or on their tile).
+     */
     private boolean resolveEndingNeighborTile(TileWorldComponent world, int px, int py, int[] outTileXY) {
         int[][] offs = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
         for (int[] o : offs) {

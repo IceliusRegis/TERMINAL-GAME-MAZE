@@ -518,6 +518,8 @@ public final class EndingCutsceneRoot extends WidgetGroup implements Disposable 
             neutralPhaseTimer -= delta;
             if (neutralPhaseTimer <= 0f) {
                 badStep = 4;
+                centerTitleLabel.clearActions();
+                centerTitleLabel.addAction(Actions.sequence(Actions.fadeOut(0.8f), Actions.hide()));
                 if (Gdx.files.internal("ends/badENDBG.png").exists()) {
                     if (ownedEndBgTexture != null)
                         ownedEndBgTexture.dispose();

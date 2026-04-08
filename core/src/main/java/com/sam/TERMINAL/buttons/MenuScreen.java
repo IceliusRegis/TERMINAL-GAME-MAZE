@@ -66,14 +66,16 @@ public class MenuScreen {
     /** Set while confrontation is open — used by key shortcuts (1/K, 2/M). */
     private boolean confrontationMercyUnlockedForKeys;
 
-    /** Prepended to the input multiplexer whenever the confrontation modal is open. */
+    /**
+     * Prepended to the input multiplexer whenever the confrontation modal is open.
+     */
     private final InputAdapter confrontationKeyShortcuts = new InputAdapter() {
         @Override
         public boolean keyDown(int keycode) {
             if (!isConfrontationVisible)
                 return false;
             if (keycode == Input.Keys.TAB || keycode == Input.Keys.F1
-                || keycode == Input.Keys.F5 || keycode == Input.Keys.U || keycode == Input.Keys.P)
+                    || keycode == Input.Keys.F5 || keycode == Input.Keys.U || keycode == Input.Keys.P)
                 return true;
             if (keycode == Input.Keys.ESCAPE) {
                 isConfrontationVisible = false;
@@ -350,7 +352,24 @@ public class MenuScreen {
         isPapersReaderVisible = false;
         if (papersReaderStage != null)
             papersReaderStage.setKeyboardFocus(null);
-        showNarrativeDialog("That report... argh.\n\nNo wonder this place feels spooky.", 12f);
+
+        // If the player already picked up the student ID, show the connecting
+        // revelation about Chizo Kashima instead of the generic reaction.
+        Entity player = getPlayerEntity();
+        boolean hasStudID = false;
+        if (player != null) {
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            if (inv != null) {
+                hasStudID = inv.hasItem("studID");
+            }
+        }
+        if (hasStudID) {
+            showNarrativeDialog(
+                    "Wait... Chizo Kashima.\n\nIsn't this the same girl from that ID...?\n\nThis is making my head hurt..",
+                    6f);
+        } else {
+            showNarrativeDialog("That report... argh.\n\nNo wonder this place feels spooky.", 4f);
+        }
         updateInputProcessor();
     }
 
@@ -363,8 +382,10 @@ public class MenuScreen {
     }
 
     /**
-     * While any of these are open, {@link com.sam.TERMINAL.systems.WinLossSystem} must not run
-     * lose/win/ending logic — the ECS may still be stepped with delta 0, but overlap would
+     * While any of these are open, {@link com.sam.TERMINAL.systems.WinLossSystem}
+     * must not run
+     * lose/win/ending logic — the ECS may still be stepped with delta 0, but
+     * overlap would
      * otherwise trigger death every frame (e.g. during confrontation).
      */
     public boolean blocksWinLossChecks() {
@@ -530,7 +551,8 @@ public class MenuScreen {
 
     /**
      * Shows one of the three ending screens: "neutral", "bad", or "good".
-     * Each displays a full-screen overlay with the ending label and a restart button.
+     * Each displays a full-screen overlay with the ending label and a restart
+     * button.
      */
     public void showEndScreen(String endingType) {
         if (isGameOver)
@@ -548,7 +570,7 @@ public class MenuScreen {
         // UPDATE THIS LINE: Change () -> mainGame.resetGame()
         // to () -> Gdx.app.postRunnable(mainGame::returnToTitleScreen)
         endingCutscene = new EndingCutsceneRoot(mainGame, font, bodyFont, whitePixel, restartTexture, endingKind,
-            () -> Gdx.app.postRunnable(mainGame::returnToTitleScreen));
+                () -> Gdx.app.postRunnable(mainGame::returnToTitleScreen));
 
         endingCutscene.setFillParent(true);
         uiStage.addActor(endingCutscene);
@@ -572,8 +594,10 @@ public class MenuScreen {
 
         confrontationStage.clear();
 
-        // Load exit texture as a field-level reference so it stays alive while rendering
-        if (backTexture != null) backTexture.dispose();
+        // Load exit texture as a field-level reference so it stays alive while
+        // rendering
+        if (backTexture != null)
+            backTexture.dispose();
         backTexture = new Texture(Gdx.files.internal("ui/exit.png"));
 
         // Opaque backdrop
@@ -913,7 +937,10 @@ public class MenuScreen {
         return fallback;
     }
 
-    /** Refreshes inventory grid (e.g. after picking up the lily). Safe to call anytime. */
+    /**
+     * Refreshes inventory grid (e.g. after picking up the lily). Safe to call
+     * anytime.
+     */
     public void refreshInventoryDisplay() {
         refreshInventory();
     }

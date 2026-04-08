@@ -80,33 +80,28 @@ public class TutorialScene {
 
     private int tutorialIndex = 0;
 
-    private final String complaintText =
-        "They're all calling out.\nI'm stuck covering for coworkers again.\n\nEnter x, space, or click to continue.";
+    private final String complaintText = "They're all calling out.\nI'm stuck covering for coworkers again.\n\nEnter x, space, or click to continue.";
 
-    private final String fillerTextBeforeLoginsam =
-        "Another shift...\nmy eyes feel heavy.";
+    private final String fillerTextBeforeLoginsam = "Another shift...\nmy eyes feel heavy.";
 
-    private final String postGlitchDialogue =
-        "?!\nWhat...?\nThis isn't...";
+    private final String postGlitchDialogue = "?!\nWhat...?\nThis isn't...";
 
-    private final String postSpawnDialogue =
-        "Huh...?\nWhat happened?";
+    private final String postSpawnDialogue = "Huh...?\nWhat happened?";
 
-    private final String employeeIdText =
-        "> EMPLOYEE ID: 88-SAM\n>STATUS: OVERTIME";
-    private final String studentIdText =
-        ">STUDENT ID: 1423-CHIZO\n>STATUS: DEAD";
+    private final String employeeIdText = "> EMPLOYEE ID: 88-SAM\n>STATUS: OVERTIME";
+    private final String studentIdText = ">STUDENT ID: 1423-CHIZO\n>STATUS: DEAD";
 
     private final String[] tutorialLines = {
-        "Emergency protocol online.",
-        "Use WASD to move. Stay alert and watch your surroundings.",
-        "Look for clues to solve the mystery.",
-        "Focus on objectives, collect items to get out.",
-        "Interact with nearby objects using E.",
-        "Turn on flashlight using F, reload batteries using U.",
-        "Open inventory using TAB, F5 to quicksave.",
-        "Use ESC to open settings.",
-        "Tutorial complete."
+            "Emergency protocol online.",
+            "Use WASD to move. Stay alert and watch your surroundings.",
+            "Look for clues to solve the mystery.",
+            "Focus on objectives, collect items to get out.",
+            "Interact with nearby objects using E.",
+            "Turn on flashlight using F, reload batteries using U.",
+            "Open inventory using TAB, F5 to quicksave, F9 to quickload.",
+            "Consume speed boost using U",
+            "Use ESC to open settings.",
+            "Tutorial complete."
     };
 
     public TutorialScene(SpriteBatch batch, TutorialListener listener) {
@@ -198,8 +193,10 @@ public class TutorialScene {
     }
 
     private void onUserInputAdvance() {
-        if (introBlackTimer > 0f) return;
-        if (phase == Phase.DONE) return;
+        if (introBlackTimer > 0f)
+            return;
+        if (phase == Phase.DONE)
+            return;
 
         // 1) If any active typewriter isn't done, advance it immediately.
         if (!complaintTypewriter.isDone()) {
@@ -302,7 +299,8 @@ public class TutorialScene {
             darkOverlay.setColor(0, 0, 0, alpha);
         } else if (phase != Phase.BLINK && phase != Phase.POST_SPAWN && phase != Phase.TUTORIAL) {
             // Ensure overlay doesn't accidentally stay pitch black if not in a transition
-            if (phase != Phase.LOGINSAM) darkOverlay.setColor(0, 0, 0, 0f);
+            if (phase != Phase.LOGINSAM)
+                darkOverlay.setColor(0, 0, 0, 0f);
         }
 
         // Update typewriters (bottom dialogue + optional loginsam overlay).
@@ -344,12 +342,14 @@ public class TutorialScene {
     }
 
     private boolean showPreGameBackground() {
-        // Once we spawn into the maze, TutorialScene should not cover it with a fake background.
+        // Once we spawn into the maze, TutorialScene should not cover it with a fake
+        // background.
         return phase != Phase.DONE && !spawnTriggered;
     }
 
     private void updateTypingSfx() {
-        if (typingSfx == null) return;
+        if (typingSfx == null)
+            return;
 
         boolean complaintTyping = !complaintTypewriter.isDone();
         boolean loginsamTyping = loginArrowPanel.isVisible() && !loginsamTypewriter.isDone();
@@ -388,7 +388,8 @@ public class TutorialScene {
     }
 
     /** Draws texture scaled to cover viewport while preserving aspect ratio. */
-    private void drawBackgroundCover(SpriteBatch batch, Texture texture, float vw, float vh, float offsetX, float offsetY) {
+    private void drawBackgroundCover(SpriteBatch batch, Texture texture, float vw, float vh, float offsetX,
+            float offsetY) {
         batch.setColor(Color.WHITE);
 
         float tw = texture.getWidth();
@@ -406,14 +407,16 @@ public class TutorialScene {
     private void updatePhase(float delta) {
         switch (phase) {
             case GLITCH: {
-                // Gradually increase vignette while glitching. Phase transition is input-driven.
+                // Gradually increase vignette while glitching. Phase transition is
+                // input-driven.
                 float t = MathUtils.clamp(phaseTimer / GLITCH_DURATION, 0f, 1f);
                 vignetteOverlay.setColor(0, 0, 0, 0.15f + t * 0.6f);
                 // Background swap is handled in render() via phase == GLITCH.
                 break;
             }
             case BLINK: {
-                // Increase vignette and perform the "two blinks". Spawn happens when this finishes.
+                // Increase vignette and perform the "two blinks". Spawn happens when this
+                // finishes.
                 float t = MathUtils.clamp(phaseTimer / BLINK_DURATION, 0f, 1f);
                 vignetteOverlay.setColor(0, 0, 0, 0.35f + t * 0.65f);
 
@@ -443,7 +446,8 @@ public class TutorialScene {
                 break;
             }
             default: {
-                // All other phases are either static waiting-for-input or handled by the input callback.
+                // All other phases are either static waiting-for-input or handled by the input
+                // callback.
                 break;
             }
         }
@@ -536,7 +540,8 @@ public class TutorialScene {
         }
 
         void update(float delta) {
-            if (done) return;
+            if (done)
+                return;
             timer += delta;
             while (timer >= interval && visibleChars < text.length()) {
                 visibleChars++;
