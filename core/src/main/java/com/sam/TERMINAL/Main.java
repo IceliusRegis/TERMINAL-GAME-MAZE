@@ -433,8 +433,13 @@ public class Main extends ApplicationAdapter {
             TileWorldComponent world = worldEntities.first().getComponent(TileWorldComponent.class);
             int pTileX = (int) (t.pos.x / 32f);
             int pTileY = (int) (t.pos.y / 32f);
+
+            // Check if player already owns a flashlight so we don't spawn a duplicate.
+            InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
+            boolean hasFlashlight = (inv != null && inv.hasItem("flashlight"));
+
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
-                    pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
+                    pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles, hasFlashlight);
 
             // Spawn papers in Level 1 after lily trigger
             if (papersRegion != null) {
@@ -711,8 +716,15 @@ public class Main extends ApplicationAdapter {
                     pTileY = (int) (t.pos.y / 32f);
                 }
             }
+            // Check if player already owns a flashlight (from restored inventory)
+            boolean playerHasFlashlight = false;
+            if (players.size() > 0) {
+                InventoryComponent rInv = players.first().getComponent(InventoryComponent.class);
+                playerHasFlashlight = (rInv != null && rInv.hasItem("flashlight"));
+            }
+
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
+                    pTileY, world.mapWidthTiles, world.mapHeightTiles, playerHasFlashlight);
 
             // Re-spawn Level 2 key items on reset if we're in Level 2
             if (currentLevel == 2 && studIDRegion != null) {
@@ -802,10 +814,9 @@ public class Main extends ApplicationAdapter {
                 if (inv != null) playerHasFlashlight = inv.hasItem("flashlight");
             }
 
-            EntitySpawner.spawnItems(engine, beepRegion,
-                playerHasFlashlight ? null : flashlightRegion,
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion,
                 batteryRegion, potionRegion, world, pTileX,
-                pTileY, world.mapWidthTiles, world.mapHeightTiles);
+                pTileY, world.mapWidthTiles, world.mapHeightTiles, playerHasFlashlight);
 
             // Spawn Level 2 key items (studID + confrontation trigger)
             if (studIDRegion != null) {

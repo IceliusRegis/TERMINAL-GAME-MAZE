@@ -119,6 +119,9 @@ public class EntitySpawner {
         Gdx.app.log("SPAWNER", "The hunter has entered the maze...");
     }
 
+    /** Minimum Manhattan distance (in tiles) between beep card spawns. */
+    private static final int MIN_BEEP_CARD_DISTANCE = 5;
+
     public static void spawnItems(PooledEngine engine,
             TextureRegion beepRegion,
             TextureRegion flashlightRegion,
@@ -127,33 +130,51 @@ public class EntitySpawner {
             TileWorldComponent world,
             int pTileX, int pTileY,
             int mapWidth, int mapHeight) {
+        // Default: spawn flashlight (legacy callers)
+        spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
+                pTileX, pTileY, mapWidth, mapHeight, false);
+    }
 
-        com.badlogic.gdx.math.GridPoint2 usedPoint = null;
+    public static void spawnItems(PooledEngine engine,
+            TextureRegion beepRegion,
+            TextureRegion flashlightRegion,
+            TextureRegion batteryRegion,
+            TextureRegion potionRegion,
+            TileWorldComponent world,
+            int pTileX, int pTileY,
+            int mapWidth, int mapHeight,
+            boolean playerHasFlashlight) {
+
+        // Track ALL previously-used spawn points so beep cards stay far apart.
+        java.util.List<com.badlogic.gdx.math.GridPoint2> usedPoints = new java.util.ArrayList<>();
 
         // --- SAFE POTION POSITION ---
         int numPotions = 1;
         for (int i = 0; i < numPotions; i++) {
             int potTileX;
             int potTileY;
-            com.badlogic.gdx.math.GridPoint2 randomPotSpawn = (world != null) ? world.getRandomSpawnPoint(usedPoint)
+            com.badlogic.gdx.math.GridPoint2 randomPotSpawn = (world != null)
+                    ? getSpawnPointAvoidingAll(world, usedPoints, 0)
                     : null;
             if (randomPotSpawn != null) {
                 potTileX = randomPotSpawn.x;
                 potTileY = randomPotSpawn.y;
-                usedPoint = randomPotSpawn;
+                usedPoints.add(randomPotSpawn);
             } else {
                 int[] safe = findSafeTileRandom(world, pTileX, pTileY, 20, 10, mapWidth, mapHeight);
                 potTileX = safe[0];
                 potTileY = safe[1];
+                usedPoints.add(new com.badlogic.gdx.math.GridPoint2(potTileX, potTileY));
             }
             EntityFactory.createPotion(engine, potTileX * TILE_SIZE, potTileY * TILE_SIZE, potionRegion,
                     POTION_SAVE_ID + "_" + i);
         }
 
-        // --- SAFE BEEP CARDS POSITION ---
+        // --- SAFE BEEP CARDS POSITION (enforced minimum distance) ---
         totalBeepCardsSpawned = REQUIRED_BEEP_CARDS;
         for (int i = 0; i < totalBeepCardsSpawned; i++) {
-            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = world != null ? world.getRandomSpawnPoint(usedPoint)
+            com.badlogic.gdx.math.GridPoint2 randomCardSpawn = (world != null)
+                    ? getSpawnPointAvoidingAll(world, usedPoints, MIN_BEEP_CARD_DISTANCE)
                     : null;
             int keyTileX = KEY_TILE_X;
             int keyTileY = KEY_TILE_Y;
@@ -161,30 +182,33 @@ public class EntitySpawner {
             if (randomCardSpawn != null) {
                 keyTileX = randomCardSpawn.x;
                 keyTileY = randomCardSpawn.y;
-                usedPoint = randomCardSpawn;
             } else if (world != null && world.isSolidForSpawning(keyTileX, keyTileY)) {
                 int[] safe = findSafeTile(world, keyTileX, keyTileY, 8, pTileX, pTileY, 0);
                 keyTileX = safe[0];
                 keyTileY = safe[1];
             }
+            usedPoints.add(new com.badlogic.gdx.math.GridPoint2(keyTileX, keyTileY));
             EntityFactory.createKey(engine, keyTileX * TILE_SIZE, keyTileY * TILE_SIZE, beepRegion,
                     KEY_SAVE_ID + "_" + i);
         }
 
         // --- SAFE FLASHLIGHT POSITION ---
-        // Only spawn if a region is provided (null = player already has it from Level 1)
-        if (flashlightRegion != null) {
+        // Only spawn ONE flashlight if the player does NOT already have one.
+        if (!playerHasFlashlight && flashlightRegion != null) {
             int flTileX = pTileX + 6;
             int flTileY = pTileY + 6;
-            com.badlogic.gdx.math.GridPoint2 randomFlSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+            com.badlogic.gdx.math.GridPoint2 randomFlSpawn = (world != null)
+                    ? getSpawnPointAvoidingAll(world, usedPoints, 0)
+                    : null;
             if (randomFlSpawn != null) {
                 flTileX = randomFlSpawn.x;
                 flTileY = randomFlSpawn.y;
-                usedPoint = randomFlSpawn;
+                usedPoints.add(randomFlSpawn);
             } else if (world != null) {
                 int[] flSafe = findSafeTileRandom(world, pTileX, pTileY, 12, 4, mapWidth, mapHeight);
                 flTileX = flSafe[0];
                 flTileY = flSafe[1];
+                usedPoints.add(new com.badlogic.gdx.math.GridPoint2(flTileX, flTileY));
             }
             EntityFactory.createFlashlight(engine, flTileX * TILE_SIZE, flTileY * TILE_SIZE, flashlightRegion,
                 FLASHLIGHT_SAVE_ID);
@@ -193,7 +217,9 @@ public class EntitySpawner {
         // --- SAFE BATTERY POSITION ---
         int batTileX = pTileX + 8;
         int batTileY = pTileY + 8;
-        com.badlogic.gdx.math.GridPoint2 randomBatSpawn = world != null ? world.getRandomSpawnPoint(usedPoint) : null;
+        com.badlogic.gdx.math.GridPoint2 randomBatSpawn = (world != null)
+                ? getSpawnPointAvoidingAll(world, usedPoints, 0)
+                : null;
         if (randomBatSpawn != null) {
             batTileX = randomBatSpawn.x;
             batTileY = randomBatSpawn.y;
@@ -203,6 +229,66 @@ public class EntitySpawner {
             batTileY = batSafe[1];
         }
         EntityFactory.createBattery(engine, batTileX * TILE_SIZE, batTileY * TILE_SIZE, batteryRegion, BATTERY_SAVE_ID);
+    }
+
+    // =========================================================================
+    // Spawn-point helper: avoids ALL previously-used points with min distance
+    // =========================================================================
+
+    /**
+     * Picks a random valid spawn point that is at least {@code minDist}
+     * Manhattan tiles away from every point in {@code usedPoints}.
+     *
+     * @return a safe GridPoint2, or null if no suitable point was found.
+     */
+    private static com.badlogic.gdx.math.GridPoint2 getSpawnPointAvoidingAll(
+            TileWorldComponent world,
+            java.util.List<com.badlogic.gdx.math.GridPoint2> usedPoints,
+            int minDist) {
+
+        if (world == null || world.validSpawnPoints.isEmpty()) {
+            return null;
+        }
+
+        int maxAttempts = 80;
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+            int index = com.badlogic.gdx.math.MathUtils.random(world.validSpawnPoints.size() - 1);
+            com.badlogic.gdx.math.GridPoint2 candidate = world.validSpawnPoints.get(index);
+
+            boolean tooClose = false;
+            for (com.badlogic.gdx.math.GridPoint2 used : usedPoints) {
+                if (used == null) {
+                    continue;
+                }
+                int manhattan = Math.abs(candidate.x - used.x) + Math.abs(candidate.y - used.y);
+                if (manhattan < minDist) {
+                    tooClose = true;
+                    break;
+                }
+                // Also reject exact overlaps regardless of minDist
+                if (candidate.x == used.x && candidate.y == used.y) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (!tooClose) {
+                return candidate;
+            }
+        }
+        // Fallback: return any point that at least doesn't overlap exactly
+        for (com.badlogic.gdx.math.GridPoint2 candidate : world.validSpawnPoints) {
+            boolean overlaps = false;
+            for (com.badlogic.gdx.math.GridPoint2 used : usedPoints) {
+                if (used != null && candidate.x == used.x && candidate.y == used.y) {
+                    overlaps = true;
+                    break;
+                }
+            }
+            if (!overlaps) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     // =========================================================================
