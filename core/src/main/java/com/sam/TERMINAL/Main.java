@@ -69,6 +69,10 @@ public class Main extends ApplicationAdapter {
     private float triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
     private int currentLevel = 1;
 
+    /** Snapshot of inventory items the player had at the start of the current level.
+     *  Used by resetGame() to restore key items on death/restart. */
+    private java.util.List<String> levelStartInventorySnapshot = new java.util.ArrayList<>();
+
     /** Ending cutscene BGM (neutral / bad / good). Tri BGM is paused while this plays. */
     private Music endingMusic;
 
@@ -338,6 +342,17 @@ public class Main extends ApplicationAdapter {
         if (lilyTriggered)
             return;
         lilyTriggered = true;
+
+        // Snapshot the inventory now (lily was just added by InteractionSystem)
+        // so that death/restart in Level 1 preserves the lily.
+        levelStartInventorySnapshot.clear();
+        ImmutableArray<Entity> snapshotPlayers = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
+        if (snapshotPlayers.size() > 0) {
+            InventoryComponent snapshotInv = snapshotPlayers.first().getComponent(InventoryComponent.class);
+            if (snapshotInv != null) {
+                levelStartInventorySnapshot.addAll(snapshotInv.items);
+            }
+        }
 
         transitionToTriBgm();
 
@@ -668,8 +683,15 @@ public class Main extends ApplicationAdapter {
         if (players.size() > 0) {
             Entity p = players.first();
             InventoryComponent inv = p.getComponent(InventoryComponent.class);
-            if (inv != null)
-                inv.items.clear();
+            if (inv != null) {
+                if (!levelStartInventorySnapshot.isEmpty()) {
+                    // Restore the inventory snapshot so key items (lily, papers, etc.) are kept
+                    inv.items.clear();
+                    inv.items.addAll(levelStartInventorySnapshot);
+                } else {
+                    inv.items.clear();
+                }
+            }
             BatteryComponent bat = p.getComponent(BatteryComponent.class);
             if (bat != null) {
                 bat.battery = bat.maxBattery;
@@ -701,7 +723,10 @@ public class Main extends ApplicationAdapter {
         }
 
         if (players.size() > 0 && lightingSystem != null) {
-            lightingSystem.createPlayerLight(players.first(), false);
+            Entity rPlayer = players.first();
+            InventoryComponent rInv = rPlayer.getComponent(InventoryComponent.class);
+            boolean hasFlashlight = rInv != null && rInv.hasItem("flashlight");
+            lightingSystem.createPlayerLight(rPlayer, hasFlashlight);
         }
 
         lilyPlacedAtAccidentSite = false;
@@ -727,8 +752,8 @@ public class Main extends ApplicationAdapter {
         if (players.size() > 0) {
             Entity player = players.first();
             TransformComponent playerTransform = player.getComponent(TransformComponent.class);
-            playerTransform.pos.set(10 * 32f, 10 * 32f);
-            playerTransform.updateBounds();
+            // Position will be set after map loads — use safe spawn below
+            // (placeholder; overwritten once we have the world component)
 
             InventoryComponent inv = player.getComponent(InventoryComponent.class);
             if (inv != null) {
@@ -756,15 +781,21 @@ public class Main extends ApplicationAdapter {
                 : null;
 
         if (world != null) {
-            int pTileX = 10;
-            int pTileY = 10;
+            // Find a safe, non-collision tile at the bottom-left of the Level 2 map
+            // — same approach Level 1 uses with its hardcoded-but-validated coordinates.
+            int[] safeSpawn = EntitySpawner.findSafeBottomLeftSpawn(world);
+            int pTileX = safeSpawn[0];
+            int pTileY = safeSpawn[1];
+
+            // Move the player to the safe spawn point
             if (players.size() > 0) {
                 TransformComponent t = players.first().getComponent(TransformComponent.class);
                 if (t != null) {
-                    pTileX = (int) (t.pos.x / 32f);
-                    pTileY = (int) (t.pos.y / 32f);
+                    t.pos.set(pTileX * 32f, pTileY * 32f);
+                    t.updateBounds();
                 }
             }
+
             boolean playerHasFlashlight = false;
             if (players.size() > 0) {
                 InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
@@ -783,6 +814,18 @@ public class Main extends ApplicationAdapter {
 
             // Garc's Level 2 Enemy Spawn approach
             monsterSpawnTimer = 30.0f;
+
+            // Snapshot the player's inventory at level start so resetGame()
+            // can restore key items (lily, papers, flashlight) on death.
+            levelStartInventorySnapshot.clear();
+            if (players.size() > 0) {
+                InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
+                if (inv != null) {
+                    levelStartInventorySnapshot.addAll(inv.items);
+                }
+            }
+
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
         if (players.size() > 0 && lightingSystem != null) {
@@ -861,6 +904,7 @@ public class Main extends ApplicationAdapter {
         currentLevel = 1;
         monsterSpawnTimer = -1f;
         triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
+        levelStartInventorySnapshot.clear();
 
         // Delete save files so "New Game" starts completely fresh
         SaveManager.delete(MAIN_SAVE_FILE);

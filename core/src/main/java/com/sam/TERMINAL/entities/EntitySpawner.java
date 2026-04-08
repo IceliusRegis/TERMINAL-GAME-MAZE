@@ -45,6 +45,23 @@ public class EntitySpawner {
     // =========================================================================
 
     /**
+     * Scans from the bottom-left corner of the map outward to find the first
+     * non-collision, non-wall tile suitable for player spawning.
+     * Uses the same safety checks as Level 1 item/player spawning.
+     *
+     * @return int[] { tileX, tileY } in LibGDX coordinates (origin bottom-left).
+     */
+    public static int[] findSafeBottomLeftSpawn(TileWorldComponent world) {
+        if (world == null) {
+            return new int[] { 2, 2 };
+        }
+        // Start searching from tile (1, 1) — just inside the map border.
+        // Spiral outward using the existing findSafeTile logic with a large radius.
+        int searchRadius = Math.max(world.mapWidthTiles, world.mapHeightTiles);
+        return findSafeTile(world, 1, 1, searchRadius, -1, -1, 0);
+    }
+
+    /**
      * THIS IS THE METHOD CALLED BY MovementSystem AFTER 15 SECONDS.
      * It spawns a single battery at the specified world coordinates.
      */
