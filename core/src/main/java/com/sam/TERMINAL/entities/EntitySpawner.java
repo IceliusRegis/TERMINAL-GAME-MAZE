@@ -18,9 +18,9 @@ public class EntitySpawner {
     private static final float TILE_SIZE = 32f;
 
     // Default hardcoded tile positions (calculated from LibGDX bottom-left origin)
-    // Tiled coordinates (15, 7) on a 50x50 map equal LibGDX coordinates (15, 42)
-    private static final float PLAYER_X = 15 * TILE_SIZE;
-    private static final float PLAYER_Y = 42 * TILE_SIZE;
+    // Tiled coordinates (14, 14) on a 50x50 map equal LibGDX coordinates (14, 35)
+    private static final float PLAYER_X = 14 * TILE_SIZE;
+    private static final float PLAYER_Y = 35 * TILE_SIZE;
     private static final int KEY_TILE_X = 20;
     private static final int KEY_TILE_Y = 10;
     private static final float ENEMY_X = 5 * TILE_SIZE;

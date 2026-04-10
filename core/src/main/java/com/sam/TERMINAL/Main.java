@@ -707,8 +707,8 @@ public class Main extends ApplicationAdapter {
         ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
         TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
         if (world != null) {
-            int pTileX = 15;
-            int pTileY = 42;
+            int pTileX = 14;
+            int pTileY = 35;
             if (players.size() > 0) {
                 TransformComponent t = players.first().getComponent(TransformComponent.class);
                 if (t != null) {
