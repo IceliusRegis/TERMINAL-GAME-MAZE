@@ -46,6 +46,7 @@ public class EnemySystem extends IteratingSystem {
     private final ComponentMapper<TransformComponent> transformMapper = ComponentMapper
         .getFor(TransformComponent.class);
     private final ComponentMapper<EnemyComponent> enemyMapper = ComponentMapper.getFor(EnemyComponent.class);
+    private final ComponentMapper<SpriteComponent> spriteMapper = ComponentMapper.getFor(SpriteComponent.class);
 
     /** Cached player entity — looked up once and reused until engine reset. */
     private Entity cachedPlayer;
@@ -58,6 +59,9 @@ public class EnemySystem extends IteratingSystem {
 
     /** Guard flag — true once the callback has fired, preventing repeat triggers. */
     private boolean triggered;
+
+    /** Debug flag to pause AI. */
+    public boolean aiPaused = false;
 
     // --- Audio Fields ---
     private Sound heartbeatSound;
@@ -136,6 +140,7 @@ public class EnemySystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        if (aiPaused) return;
 
         // 1. Find player entity (cached after first frame)
         if (cachedPlayer == null) {
@@ -210,6 +215,11 @@ public class EnemySystem extends IteratingSystem {
             float dx = targetX - enemyT.pos.x;
             float dy = targetY - enemyT.pos.y;
             float dist = (float) Math.sqrt(dx * dx + dy * dy);
+
+            SpriteComponent sprite = spriteMapper.get(entity);
+            if (sprite != null && Math.abs(dx) > 0.001f) {
+                sprite.facingRight = dx > 0f;
+            }
 
             if (dist <= ARRIVAL_THRESHOLD) {
                 // Snap to waypoint and pop it — move to the next one next frame

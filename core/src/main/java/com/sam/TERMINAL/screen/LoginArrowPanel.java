@@ -32,11 +32,11 @@ public class LoginArrowPanel extends Table {
         defaults().left().top();
     }
 
-    public static void disposeShared() {
+    public void disposePanel() {
         if (panelTexture != null) {
             panelTexture.dispose();
             panelTexture = null;
-            panelDrawable = null;
         }
+        setBackground((com.badlogic.gdx.scenes.scene2d.utils.Drawable) null);
     }
 }

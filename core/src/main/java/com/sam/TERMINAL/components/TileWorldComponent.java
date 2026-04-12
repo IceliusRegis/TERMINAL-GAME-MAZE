@@ -19,6 +19,7 @@ public class TileWorldComponent implements Component {
     public TiledMapTileLayer collisionLayer;
     public TiledMapTileLayer wallsLayer;
     public TiledMapTileLayer winningLayer;
+    public TiledMapTileLayer endingLayer;
     public TiledMapTileLayer groundLayer;
     public TiledMapTileLayer noSpawnLayer;
     public java.util.List<com.badlogic.gdx.math.GridPoint2> validSpawnPoints = new java.util.ArrayList<>();
@@ -49,6 +50,9 @@ public class TileWorldComponent implements Component {
 
         Object winningRaw = tiledMap.getLayers().get("Winning");
         this.winningLayer = (winningRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) winningRaw : null;
+
+        Object endingRaw = tiledMap.getLayers().get("Ending");
+        this.endingLayer = (endingRaw instanceof TiledMapTileLayer) ? (TiledMapTileLayer) endingRaw : null;
 
         Object noSpawnRaw = tiledMap.getLayers().get("No Spawn");
         if (noSpawnRaw == null) {
@@ -134,13 +138,17 @@ public class TileWorldComponent implements Component {
      * visual walls, even if there is no collision tile there.
      */
     public boolean isSolidForSpawning(int tileX, int tileY) {
+        return isSolidForSpawning(tileX, tileY, false);
+    }
+
+    public boolean isSolidForSpawning(int tileX, int tileY, boolean ignoreNoSpawn) {
         if (isSolid(tileX, tileY)) {
             return true;
         }
         if (wallsLayer != null && wallsLayer.getCell(tileX, tileY) != null) {
             return true;
         }
-        if (noSpawnLayer != null && noSpawnLayer.getCell(tileX, tileY) != null) {
+        if (!ignoreNoSpawn && noSpawnLayer != null && noSpawnLayer.getCell(tileX, tileY) != null) {
             return true;
         }
         return false;

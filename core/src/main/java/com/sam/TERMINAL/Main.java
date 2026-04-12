@@ -18,6 +18,7 @@ import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.sam.TERMINAL.buttons.MenuScreen;
 import com.sam.TERMINAL.components.*;
+import com.sam.TERMINAL.entities.EntityFactory;
 import com.sam.TERMINAL.entities.EntitySpawner;
 import com.sam.TERMINAL.entities.MapManager;
 import com.sam.TERMINAL.persistence.GameData;
@@ -49,6 +50,7 @@ public class Main extends ApplicationAdapter {
     private Music tutorialMusic;
     private Music triBgmMusic;
     private float titleMusicDelayTimer;
+    private float monsterSpawnTimer = -1f;
     private boolean titleMusicStarted;
 
     private static final float CURSOR_HIDE_DELAY_SECONDS = 5f;
@@ -60,9 +62,19 @@ public class Main extends ApplicationAdapter {
     // Garc's Tutorial & Narrative Flags
     private boolean startedGameProperFromTutorial = false;
     private boolean disableLightingDuringTutorial = false;
-    private boolean timeSignalPlayedForRun = false;
     private boolean tutorialMovementAllowed = true;
     private boolean lilyTriggered = false;
+    /** Level 2: lily left on Ending-layer accident site; E then opens confrontation. */
+    private boolean lilyPlacedAtAccidentSite = false;
+    private float triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
+    private int currentLevel = 1;
+
+    /** Snapshot of inventory items the player had at the start of the current level.
+     *  Used by resetGame() to restore key items on death/restart. */
+    private java.util.List<String> levelStartInventorySnapshot = new java.util.ArrayList<>();
+
+    /** Ending cutscene BGM (neutral / bad / good). Tri BGM is paused while this plays. */
+    private Music endingMusic;
 
     private Sound timeSignalSound;
     private Sound lilyTriggerSound;
@@ -70,10 +82,20 @@ public class Main extends ApplicationAdapter {
     // Asset References
     private Texture playerSpriteSheet, cursorTexture, enemyTexture;
     private Texture beepTexture, flashlightTexture, batteryTexture, potionTexture, lilyTexture;
+    private Texture studIDTexture, papersTexture;
 
     // Regions and Animation
-    private TextureRegion beepRegion, enemyRegion, flashlightRegion, batteryRegion, potionRegion, lilyRegion;
+    private TextureRegion beepRegion, flashlightRegion, batteryRegion, potionRegion, lilyRegion;
+    private TextureRegion studIDRegion, papersRegion;
     private Animation<TextureRegion> walkAnimation, idleAnimation;
+    private Animation<TextureRegion> enemyAnimation;
+
+    /** Single-frame size for `sprites/enemy_sheet.png` (1 row × 5 columns). */
+    public static final int ENEMY_FRAME_W = 125;
+    public static final int ENEMY_FRAME_H = 245;
+    /** On-screen draw size — larger than player (128×250). */
+    public static final float ENEMY_DRAW_W = 160f;
+    public static final float ENEMY_DRAW_H = 310f;
 
     // Save Files
     private static final String TEMP_SAVE_FILE = "temp_initial_state.json";
@@ -119,7 +141,6 @@ public class Main extends ApplicationAdapter {
     private void startTutorial() {
         fadeOutTitleMusic(1.0f);
         playTutorialMusic();
-        timeSignalPlayedForRun = false;
         disableLightingDuringTutorial = true;
         tutorialMovementAllowed = false;
         lilyTriggered = false;
@@ -190,17 +211,127 @@ public class Main extends ApplicationAdapter {
         TextureRegion[][] idleFrames = TextureRegion.split(idleSheet, 128, 250);
         idleAnimation = new Animation<>(0.3f, idleFrames[0]);
 
-        enemyTexture = new Texture(Gdx.files.internal("sprites/enemy.png"));
-        enemyRegion = new TextureRegion(enemyTexture);
+        enemyTexture = new Texture(Gdx.files.internal("sprites/enemy_sheet.png"));
+        TextureRegion[][] enemyFrames = TextureRegion.split(enemyTexture, ENEMY_FRAME_W, ENEMY_FRAME_H);
+        enemyAnimation = new Animation<>(0.2f, enemyFrames[0]);
 
         if (Gdx.files.internal("ui/LilyOUTLINED.png").exists()) {
             lilyTexture = new Texture(Gdx.files.internal("ui/LilyOUTLINED.png"));
             lilyRegion = new TextureRegion(lilyTexture);
         }
+
+        if (Gdx.files.internal("ui/studID.png").exists()) {
+            studIDTexture = new Texture(Gdx.files.internal("ui/studID.png"));
+            studIDRegion = new TextureRegion(studIDTexture);
+        }
+
+        if (Gdx.files.internal("ui/papers.png").exists()) {
+            papersTexture = new Texture(Gdx.files.internal("ui/papers.png"));
+            papersRegion = new TextureRegion(papersTexture);
+        }
     }
 
     public boolean isTutorialMovementAllowed() {
         return tutorialMovementAllowed;
+    }
+
+    public TextureRegion getLilyRegion() {
+        return lilyRegion;
+    }
+
+    public int getCurrentLevel() {
+        return currentLevel;
+    }
+
+    public boolean isLilyPlacedAtAccidentSite() {
+        return lilyPlacedAtAccidentSite;
+    }
+
+    /** Spawns LilyOUTLINED memorial at map tile center (Level 2 accident / Ending layer). */
+    public void placeLilyAtAccidentSite(int tileX, int tileY) {
+        if (lilyRegion == null)
+            return;
+        lilyPlacedAtAccidentSite = true;
+        float tilePx = 32f;
+        float cx = tileX * tilePx + tilePx * 0.5f;
+        float cy = tileY * tilePx + tilePx * 0.5f;
+        float dw = 48f;
+        EntityFactory.createLilyMemorial(engine, cx - dw * 0.5f, cy - dw * 0.5f, lilyRegion);
+    }
+
+    /**
+     * Called when the player leaves Level 1 via the win screen loading sequence: plays time-signal
+     * and ducks triBGM volume by 30% until {@link #loadLevelTwo()} finishes.
+     */
+    /** Pause level BGM when an ending starts (bad: call from kill; neutral/good start their own tracks). */
+    public void pauseGameplayMusicForEnding() {
+        if (triBgmMusic != null && triBgmMusic.isPlaying())
+            triBgmMusic.pause();
+    }
+
+    private void stopAndDisposeEndingMusic() {
+        if (endingMusic != null) {
+            endingMusic.stop();
+            endingMusic.dispose();
+            endingMusic = null;
+        }
+    }
+
+    private void playEndingMusicFromFile(String internalPath, float volume) {
+        stopAndDisposeEndingMusic();
+        if (!Gdx.files.internal(internalPath).exists())
+            return;
+        try {
+            endingMusic = Gdx.audio.newMusic(Gdx.files.internal(internalPath));
+            endingMusic.setLooping(true);
+            endingMusic.setVolume(volume);
+            endingMusic.play();
+        } catch (Exception e) {
+            Gdx.app.log("Main", "Ending music failed: " + internalPath + " — " + e.getMessage());
+        }
+    }
+
+    /** Neutral ending: stop tri, play neutral.wav. */
+    public void startEndingMusicNeutral() {
+        pauseGameplayMusicForEnding();
+        playEndingMusicFromFile("music/neutral.wav", 0.7f);
+    }
+
+    /** Bad ending: chizo phase — play bad.wav (tri already paused). */
+    public void startEndingMusicBad() {
+        playEndingMusicFromFile("music/bad.wav", 0.7f);
+    }
+
+    /** Good ending: after mercy — tri paused, play good.wav. */
+    public void playGoodEndingMusic() {
+        pauseGameplayMusicForEnding();
+        playEndingMusicFromFile("music/good.wav", 0.7f);
+    }
+
+    /** After ending cutscene / reset: stop ending track and restore tri BGM if present. */
+    public void stopEndingMusicAndResumeGameplay() {
+        stopAndDisposeEndingMusic();
+        if (triBgmMusic != null) {
+            triBgmMusic.setVolume(0.65f);
+            if (!triBgmMusic.isPlaying())
+                triBgmMusic.play();
+        }
+    }
+
+    public void onLevel1ExitLoadingStarted() {
+        if (Gdx.files.internal("sfx/time-signal.ogg").exists()) {
+            if (timeSignalSound == null) {
+                timeSignalSound = Gdx.audio.newSound(Gdx.files.internal("sfx/time-signal.ogg"));
+            }
+            try {
+                timeSignalSound.play(0.7f);
+            } catch (Exception ignored) {
+            }
+        }
+        if (triBgmMusic != null && triBgmMusic.isPlaying() && triBgmVolumeSavedBeforeLevelLoadDuck < 0f) {
+            triBgmVolumeSavedBeforeLevelLoadDuck = triBgmMusic.getVolume();
+            triBgmMusic.setVolume(triBgmVolumeSavedBeforeLevelLoadDuck * 0.7f);
+        }
     }
 
     public boolean isLilyTriggered() {
@@ -211,6 +342,17 @@ public class Main extends ApplicationAdapter {
         if (lilyTriggered)
             return;
         lilyTriggered = true;
+
+        // Snapshot the inventory now (lily was just added by InteractionSystem)
+        // so that death/restart in Level 1 preserves the lily.
+        levelStartInventorySnapshot.clear();
+        ImmutableArray<Entity> snapshotPlayers = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
+        if (snapshotPlayers.size() > 0) {
+            InventoryComponent snapshotInv = snapshotPlayers.first().getComponent(InventoryComponent.class);
+            if (snapshotInv != null) {
+                levelStartInventorySnapshot.addAll(snapshotInv.items);
+            }
+        }
 
         transitionToTriBgm();
 
@@ -279,6 +421,8 @@ public class Main extends ApplicationAdapter {
                 spawnPostLilyEntities();
             }
         }, 4.3f);
+
+        monsterSpawnTimer = 45.0f;
     }
 
     private void spawnPostLilyEntities() {
@@ -289,11 +433,17 @@ public class Main extends ApplicationAdapter {
             TileWorldComponent world = worldEntities.first().getComponent(TileWorldComponent.class);
             int pTileX = (int) (t.pos.x / 32f);
             int pTileY = (int) (t.pos.y / 32f);
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
-                    pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles);
 
-            if (enemyRegion != null) {
-                EntitySpawner.spawnEnemy(engine, enemyRegion);
+            // Check if player already owns a flashlight so we don't spawn a duplicate.
+            InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
+            boolean hasFlashlight = (inv != null && inv.hasItem("flashlight"));
+
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world,
+                    pTileX, pTileY, world.mapWidthTiles, world.mapHeightTiles, hasFlashlight);
+
+            // Spawn papers in Level 1 after lily trigger
+            if (papersRegion != null) {
+                EntitySpawner.spawnPapers(engine, papersRegion, world, pTileX, pTileY);
             }
         }
     }
@@ -436,7 +586,7 @@ public class Main extends ApplicationAdapter {
         engine.addSystem(winLossSystem);
         engine.addSystem(new AnimationSystem());
         engine.addSystem(new CameraFollowSystem(camera));
-        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyRegion, batteryRegion, potionRegion));
+        engine.addSystem(new SaveSystem(beepRegion, flashlightRegion, enemyAnimation, batteryRegion, potionRegion));
         engine.addSystem(new RenderSystem(batch, camera));
         engine.addSystem(new InteractionSystem(batch));
 
@@ -459,6 +609,8 @@ public class Main extends ApplicationAdapter {
         GameData mainSave = SaveManager.load(MAIN_SAVE_FILE);
         GameData tempSave = SaveManager.load(TEMP_SAVE_FILE);
 
+        currentLevel = 1;
+
         mapManager = new MapManager(engine);
         mapManager.loadMap("maps/mapTest.tmx");
 
@@ -471,7 +623,7 @@ public class Main extends ApplicationAdapter {
                 engine.getSystem(SaveSystem.class).setRunID(mainSave.runId);
 
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
-                    enemyRegion, flashlightRegion, batteryRegion, potionRegion);
+                    enemyAnimation, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
 
             if (!snapshotIsValid) {
@@ -486,7 +638,7 @@ public class Main extends ApplicationAdapter {
                 EntitySpawner.spawnTutorialStart(engine, walkAnimation, idleAnimation, lilyRegion);
             } else {
                 EntitySpawner.spawnInitialEntities(engine, beepRegion, walkAnimation, idleAnimation,
-                        enemyRegion, flashlightRegion, batteryRegion, potionRegion);
+                        enemyAnimation, flashlightRegion, batteryRegion, potionRegion);
             }
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
@@ -505,6 +657,9 @@ public class Main extends ApplicationAdapter {
     }
 
     public void resetGame() {
+        monsterSpawnTimer = -1f;
+        if (menuScreen != null) menuScreen.hideMonsterTimer();
+
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls != null)
             wls.reset();
@@ -533,8 +688,15 @@ public class Main extends ApplicationAdapter {
         if (players.size() > 0) {
             Entity p = players.first();
             InventoryComponent inv = p.getComponent(InventoryComponent.class);
-            if (inv != null)
-                inv.items.clear();
+            if (inv != null) {
+                if (!levelStartInventorySnapshot.isEmpty()) {
+                    // Restore the inventory snapshot so key items (lily, papers, etc.) are kept
+                    inv.items.clear();
+                    inv.items.addAll(levelStartInventorySnapshot);
+                } else {
+                    inv.items.clear();
+                }
+            }
             BatteryComponent bat = p.getComponent(BatteryComponent.class);
             if (bat != null) {
                 bat.battery = bat.maxBattery;
@@ -545,8 +707,8 @@ public class Main extends ApplicationAdapter {
         ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
         TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
         if (world != null) {
-            int pTileX = 15;
-            int pTileY = 42;
+            int pTileX = 14;
+            int pTileY = 35;
             if (players.size() > 0) {
                 TransformComponent t = players.first().getComponent(TransformComponent.class);
                 if (t != null) {
@@ -554,31 +716,39 @@ public class Main extends ApplicationAdapter {
                     pTileY = (int) (t.pos.y / 32f);
                 }
             }
+            // Check if player already owns a flashlight (from restored inventory)
+            boolean playerHasFlashlight = false;
+            if (players.size() > 0) {
+                InventoryComponent rInv = players.first().getComponent(InventoryComponent.class);
+                playerHasFlashlight = (rInv != null && rInv.hasItem("flashlight"));
+            }
+
             EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
+                    pTileY, world.mapWidthTiles, world.mapHeightTiles, playerHasFlashlight);
+
+            // Re-spawn Level 2 key items on reset if we're in Level 2
+            if (currentLevel == 2 && studIDRegion != null) {
+                EntitySpawner.spawnLevel2KeyItems(engine, studIDRegion);
+            }
+
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
         if (players.size() > 0 && lightingSystem != null) {
-            lightingSystem.createPlayerLight(players.first(), false);
+            Entity rPlayer = players.first();
+            InventoryComponent rInv = rPlayer.getComponent(InventoryComponent.class);
+            boolean hasFlashlight = rInv != null && rInv.hasItem("flashlight");
+            lightingSystem.createPlayerLight(rPlayer, hasFlashlight);
         }
 
+        lilyPlacedAtAccidentSite = false;
+        stopEndingMusicAndResumeGameplay();
         menuScreen.resetUI();
     }
 
     public void loadLevelTwo() {
-        if (!timeSignalPlayedForRun) {
-            timeSignalPlayedForRun = true;
-            if (Gdx.files.internal("sfx/time-signal.ogg").exists()) {
-                if (timeSignalSound == null) {
-                    timeSignalSound = Gdx.audio.newSound(Gdx.files.internal("sfx/time-signal.ogg"));
-                }
-                try {
-                    timeSignalSound.play(0.7f);
-                } catch (Exception ignored) {
-                }
-            }
-        }
+        currentLevel = 2;
+        lilyPlacedAtAccidentSite = false;
 
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (wls != null)
@@ -594,12 +764,19 @@ public class Main extends ApplicationAdapter {
         if (players.size() > 0) {
             Entity player = players.first();
             TransformComponent playerTransform = player.getComponent(TransformComponent.class);
-            playerTransform.pos.set(10 * 32f, 10 * 32f);
-            playerTransform.updateBounds();
+            // Position will be set after map loads — use safe spawn below
+            // (placeholder; overwritten once we have the world component)
 
             InventoryComponent inv = player.getComponent(InventoryComponent.class);
-            if (inv != null)
+            if (inv != null) {
+                boolean hasLily = inv.hasItem("lily");
+                boolean hasPapers = inv.hasItem("papers");
+                boolean hasFlashlight = inv.hasItem("flashlight");
                 inv.items.clear();
+                if (hasLily) inv.addItem("lily");
+                if (hasPapers) inv.addItem("papers");
+                if (hasFlashlight) inv.addItem("flashlight");
+            }
 
             BatteryComponent bat = player.getComponent(BatteryComponent.class);
             if (bat != null) {
@@ -616,24 +793,62 @@ public class Main extends ApplicationAdapter {
                 : null;
 
         if (world != null) {
-            int pTileX = 10;
-            int pTileY = 10;
+            // Find a safe, non-collision tile at the bottom-left of the Level 2 map
+            // — same approach Level 1 uses with its hardcoded-but-validated coordinates.
+            int[] safeSpawn = EntitySpawner.findSafeBottomLeftSpawn(world);
+            int pTileX = safeSpawn[0];
+            int pTileY = safeSpawn[1];
+
+            // Move the player to the safe spawn point
             if (players.size() > 0) {
                 TransformComponent t = players.first().getComponent(TransformComponent.class);
                 if (t != null) {
-                    pTileX = (int) (t.pos.x / 32f);
-                    pTileY = (int) (t.pos.y / 32f);
+                    t.pos.set(pTileX * 32f, pTileY * 32f);
+                    t.updateBounds();
                 }
             }
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                    pTileY, world.mapWidthTiles, world.mapHeightTiles);
+
+            boolean playerHasFlashlight = false;
+            if (players.size() > 0) {
+                InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
+                if (inv != null) playerHasFlashlight = inv.hasItem("flashlight");
+            }
+
+            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion,
+                batteryRegion, potionRegion, world, pTileX,
+                pTileY, world.mapWidthTiles, world.mapHeightTiles, playerHasFlashlight);
+
+            // Spawn Level 2 key items (studID + confrontation trigger)
+            if (studIDRegion != null) {
+                EntitySpawner.spawnLevel2KeyItems(engine, studIDRegion);
+            }
 
             // Garc's Level 2 Enemy Spawn approach
-            com.sam.TERMINAL.entities.EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyRegion);
+            monsterSpawnTimer = 30.0f;
+
+            // Snapshot the player's inventory at level start so resetGame()
+            // can restore key items (lily, papers, flashlight) on death.
+            levelStartInventorySnapshot.clear();
+            if (players.size() > 0) {
+                InventoryComponent inv = players.first().getComponent(InventoryComponent.class);
+                if (inv != null) {
+                    levelStartInventorySnapshot.addAll(inv.items);
+                }
+            }
+
+            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
         if (players.size() > 0 && lightingSystem != null) {
-            lightingSystem.createPlayerLight(players.first(), false);
+            Entity player = players.first();
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            boolean hasFlashlight = inv != null && inv.hasItem("flashlight");
+            lightingSystem.createPlayerLight(player, hasFlashlight);
+        }
+
+        if (triBgmVolumeSavedBeforeLevelLoadDuck >= 0f && triBgmMusic != null) {
+            triBgmMusic.setVolume(triBgmVolumeSavedBeforeLevelLoadDuck);
+            triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
         }
 
         if (menuScreen != null)
@@ -647,6 +862,73 @@ public class Main extends ApplicationAdapter {
             buffer.add(e);
         for (Entity e : buffer)
             engine.removeEntity(e);
+    }
+
+    private void onMonsterSpawnTimerElapsed() {
+        if (enemyAnimation != null) {
+            if (currentLevel == 2) {
+                EntityFactory.createEnemy(engine, 5 * 32f, 5 * 32f, enemyAnimation, ENEMY_DRAW_W, ENEMY_DRAW_H);
+            } else {
+                EntitySpawner.spawnEnemy(engine, enemyAnimation, ENEMY_DRAW_W, ENEMY_DRAW_H);
+            }
+        }
+        monsterSpawnTimer = -1f;
+        if (menuScreen != null)
+            menuScreen.hideMonsterTimer();
+    }
+
+    public void skipMonsterSpawnTimerDebug() {
+        if (monsterSpawnTimer > 0) {
+            onMonsterSpawnTimerElapsed();
+            Gdx.app.log("TERMINAL_DEBUG", "Skipped monster spawn timer");
+        }
+    }
+
+    public void returnToTitleScreen() {
+        // Stop all active ending/gameplay music
+        stopAndDisposeEndingMusic();
+        stopTutorialMusic(); // disposes tutorialMusic + triBgmMusic
+
+        // Clear the engine and UI
+        engine.removeAllEntities();
+        if (menuScreen != null) {
+            menuScreen.dispose();
+            menuScreen = null;
+        }
+
+        // Dispose any leftover tutorial scene
+        if (tutorialScene != null) {
+            tutorialScene.dispose();
+            tutorialScene = null;
+        }
+
+        // ----------------------------------------------------------------
+        // Reset ALL per-run narrative / tutorial state so that "New Game"
+        // after watching an ending plays the tutorials exactly like the
+        // very first launch of the game.
+        // ----------------------------------------------------------------
+        startedGameProperFromTutorial = false;
+        disableLightingDuringTutorial = false;
+        tutorialMovementAllowed = true;
+        lilyTriggered = false;
+        lilyPlacedAtAccidentSite = false;
+        currentLevel = 1;
+        monsterSpawnTimer = -1f;
+        triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
+        levelStartInventorySnapshot.clear();
+
+        // Delete save files so "New Game" starts completely fresh
+        SaveManager.delete(MAIN_SAVE_FILE);
+        SaveManager.delete(TEMP_SAVE_FILE);
+
+        // Return to Title state (hasSave will now be false — no continue slot)
+        boolean hasSave = SaveManager.load(MAIN_SAVE_FILE) != null;
+        titleScreen = new TitleScreen(batch, hasSave, this::onTitleScreenChoice);
+        flowState = FlowState.TITLE;
+
+        // Reset title music so it fades back in naturally
+        titleMusicStarted = false;
+        titleMusicDelayTimer = 0f;
     }
 
     @Override
@@ -686,8 +968,18 @@ public class Main extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
-        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()) {
+        if (!menuScreen.isSettingsVisible() && !menuScreen.isGameOver() && !menuScreen.isJumpscaring()
+                && !menuScreen.isPapersReportReaderVisible() && !menuScreen.isConfrontationVisible()) {
             engine.update(delta);
+
+            if (monsterSpawnTimer > 0) {
+                monsterSpawnTimer -= delta;
+                if (monsterSpawnTimer <= 0) {
+                    onMonsterSpawnTimerElapsed();
+                } else {
+                    if (menuScreen != null) menuScreen.updateMonsterTimer((int)Math.ceil(monsterSpawnTimer));
+                }
+            }
         } else {
             engine.update(0);
         }
@@ -699,7 +991,7 @@ public class Main extends ApplicationAdapter {
         renderInteractionPrompts();
 
         if (debugManager != null) {
-            debugManager.update(lightingSystem);
+            debugManager.update(this, engine, lightingSystem);
             debugManager.renderHitboxes(engine, camera);
             if (debugManager.showHitboxes) {
                 EnemySystem enemySys = engine.getSystem(EnemySystem.class);
@@ -716,7 +1008,9 @@ public class Main extends ApplicationAdapter {
 
         WinLossSystem wls = engine.getSystem(WinLossSystem.class);
         if (!menuScreen.isJumpscaring()) {
-            if (wls.win && !menuScreen.isGameOver()) {
+            if (wls.neutralEnd && !menuScreen.isGameOver()) {
+                // Neutral end already handled by WinLossSystem -> menuScreen.showEndScreen
+            } else if (wls.win && !menuScreen.isGameOver()) {
                 menuScreen.showGameOver(true);
             } else if (wls.gameOver && !menuScreen.isGameOver()) {
                 menuScreen.showGameOver(false);
@@ -726,7 +1020,8 @@ public class Main extends ApplicationAdapter {
     }
 
     private void renderInteractionPrompts() {
-        if (menuScreen == null || menuScreen.isGameOver())
+        if (menuScreen == null || menuScreen.isGameOver() || menuScreen.isPapersReportReaderVisible()
+                || menuScreen.isConfrontationVisible())
             return;
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
@@ -799,6 +1094,7 @@ public class Main extends ApplicationAdapter {
             tutorialScene.dispose();
         if (menuScreen != null)
             menuScreen.dispose();
+        stopAndDisposeEndingMusic();
         if (titleMusic != null)
             titleMusic.dispose();
         stopTutorialMusic();
@@ -818,6 +1114,10 @@ public class Main extends ApplicationAdapter {
             potionTexture.dispose();
         if (lilyTexture != null)
             lilyTexture.dispose();
+        if (studIDTexture != null)
+            studIDTexture.dispose();
+        if (papersTexture != null)
+            papersTexture.dispose();
         if (lilyTriggerSound != null)
             lilyTriggerSound.dispose();
         WinLossSystem wlsDispose = engine.getSystem(WinLossSystem.class);
@@ -841,11 +1141,19 @@ public class Main extends ApplicationAdapter {
         return potionRegion;
     }
 
-    public TextureRegion getEnemyRegion() {
-        return enemyRegion;
+    public Animation<TextureRegion> getEnemyAnimation() {
+        return enemyAnimation;
     }
 
     public MenuScreen getMenuScreen() {
         return menuScreen;
+    }
+
+    public TextureRegion getStudIDRegion() {
+        return studIDRegion;
+    }
+
+    public TextureRegion getPapersRegion() {
+        return papersRegion;
     }
 }

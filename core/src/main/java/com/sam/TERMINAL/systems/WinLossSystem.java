@@ -26,7 +26,11 @@ import com.sam.TERMINAL.buttons.MenuScreen;
  * of whether they hold the Beep Card. If E is pressed without the card, a
  * timed "Find the Beep Card first!" warning appears for a few seconds.
  *
- * Lose condition: Enemy entity overlaps the player.
+ * Enemy death is handled by {@link com.sam.TERMINAL.systems.EnemySystem} (catch
+ * → jumpscare →
+ * game over), not by this system — overlap here used to race with deferred
+ * jumpscare and caused
+ * both YOU DIED and jumpscare.
  */
 public class WinLossSystem extends EntitySystem {
 
@@ -37,6 +41,7 @@ public class WinLossSystem extends EntitySystem {
     private MenuScreen menuScreen;
     public boolean gameOver = false;
     public boolean win = false;
+    public boolean neutralEnd = false;
 
     private final SpriteBatch batch;
     private Texture promptTexture;
@@ -58,9 +63,15 @@ public class WinLossSystem extends EntitySystem {
 
     // Set each frame in update(); read by renderPrompt() in Main after lighting.
     private boolean nearWinTile = false;
+    private boolean nearEndingTile = false;
     private boolean playerHasBeepCard = false;
     private float promptWorldX = 0f;
     private float promptWorldY = 0f;
+    private float endingPromptWorldX = 0f;
+    private float endingPromptWorldY = 0f;
+    private int endingSiteTileX = 0;
+    private int endingSiteTileY = 0;
+    private boolean accidentLilyPromptShown = false;
 
     /**
      * Counts down from MISSING_CARD_DISPLAY_DURATION to 0.
@@ -94,6 +105,7 @@ public class WinLossSystem extends EntitySystem {
     public void update(float deltaTime) {
         // Reset per-frame state flags at the top of every frame.
         nearWinTile = false;
+        nearEndingTile = false;
         playerHasBeepCard = false;
 
         // Tick down the warning timer independently of the win/loss state so
@@ -105,31 +117,15 @@ public class WinLossSystem extends EntitySystem {
             }
         }
 
-        if (gameOver || win)
+        if (gameOver || win || neutralEnd)
             return;
 
-        // --- LOSE: Enemy touches player ---
-        ImmutableArray<Entity> players = getEngine()
-                .getEntitiesFor(Family.all(PlayerComponent.class).get());
-        ImmutableArray<Entity> enemies = getEngine()
-                .getEntitiesFor(Family.all(EnemyComponent.class).get());
-
-        if (players.size() > 0 && enemies.size() > 0) {
-            TransformComponent pT = players.first().getComponent(TransformComponent.class);
-            for (Entity e : enemies) {
-                TransformComponent eT = e.getComponent(TransformComponent.class);
-                if (eT != null && eT.bounds.overlaps(pT.bounds)) {
-                    if (menuScreen != null && menuScreen.isJumpscaring()) {
-                        return;
-                    }
-                    Gdx.app.log("TERMINAL", "YOU DIED - GAME OVER");
-                    gameOver = true;
-                    return;
-                }
-            }
-        }
+        if (menuScreen != null && menuScreen.blocksWinLossChecks())
+            return;
 
         // --- WIN: Proximity to Winning layer tiles + Beep Card check ---
+        ImmutableArray<Entity> players = getEngine()
+                .getEntitiesFor(Family.all(PlayerComponent.class).get());
         if (players.size() == 0)
             return;
 
@@ -157,46 +153,100 @@ public class WinLossSystem extends EntitySystem {
                 || isWinningTile(world, playerTileX, playerTileY + 1)
                 || isWinningTile(world, playerTileX, playerTileY - 1);
 
-        if (!nearWinTile)
-            return;
+        if (nearWinTile) {
+            // --- Dynamic prompt position ---
+            // Place the icon to the right of the player bounding box so it never
+            // overlaps the sprite itself. A small horizontal gap of 4 pixels is
+            // added between the right edge and the icon's left edge.
+            float promptGap = 4f;
+            promptWorldX = playerTransform.pos.x + playerTransform.width + promptGap;
+            // Vertically centered on the player bounding box.
+            promptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
 
-        // --- Dynamic prompt position ---
-        // Place the icon to the right of the player bounding box so it never
-        // overlaps the sprite itself. A small horizontal gap of 4 pixels is
-        // added between the right edge and the icon's left edge.
-        float promptGap = 4f;
-        promptWorldX = playerTransform.pos.x + playerTransform.width + promptGap;
-        // Vertically centered on the player bounding box.
-        promptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
-
-        // --- Beep Card prerequisite check ---
-        int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
-        int heldCards = 0;
-        InventoryComponent inventory = player.getComponent(InventoryComponent.class);
-        if (inventory != null) {
-            heldCards = java.util.Collections.frequency(inventory.items, BEEP_CARD_ITEM_ID);
-        }
-        playerHasBeepCard = (heldCards >= totalExpected && totalExpected > 0);
-
-        // Update dynamic missing message
-        currentMissingMessage = "Find all Beep Cards! (" + heldCards + "/" + totalExpected + ")";
-
-        // The 'E' prompt is always shown from here on (nearWinTile == true).
-        // If E is pressed, attempt the win or start the warning timer.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            if (playerHasBeepCard) {
-                Gdx.app.log("TERMINAL", "WIN CONDITION MET — Showing Escape Screen");
-
-                win = true; // Set the local flag to stop system updates
-
-                if (menuScreen != null) {
-                    menuScreen.showGameOver(true); // This shows your "YOU ESCAPED" window
-                }
-            } else {
-                // Restart (or extend) the warning display timer.
-                missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;
-                Gdx.app.log("TERMINAL", "Win attempt blocked — Beep Card not found.");
+            // --- Beep Card prerequisite check ---
+            int totalExpected = com.sam.TERMINAL.entities.EntitySpawner.totalBeepCardsSpawned;
+            int heldCards = 0;
+            InventoryComponent inventory = player.getComponent(InventoryComponent.class);
+            if (inventory != null) {
+                heldCards = java.util.Collections.frequency(inventory.items, BEEP_CARD_ITEM_ID);
             }
+            playerHasBeepCard = (heldCards >= totalExpected && totalExpected > 0);
+
+            // Update dynamic missing message
+            currentMissingMessage = "Find all Beep Cards! (" + heldCards + "/" + totalExpected + ")";
+
+            // The 'E' prompt is always shown from here on (nearWinTile == true).
+            // If E is pressed, attempt the win or start the warning timer.
+            if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+                if (playerHasBeepCard) {
+                    Gdx.app.log("TERMINAL", "WIN CONDITION MET — Escaping...");
+
+                    win = true; // Set the local flag to stop system updates
+
+                    if (menuScreen != null) {
+                        if (mainGame.getCurrentLevel() == 1) {
+                            menuScreen.showGameOver(true); // This shows your "YOU ESCAPED" window
+                        } else {
+                            menuScreen.showEndScreen("neutral");
+                        }
+                    }
+                } else {
+                    // Restart (or extend) the warning display timer.
+                    missingCardWarningTimer = MISSING_CARD_DISPLAY_DURATION;
+                    Gdx.app.log("TERMINAL", "Win attempt blocked — Beep Card not found.");
+                }
+            }
+        }
+
+        // --- Level 2 accident / Ending layer: place lily, then confrontation ---
+        if (world.endingLayer != null) {
+            int[] endingXY = new int[2];
+            nearEndingTile = resolveEndingNeighborTile(world, playerTileX, playerTileY, endingXY);
+
+            if (nearEndingTile) {
+                endingSiteTileX = endingXY[0];
+                endingSiteTileY = endingXY[1];
+                float endingPromptGap = 4f;
+                endingPromptWorldX = playerTransform.pos.x + playerTransform.width + endingPromptGap;
+                endingPromptWorldY = playerCenterY - (PROMPT_HEIGHT / 2f);
+
+                if (mainGame.getCurrentLevel() == 2) {
+                    InventoryComponent inv = player.getComponent(InventoryComponent.class);
+                    boolean hasLily = inv != null && inv.hasItem("lily");
+                    boolean placed = mainGame.isLilyPlacedAtAccidentSite();
+
+                    if (hasLily && !placed && !accidentLilyPromptShown && menuScreen != null) {
+                        menuScreen.showNarrativeDialog("So this is where...");
+                        accidentLilyPromptShown = true;
+                    }
+
+                    if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+                        if (mainGame.isLilyPlacedAtAccidentSite()) {
+                            Gdx.app.log("TERMINAL", "Ending site: confrontation.");
+                            if (menuScreen != null)
+                                menuScreen.showConfrontation();
+                        } else if (inv != null && inv.hasItem("lily")) {
+                            mainGame.placeLilyAtAccidentSite(endingSiteTileX, endingSiteTileY);
+                            inv.removeItem("lily");
+                            if (menuScreen != null) {
+                                menuScreen.hideNarrativeDialog();
+                                menuScreen.refreshInventoryDisplay();
+                                menuScreen.showNarrativeDialog(
+                                        "Rest in peace to the departed. You set the lily down. The air feels solemn...",
+                                        2.8f);
+                            }
+                        } else {
+                            if (menuScreen != null) {
+                                menuScreen.showNarrativeDialog("You need a flower to pay respects...", 3f);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!nearEndingTile) {
+            accidentLilyPromptShown = false;
         }
     }
 
@@ -218,13 +268,14 @@ public class WinLossSystem extends EntitySystem {
             renderMissingCardWarning();
         }
 
-        if (!nearWinTile) {
-            return;
+        // Always draw the Press-E icon when the player is adjacent to the win tile.
+        if (nearWinTile && promptRegion != null) {
+            batch.draw(promptRegion, promptWorldX, promptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
         }
 
-        // Always draw the Press-E icon when the player is adjacent to the win tile.
-        if (promptRegion != null) {
-            batch.draw(promptRegion, promptWorldX, promptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
+        // Also draw prompt for Ending tile if near
+        if (nearEndingTile && promptRegion != null) {
+            batch.draw(promptRegion, endingPromptWorldX, endingPromptWorldY, PROMPT_WIDTH, PROMPT_HEIGHT);
         }
     }
 
@@ -281,10 +332,42 @@ public class WinLossSystem extends EntitySystem {
         return world.winningLayer.getCell(tileX, tileY) != null;
     }
 
+    /**
+     * Checks if a tile on the Ending layer is non-zero.
+     */
+    private boolean isEndingTile(TileWorldComponent world, int tileX, int tileY) {
+        if (tileX < 0 || tileX >= world.mapWidthTiles || tileY < 0 || tileY >= world.mapHeightTiles) {
+            return false;
+        }
+        if (world.endingLayer == null) {
+            return false;
+        }
+        return world.endingLayer.getCell(tileX, tileY) != null;
+    }
+
+    /**
+     * Picks the first Ending-layer tile adjacent to the player (or on their tile).
+     */
+    private boolean resolveEndingNeighborTile(TileWorldComponent world, int px, int py, int[] outTileXY) {
+        int[][] offs = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        for (int[] o : offs) {
+            int tx = px + o[0];
+            int ty = py + o[1];
+            if (isEndingTile(world, tx, ty)) {
+                outTileXY[0] = tx;
+                outTileXY[1] = ty;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void reset() {
         gameOver = false;
         win = false;
+        neutralEnd = false;
         missingCardWarningTimer = 0f;
+        accidentLilyPromptShown = false;
     }
 
     public void dispose() {
