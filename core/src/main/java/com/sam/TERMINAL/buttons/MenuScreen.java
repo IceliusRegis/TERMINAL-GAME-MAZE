@@ -838,7 +838,7 @@ public class MenuScreen {
             float vw = uiStage.getViewport().getWorldWidth();
             float vh = uiStage.getViewport().getWorldHeight();
             float panelW = com.badlogic.gdx.math.MathUtils.clamp(vw * 0.82f, 320f, 760f);
-            float panelH = com.badlogic.gdx.math.MathUtils.clamp(vh * 0.22f, 130f, 210f);
+            float panelH = com.badlogic.gdx.math.MathUtils.clamp(vh * 0.26f, 130f, 260f);
             narrativePanel.setSize(panelW, panelH);
             narrativePanel.setPosition((vw - panelW) / 2f, 8f);
             narrativePanel.getCell(narrativeLabel).width(panelW - 40f);
@@ -918,7 +918,7 @@ public class MenuScreen {
         narrativeLabel.setAlignment(Align.topLeft);
         narrativePanel.add(narrativeLabel).width(520f).left().top();
         narrativePanel.setVisible(false);
-        narrativePanel.setSize(560f, 150f);
+        narrativePanel.setSize(560f, 220f);
         narrativePanel.setPosition((uiStage.getViewport().getWorldWidth() - 560f) / 2f, 8f);
         uiStage.addActor(narrativePanel);
     }

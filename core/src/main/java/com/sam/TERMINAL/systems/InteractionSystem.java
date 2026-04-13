@@ -51,6 +51,7 @@ public class InteractionSystem extends EntitySystem {
     private boolean lilyPromptShown = false;
     private boolean papersPromptShown = false;
     private boolean studIDPromptShown = false;
+    private boolean proximityNarrativeActive = false;
 
     public InteractionSystem(SpriteBatch batch) {
         this.batch = batch;
@@ -139,6 +140,7 @@ public class InteractionSystem extends EntitySystem {
                                 game.getMenuScreen().showNarrativeDialog("A lily..? What's it doing here?");
                             }
                             lilyPromptShown = true;
+                            proximityNarrativeActive = true;
                         }
                     }
                     if ("papers".equals(interact.type)) {
@@ -150,6 +152,7 @@ public class InteractionSystem extends EntitySystem {
                                         "Ugh.. maintenance reports... who trashed this place up?");
                             }
                             papersPromptShown = true;
+                            proximityNarrativeActive = true;
                         }
                     }
                     if ("studID".equals(interact.type)) {
@@ -166,6 +169,7 @@ public class InteractionSystem extends EntitySystem {
                                 game.getMenuScreen().showNarrativeDialog(msg, 18f);
                             }
                             studIDPromptShown = true;
+                            proximityNarrativeActive = true;
                         }
                     }
 
@@ -188,6 +192,15 @@ public class InteractionSystem extends EntitySystem {
         }
         if (!nearStudIDThisFrame) {
             studIDPromptShown = false;
+        }
+
+        // Dismiss proximity narrative when the player walks away from all items
+        if (proximityNarrativeActive && !nearLilyThisFrame && !nearPapersThisFrame && !nearStudIDThisFrame) {
+            Main game = (Main) Gdx.app.getApplicationListener();
+            if (game != null && game.getMenuScreen() != null) {
+                game.getMenuScreen().hideNarrativeDialog();
+            }
+            proximityNarrativeActive = false;
         }
     }
 

@@ -180,10 +180,6 @@ public class SaveSystem extends IteratingSystem {
                         com.sam.TERMINAL.entities.EntityFactory.createPapers(
                                 (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y, game.getPapersRegion(),
                                 iData.saveId);
-                    } else if (iData.type.equals("confrontation")) {
-                        com.sam.TERMINAL.entities.EntityFactory.createConfrontationSpot(
-                                (com.badlogic.ashley.core.PooledEngine) getEngine(), iData.x, iData.y,
-                                iData.saveId);
                     }
                 }
             }

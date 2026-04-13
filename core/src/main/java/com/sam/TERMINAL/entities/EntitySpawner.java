@@ -317,16 +317,6 @@ public class EntitySpawner {
             studTileY = safe[1];
         }
         EntityFactory.createStudID(engine, studTileX * TILE_SIZE, studTileY * TILE_SIZE, studIDRegion, STUD_ID_SAVE_ID);
-
-        // Confrontation trigger — invisible spot at a fixed location
-        int confTileX = 20;
-        int confTileY = 30;
-        if (world != null) {
-            int[] confSafe = findSafeTile(world, confTileX, confTileY, 8, 0, 0, 0);
-            confTileX = confSafe[0];
-            confTileY = confSafe[1];
-        }
-        EntityFactory.createConfrontationSpot(engine, confTileX * TILE_SIZE, confTileY * TILE_SIZE, CONFRONTATION_SAVE_ID);
     }
 
     /**

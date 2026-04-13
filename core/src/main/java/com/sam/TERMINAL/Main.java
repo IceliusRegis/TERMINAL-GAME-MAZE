@@ -446,6 +446,10 @@ public class Main extends ApplicationAdapter {
                 EntitySpawner.spawnPapers(engine, papersRegion, world, pTileX, pTileY);
             }
 
+            // Hard-cap beep cards to exactly REQUIRED_BEEP_CARDS before
+            // writing the checkpoint, preventing double-spawn edge cases.
+            enforceBeepCardLimit();
+
             // Commit the post-lily checkpoint synchronously so that
             // forceImmediateLoad(TEMP_SAVE_FILE) in resetGame() will
             // always restore a world that includes spawned items.
@@ -687,7 +691,24 @@ public class Main extends ApplicationAdapter {
         for (Entity e : toRemove)
             engine.removeEntity(e);
 
+        // Purge lily memorial entities (decorative only — no InteractableComponent
+        // or EnemyComponent, so the two passes above miss them).
+        ImmutableArray<Entity> allSprites = engine.getEntitiesFor(Family.all(SpriteComponent.class).get());
+        com.badlogic.gdx.utils.Array<Entity> toRemoveMemorials = new com.badlogic.gdx.utils.Array<>();
+        for (Entity e : allSprites) {
+            SpriteComponent sc = e.getComponent(SpriteComponent.class);
+            if (sc != null && "lily_memorial".equals(sc.name)) {
+                toRemoveMemorials.add(e);
+            }
+        }
+        for (Entity e : toRemoveMemorials)
+            engine.removeEntity(e);
+
         engine.getSystem(SaveSystem.class).forceImmediateLoad(TEMP_SAVE_FILE);
+
+        // Safety net: if a pre-fix or corrupted save contained duplicate beep cards,
+        // cull them immediately so the restored world has at most REQUIRED_BEEP_CARDS.
+        enforceBeepCardLimit();
 
         ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
@@ -808,6 +829,10 @@ public class Main extends ApplicationAdapter {
                 EntitySpawner.spawnLevel2KeyItems(engine, studIDRegion);
             }
 
+            // Hard-cap beep cards to exactly REQUIRED_BEEP_CARDS before
+            // writing the Level 2 checkpoint, preventing double-spawn edge cases.
+            enforceBeepCardLimit();
+
             // Garc's Level 2 Enemy Spawn approach
             monsterSpawnTimer = 30.0f;
 
@@ -847,6 +872,60 @@ public class Main extends ApplicationAdapter {
             buffer.add(e);
         for (Entity e : buffer)
             engine.removeEntity(e);
+    }
+
+    /**
+     * Defensive hard cap: ensures no more than {@link EntitySpawner#REQUIRED_BEEP_CARDS}
+     * active beep-card entities exist on the floor (i.e. not yet picked up).
+     * <p>
+     * Floor beep cards are identified by having both an {@link InteractableComponent}
+     * with {@code type == "beep"} and {@code isActive == true}, and a
+     * {@link SpriteComponent} still present (picked-up cards lose the sprite).
+     * <p>
+     * If more than the limit are found, the excess are removed from the engine
+     * (culling from the end of iteration order) and
+     * {@link EntitySpawner#totalBeepCardsSpawned} is corrected to match.
+     */
+    private void enforceBeepCardLimit() {
+        final int limit = EntitySpawner.REQUIRED_BEEP_CARDS;
+
+        // 1. Collect every active, on-the-floor beep card entity.
+        ImmutableArray<Entity> allInteractables = engine.getEntitiesFor(
+                Family.all(InteractableComponent.class, SpriteComponent.class).get());
+
+        java.util.List<Entity> floorBeepCards = new java.util.ArrayList<>();
+        for (Entity entity : allInteractables) {
+            InteractableComponent interactable = entity.getComponent(InteractableComponent.class);
+            if (interactable != null && "beep".equals(interactable.type) && interactable.isActive) {
+                floorBeepCards.add(entity);
+            }
+        }
+
+        int actualCount = floorBeepCards.size();
+
+        // 2. If over the limit, remove the excess (cull from the end of the list).
+        if (actualCount > limit) {
+            // Buffer the entities to remove before mutating the engine,
+            // following the same pattern used throughout resetGame().
+            com.badlogic.gdx.utils.Array<Entity> toRemove = new com.badlogic.gdx.utils.Array<>();
+            for (int i = limit; i < actualCount; i++) {
+                toRemove.add(floorBeepCards.get(i));
+            }
+            for (Entity entity : toRemove) {
+                engine.removeEntity(entity);
+            }
+
+            EntitySpawner.totalBeepCardsSpawned = limit;
+            Gdx.app.log("Main", "enforceBeepCardLimit: culled "
+                    + (actualCount - limit) + " excess beep card(s)");
+        } else {
+            // 3. No removal needed — still confirm the counter is accurate.
+            if (EntitySpawner.totalBeepCardsSpawned != limit) {
+                Gdx.app.log("Main", "enforceBeepCardLimit: corrected totalBeepCardsSpawned from "
+                        + EntitySpawner.totalBeepCardsSpawned + " to " + limit);
+                EntitySpawner.totalBeepCardsSpawned = limit;
+            }
+        }
     }
 
     private void onMonsterSpawnTimerElapsed() {
