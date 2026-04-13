@@ -231,6 +231,30 @@ public class SaveSystem extends IteratingSystem {
         }
     }
 
+    /**
+     * Mirrors {@link #forceImmediateLoad(String)} for the save path.
+     * Builds a snapshot, processes all persistence entities synchronously,
+     * and writes the result to disk — all within this single call.
+     * Use this instead of {@link #triggerManualSave(String)} when the
+     * save MUST be committed before any subsequent load could fire
+     * (e.g. level-start checkpoints).
+     */
+    public void forceImmediateSave(String fileName) {
+        this.currentSaveFile = fileName;
+        this.saving = true;
+        this.loading = false;
+        this.pendingSaveData = new GameData();
+        this.pendingSaveData.runId = this.currentRunId;
+
+        super.update(0f); // Processes all persistence entities synchronously
+
+        SaveManager.save(pendingSaveData, currentSaveFile);
+        System.out.println("Force saved to: " + currentSaveFile);
+
+        saving = false;
+        pendingSaveData = null;
+    }
+
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         // This method runs ONCE for every valid entity found.

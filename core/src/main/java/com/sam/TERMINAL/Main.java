@@ -445,6 +445,11 @@ public class Main extends ApplicationAdapter {
             if (papersRegion != null) {
                 EntitySpawner.spawnPapers(engine, papersRegion, world, pTileX, pTileY);
             }
+
+            // Commit the post-lily checkpoint synchronously so that
+            // forceImmediateLoad(TEMP_SAVE_FILE) in resetGame() will
+            // always restore a world that includes spawned items.
+            engine.getSystem(SaveSystem.class).forceImmediateSave(TEMP_SAVE_FILE);
         }
     }
 
@@ -704,35 +709,7 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        ImmutableArray<Entity> worlds = engine.getEntitiesFor(Family.all(TileWorldComponent.class).get());
-        TileWorldComponent world = worlds.size() > 0 ? worlds.first().getComponent(TileWorldComponent.class) : null;
-        if (world != null) {
-            int pTileX = 14;
-            int pTileY = 35;
-            if (players.size() > 0) {
-                TransformComponent t = players.first().getComponent(TransformComponent.class);
-                if (t != null) {
-                    pTileX = (int) (t.pos.x / 32f);
-                    pTileY = (int) (t.pos.y / 32f);
-                }
-            }
-            // Check if player already owns a flashlight (from restored inventory)
-            boolean playerHasFlashlight = false;
-            if (players.size() > 0) {
-                InventoryComponent rInv = players.first().getComponent(InventoryComponent.class);
-                playerHasFlashlight = (rInv != null && rInv.hasItem("flashlight"));
-            }
-
-            EntitySpawner.spawnItems(engine, beepRegion, flashlightRegion, batteryRegion, potionRegion, world, pTileX,
-                    pTileY, world.mapWidthTiles, world.mapHeightTiles, playerHasFlashlight);
-
-            // Re-spawn Level 2 key items on reset if we're in Level 2
-            if (currentLevel == 2 && studIDRegion != null) {
-                EntitySpawner.spawnLevel2KeyItems(engine, studIDRegion);
-            }
-
-            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
-        }
+        engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
 
         if (players.size() > 0 && lightingSystem != null) {
             Entity rPlayer = players.first();
@@ -744,6 +721,14 @@ public class Main extends ApplicationAdapter {
         lilyPlacedAtAccidentSite = false;
         stopEndingMusicAndResumeGameplay();
         menuScreen.resetUI();
+
+        // Re-initialize the monster spawn timer based on current game state
+        // so the ghost will respawn after a death/restart.
+        if (currentLevel == 2) {
+            monsterSpawnTimer = 30.0f;
+        } else if (lilyTriggered) {
+            monsterSpawnTimer = 45.0f;
+        }
     }
 
     public void loadLevelTwo() {
@@ -836,7 +821,7 @@ public class Main extends ApplicationAdapter {
                 }
             }
 
-            engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
+            engine.getSystem(SaveSystem.class).forceImmediateSave(TEMP_SAVE_FILE);
         }
 
         if (players.size() > 0 && lightingSystem != null) {
