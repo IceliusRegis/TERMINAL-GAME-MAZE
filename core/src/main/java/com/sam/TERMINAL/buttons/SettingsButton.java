@@ -15,8 +15,8 @@ import com.badlogic.gdx.utils.Array;
 public class SettingsButton {
     private Array<Texture> textures = new Array<>();
 
-    // UPDATED: Constructor now accepts onClose, onRefresh, and onSave
-    public SettingsButton(Table settingsRoot, final Runnable onClose, final Runnable onSave, final Runnable onReset) {
+    // UPDATED: Constructor now accepts onClose, onSave, onReset, and onQuit
+    public SettingsButton(Table settingsRoot, final Runnable onClose, final Runnable onSave, final Runnable onReset, final Runnable onQuit) {
         settingsRoot.clear();
         settingsRoot.setFillParent(true);
 
@@ -65,7 +65,7 @@ public class SettingsButton {
         quitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                Gdx.app.exit();
+                onQuit.run();
             }
         });
 

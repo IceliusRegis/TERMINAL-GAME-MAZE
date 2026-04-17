@@ -22,6 +22,13 @@ public class GameData {
     public float playerBattery = 100f;
     public int totalBeepCardsSpawned = 0;
 
+    /** Remaining seconds on the monster spawn countdown (-1 = inactive). */
+    public float monsterSpawnTimer = -1f;
+    /** Which level the player was on when saving (1 or 2). */
+    public int currentLevel = 1;
+    /** Whether the lily event has already been triggered. */
+    public boolean lilyTriggered = false;
+
     // We'll use a simple list of Strings for item IDs (e.g., "key_card_blue")
     public List<String> inventoryItems;
 

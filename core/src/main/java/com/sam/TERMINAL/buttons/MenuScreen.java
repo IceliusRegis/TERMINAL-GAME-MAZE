@@ -176,6 +176,13 @@ public class MenuScreen {
                     mainGame.resetGame();
                     isSettingsVisible = false;
                     updateInputProcessor();
+                },
+                () -> {
+                    // Quick-save before returning to menu so the Continue
+                    // button on the title screen resumes from this point.
+                    saveMapLogic();
+                    isSettingsVisible = false;
+                    Gdx.app.postRunnable(() -> mainGame.returnToTitleScreen(false));
                 });
 
         Table inventoryRoot = new Table();

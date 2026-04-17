@@ -243,6 +243,22 @@ public class Main extends ApplicationAdapter {
         return currentLevel;
     }
 
+    public void setCurrentLevel(int level) {
+        this.currentLevel = level;
+    }
+
+    public float getMonsterSpawnTimer() {
+        return monsterSpawnTimer;
+    }
+
+    public void setMonsterSpawnTimer(float timer) {
+        this.monsterSpawnTimer = timer;
+    }
+
+    public void setLilyTriggered(boolean triggered) {
+        this.lilyTriggered = triggered;
+    }
+
     public boolean isLilyPlacedAtAccidentSite() {
         return lilyPlacedAtAccidentSite;
     }
@@ -620,8 +636,16 @@ public class Main extends ApplicationAdapter {
 
         currentLevel = 1;
 
+        // Determine which map to load. If we have a save, peek at the
+        // saved level so we load the correct TMX before spawning.
+        String mapFile = "maps/mapTest.tmx";
+        if (mainSave != null && mainSave.currentLevel == 2) {
+            mapFile = "maps/Level2.tmx";
+            currentLevel = 2;
+        }
+
         mapManager = new MapManager(engine);
-        mapManager.loadMap("maps/mapTest.tmx");
+        mapManager.loadMap(mapFile);
 
         if (mainSave != null) {
             boolean snapshotIsValid = false;
@@ -634,6 +658,11 @@ public class Main extends ApplicationAdapter {
             EntitySpawner.spawnForLoad(engine, mainSave, beepRegion, walkAnimation, idleAnimation,
                     enemyAnimation, flashlightRegion, batteryRegion, potionRegion);
             engine.getSystem(SaveSystem.class).triggerManualLoad(MAIN_SAVE_FILE);
+
+            // Restore runtime flags from the save data
+            monsterSpawnTimer = mainSave.monsterSpawnTimer;
+            currentLevel = mainSave.currentLevel;
+            lilyTriggered = mainSave.lilyTriggered;
 
             if (!snapshotIsValid) {
                 engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
@@ -652,10 +681,31 @@ public class Main extends ApplicationAdapter {
             engine.getSystem(SaveSystem.class).triggerManualSave(TEMP_SAVE_FILE);
         }
 
+        // Hide the monster timer label — it will reappear on its own if
+        // monsterSpawnTimer > 0 during the next render frame.
+        if (menuScreen != null) menuScreen.hideMonsterTimer();
+
+        // Restore music based on game progress
+        if (mainSave != null && lilyTriggered) {
+            // Player already triggered lily — should have triBGM playing
+            if (triBgmMusic == null && Gdx.files.internal("music/triBGM.wav").exists()) {
+                triBgmMusic = Gdx.audio.newMusic(Gdx.files.internal("music/triBGM.wav"));
+                triBgmMusic.setLooping(true);
+            }
+            if (triBgmMusic != null) {
+                triBgmMusic.setVolume(0.65f);
+                if (!triBgmMusic.isPlaying()) triBgmMusic.play();
+            }
+            // Lighting should be enabled
+            if (lightingSystem != null) lightingSystem.lightingEnabled = true;
+        }
+
         ImmutableArray<Entity> players = engine.getEntitiesFor(Family.all(PlayerComponent.class).get());
         if (players.size() > 0) {
-            lightingSystem.createPlayerLight(players.first(), false);
             Entity player = players.first();
+            InventoryComponent inv = player.getComponent(InventoryComponent.class);
+            boolean hasFlashlight = inv != null && inv.hasItem("flashlight");
+            lightingSystem.createPlayerLight(player, hasFlashlight);
             TransformComponent t = player.getComponent(TransformComponent.class);
             if (t != null) {
                 camera.position.x = t.pos.x;
@@ -948,13 +998,47 @@ public class Main extends ApplicationAdapter {
         }
     }
 
+    /**
+     * Returns to the title screen, deleting save files so that
+     * "New Game" starts completely fresh. Used by ending cutscenes.
+     */
     public void returnToTitleScreen() {
+        returnToTitleScreen(true);
+    }
+
+    /**
+     * Returns to the title screen.
+     * @param deleteSaves if true, all save files are deleted (post-ending fresh start);
+     *                    if false, saves are preserved so the Continue button resumes play.
+     */
+    public void returnToTitleScreen(boolean deleteSaves) {
         // Stop all active ending/gameplay music
         stopAndDisposeEndingMusic();
         stopTutorialMusic(); // disposes tutorialMusic + triBgmMusic
 
-        // Clear the engine and UI
+        // Clear the engine: remove all entities AND systems so that
+        // startGameProper() can re-add them without duplicates.
         engine.removeAllEntities();
+
+        // Ashley has no removeAllSystems() — iterate a snapshot to avoid CME.
+        ImmutableArray<com.badlogic.ashley.core.EntitySystem> systems = engine.getSystems();
+        java.util.List<com.badlogic.ashley.core.EntitySystem> snapshot = new java.util.ArrayList<>();
+        for (com.badlogic.ashley.core.EntitySystem sys : systems) {
+            snapshot.add(sys);
+        }
+        for (com.badlogic.ashley.core.EntitySystem sys : snapshot) {
+            engine.removeSystem(sys);
+        }
+
+        lightingSystem = null;
+        debugManager = null;
+
+        // Dispose map resources
+        if (mapManager != null) {
+            mapManager.dispose();
+            mapManager = null;
+        }
+
         if (menuScreen != null) {
             menuScreen.dispose();
             menuScreen = null;
@@ -981,11 +1065,13 @@ public class Main extends ApplicationAdapter {
         triBgmVolumeSavedBeforeLevelLoadDuck = -1f;
         levelStartInventorySnapshot.clear();
 
-        // Delete save files so "New Game" starts completely fresh
-        SaveManager.delete(MAIN_SAVE_FILE);
-        SaveManager.delete(TEMP_SAVE_FILE);
+        if (deleteSaves) {
+            // Delete save files so "New Game" starts completely fresh
+            SaveManager.delete(MAIN_SAVE_FILE);
+            SaveManager.delete(TEMP_SAVE_FILE);
+        }
 
-        // Return to Title state (hasSave will now be false — no continue slot)
+        // Return to Title state — hasSave reflects whether a save file exists
         boolean hasSave = SaveManager.load(MAIN_SAVE_FILE) != null;
         titleScreen = new TitleScreen(batch, hasSave, this::onTitleScreenChoice);
         flowState = FlowState.TITLE;

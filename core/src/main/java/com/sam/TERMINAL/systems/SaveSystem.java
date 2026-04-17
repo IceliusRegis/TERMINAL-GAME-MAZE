@@ -281,6 +281,12 @@ public class SaveSystem extends IteratingSystem {
                         pendingSaveData.inventoryItems.clear();
                         pendingSaveData.inventoryItems.addAll(pInventory.items);
                     }
+
+                    // Persist Main's runtime state alongside player data
+                    com.sam.TERMINAL.Main game = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                    pendingSaveData.monsterSpawnTimer = game.getMonsterSpawnTimer();
+                    pendingSaveData.currentLevel = game.getCurrentLevel();
+                    pendingSaveData.lilyTriggered = game.isLilyTriggered();
                     break;
 
                 case "INTERACTABLE":
@@ -330,6 +336,12 @@ public class SaveSystem extends IteratingSystem {
                         pInventoryLoad.items.addAll(loadedData.inventoryItems);
                         System.out.println("Inventory Loaded: " + pInventoryLoad.items.size() + " item/s.");
                     }
+
+                    // Restore Main's runtime state from save data
+                    com.sam.TERMINAL.Main gameLoad = (com.sam.TERMINAL.Main) Gdx.app.getApplicationListener();
+                    gameLoad.setMonsterSpawnTimer(loadedData.monsterSpawnTimer);
+                    gameLoad.setCurrentLevel(loadedData.currentLevel);
+                    gameLoad.setLilyTriggered(loadedData.lilyTriggered);
 
                     break;
 
